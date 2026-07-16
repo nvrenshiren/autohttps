@@ -3,9 +3,10 @@
 //! `tasks.status=queued` 行即待办队列;单进程单 worker 按 `queued_at` FIFO 取出,
 //! `queued→running→succeeded/failed`(TT2–TT4),据结果驱动证书状态机(唯一真相在 core,不复述)。
 //!
-//! **本切片范围**:仅承接 `self_signed` 的 `issue`(T2→T3/T4)与 `revoke`(T18/T19);
-//! acme / renew / retry 尚未接入(留后续),遇到即**跳过**(保持 queued,现状打桩)。
-//! 日志脱敏(AR4/L6):`task_log_entries.message` **绝不含任何密钥材料**。
+//! **本切片范围**:承接 `self_signed` 的 `issue`(T2→T3/T4)、`renew`(T12/T13,经原根 CA 重签、
+//! 刷新同一行 serial/有效期,不新建实体 DC1)与 `revoke`(T18/T19);**acme 尚未接入**(留后续),
+//! 遇到 acme 证书即**跳过**(保持 queued,现状打桩)。日志脱敏(AR4/L6):`task_log_entries.message`
+//! **绝不含任何密钥材料**。
 
 use crate::ca;
 use crate::domain::enums::{CertificateStatus, IssuanceMethod, RootCaStatus, TaskStatus, TaskType};
@@ -46,7 +47,7 @@ pub fn spawn(ctx: CoreContext) -> tokio::task::JoinHandle<()> {
 
 /// 处理一个可执行任务;返回是否处理了任务(`false`=当前无本切片可执行任务,应休眠)。
 ///
-/// 可执行 = `issue`/`revoke` 且关联证书存在且为 `self_signed`。其余(acme / renew)保持 `queued`。
+/// 可执行 = 关联证书存在且为 `self_signed`(issue/renew/revoke 三类均承接)。acme 证书保持 `queued`。
 pub async fn tick(ctx: &CoreContext) -> CoreResult<bool> {
     let db = &ctx.db;
     let queued = tasks::Entity::find()
@@ -57,10 +58,6 @@ pub async fn tick(ctx: &CoreContext) -> CoreResult<bool> {
         .await?;
 
     for task in queued {
-        // 本切片仅 issue / revoke;renew 留后续(保持 queued)
-        if !matches!(task.task_type, TaskType::Issue | TaskType::Revoke) {
-            continue;
-        }
         let cert = certificates::Entity::find_by_id(&task.certificate_id).one(db).await?;
         let Some(cert) = cert else {
             // 证书已删除(删除会清理未完成任务;此为兜底)→ 置失败,不再纠缠
@@ -97,9 +94,8 @@ async fn claim_and_run(
 
     let result = match task.task_type {
         TaskType::Issue => run_issue_self_signed(ctx, &task, &cert).await,
+        TaskType::Renew => run_renew_self_signed(ctx, &task, &cert).await,
         TaskType::Revoke => run_revoke_self_signed(ctx, &task, &cert).await,
-        // tick 已过滤,不会到达
-        TaskType::Renew => Err(CoreError::internal("renew 执行器未接入(本切片)")),
     };
 
     match result {
@@ -183,6 +179,88 @@ async fn run_issue_self_signed(
     .await?;
 
     Ok(format!("签发成功(序列号 {})", leaf.serial_number))
+}
+
+/// self_signed 续签(T12 renewing → valid):经**原根 CA**重签叶子(换新私钥),**刷新同一证书行**的
+/// serial/指纹/有效期/文件引用(不新建实体,DC1)。旧文件材料随之清理。
+async fn run_renew_self_signed(
+    ctx: &CoreContext,
+    task: &tasks::Model,
+    cert: &certificates::Model,
+) -> CoreResult<String> {
+    let db = &ctx.db;
+
+    // 保持/确认 renewing(证书服务发起时已置;此处幂等,兼容重试链直达)
+    update_cert_status(ctx, &cert.id, CertificateStatus::Renewing).await?;
+    log(ctx, &task.id, "info", "证书置为续签中").await?;
+
+    // 原根 CA(仍须 active)
+    let root_ca_id = cert
+        .root_ca_id
+        .clone()
+        .ok_or_else(|| CoreError::internal("self_signed 证书缺少根 CA 引用"))?;
+    let root_ca = root_cas::Entity::find_by_id(&root_ca_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::InvalidRootCaReference, "根 CA 不存在"))?;
+    if root_ca.status != RootCaStatus::Active {
+        return Err(CoreError::new(ErrorCode::RootCaExpired, "根 CA 已过期,拒绝续签"));
+    }
+    log(ctx, &task.id, "info", &format!("经原根 CA「{}」重签", root_ca.name)).await?;
+
+    let hostnames = san_hostnames(db, &cert.id).await?;
+    if hostnames.is_empty() {
+        return Err(CoreError::internal("证书无关联域名(SAN 为空),无法续签"));
+    }
+
+    // 重签叶子(rcgen 每次生成新密钥 → 换新私钥,呼应 T20 语义)
+    let root_key_pem = String::from_utf8(ctx.secrets.load(&root_ca.private_key_ref)?)
+        .map_err(|_| CoreError::internal("根 CA 私钥材料损坏"))?;
+    let leaf = ca::sign_leaf(&root_ca.cert_pem, &root_key_pem, &hostnames, LEAF_VALIDITY_DAYS)?;
+    log(
+        ctx,
+        &task.id,
+        "info",
+        &format!("续签完成,新序列号 {},有效期至 {}", leaf.serial_number, leaf.not_after),
+    )
+    .await?;
+
+    // 落新材料 → 记旧引用备清理
+    let old_cert_ref = cert.cert_pem_ref.clone();
+    let old_key_ref = cert.private_key_ref.clone();
+    let cert_ref = new_id();
+    ctx.secrets.store(&cert_ref, leaf.cert_pem.as_bytes())?;
+    let key_ref = new_id();
+    ctx.secrets.store(&key_ref, leaf.key_pem.as_bytes())?;
+
+    // T12:renewing → valid(刷新同一行标识/有效期/引用,清 last_error;DC1 不新建实体)
+    let now = now_rfc3339();
+    certificates::ActiveModel {
+        id: Set(cert.id.clone()),
+        status: Set(CertificateStatus::Valid),
+        serial_number: Set(Some(leaf.serial_number.clone())),
+        fingerprint: Set(Some(leaf.fingerprint)),
+        not_before: Set(Some(leaf.not_before)),
+        not_after: Set(Some(leaf.not_after)),
+        issued_at: Set(Some(now.clone())),
+        cert_pem_ref: Set(Some(cert_ref)),
+        private_key_ref: Set(Some(key_ref)),
+        last_error: Set(None),
+        updated_at: Set(now),
+        ..Default::default()
+    }
+    .update(db)
+    .await?;
+
+    // 清理旧文件材料(避免孤儿密文;换新私钥后旧私钥应销毁)
+    if let Some(r) = old_cert_ref {
+        let _ = ctx.secrets.remove(&r);
+    }
+    if let Some(r) = old_key_ref {
+        let _ = ctx.secrets.remove(&r);
+    }
+
+    Ok(format!("续签成功(新序列号 {})", leaf.serial_number))
 }
 
 /// self_signed 吊销(T18 revoking → revoked):根 CA 记本地作废 + 证书转 revoked。

@@ -1,12 +1,14 @@
 /**
  * 证书详情(certificates/detail PRD)—— 信息 + 生命周期操作(按状态启用/禁用 + Tooltip 原因,H4;
- * 破坏性走 AlertDialog,H5)。里程碑1:续签/重试/吊销/导出执行器打桩 → 明确提示"尚未实现";删除为真实。
+ * 破坏性走 AlertDialog,H5)。续签 / 重试 / 吊销 / 删除接真端点;导出经内容选择面板(私钥走风险确认 H6)
+ * + lib/download 二进制下载。
  */
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   Ban,
   Download,
+  KeyRound,
   ListChecks,
   Loader2,
   RotateCw,
@@ -17,6 +19,7 @@ import {
 import { useCertificate, useDeleteCertificate } from "@/lib/queries";
 import type { CertificateStatus } from "@/bindings";
 import { api, ApiError } from "@/lib/api";
+import { downloadFile } from "@/lib/download";
 import { canDelete, canRenew, canRetry, canRevoke, isExportable, isInProgress } from "@/lib/cert-rules";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState, ErrorState } from "@/components/shared/states";
@@ -38,10 +41,36 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { absoluteUtc, daysLabel, relativeTime } from "@/lib/time";
 import { toast } from "@/components/ui/sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queries";
+
+/** 导出内容预设(§2.8 parts 词表;非 §4.3 状态枚举,可用字面量)。 */
+const EXPORT_PRESETS: { value: string; label: string; hasKey: boolean }[] = [
+  { value: "fullchain", label: "完整证书链(叶子 + 链)", hasKey: false },
+  { value: "leaf", label: "仅叶子证书", hasKey: false },
+  { value: "chain", label: "仅证书链(签发根 CA)", hasKey: false },
+  { value: "private_key", label: "仅私钥(敏感)", hasKey: true },
+  { value: "fullchain,private_key", label: "完整链 + 私钥(部署用,敏感)", hasKey: true },
+];
 
 function GatedButton({
   enabled,
@@ -96,6 +125,9 @@ export function CertificateDetailPage() {
   const del = useDeleteCertificate();
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportParts, setExportParts] = useState("fullchain");
+  const [keyAck, setKeyAck] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const runAction = async (path: string, label: string) => {
@@ -108,31 +140,31 @@ export function CertificateDetailPage() {
       qc.invalidateQueries({ queryKey: qk.tasks });
       qc.invalidateQueries({ queryKey: qk.dashboard });
     } catch (e) {
-      if (e instanceof ApiError && e.code === "not_implemented") {
-        toast.info(`${label}:执行器为里程碑1 打桩,尚未接入 ACME/CA`);
-      } else if (e instanceof ApiError) {
-        toast.error(e.message);
-      } else {
-        toast.error(`${label}失败`);
-      }
+      toast.error(e instanceof ApiError ? e.message : `${label}失败`);
     } finally {
       setBusy(false);
     }
   };
 
-  const onExport = async () => {
+  const openExport = () => {
+    setExportParts("fullchain");
+    setKeyAck(false);
+    setExportOpen(true);
+  };
+
+  const needsKeyAck = EXPORT_PRESETS.find((p) => p.value === exportParts)?.hasKey ?? false;
+
+  const onDownload = async () => {
+    const primary = data?.domains[0]?.hostname?.replace(/[^a-zA-Z0-9.-]/g, "_") ?? id;
+    const suffix = exportParts.replace(/,/g, "+");
+    const q = `parts=${exportParts}${needsKeyAck ? "&acknowledgeKeyExport=true" : ""}`;
     setBusy(true);
     try {
-      await api.get(`/certificates/${id}/export?parts=fullchain`);
+      await downloadFile(`/certificates/${id}/export?${q}`, `${primary}-${suffix}.pem`);
       toast.success("导出完成");
+      setExportOpen(false);
     } catch (e) {
-      if (e instanceof ApiError && e.code === "not_implemented") {
-        toast.info("导出:里程碑1 打桩,尚未实现");
-      } else if (e instanceof ApiError) {
-        toast.error(e.message);
-      } else {
-        toast.error("导出失败");
-      }
+      toast.error(e instanceof Error ? e.message : "导出失败");
     } finally {
       setBusy(false);
     }
@@ -214,7 +246,7 @@ export function CertificateDetailPage() {
             <GatedButton
               enabled={isExportable(s) && !busy}
               reason="尚无本地证书文件,不可导出"
-              onClick={onExport}
+              onClick={openExport}
             >
               <Download />
               导出
@@ -263,7 +295,7 @@ export function CertificateDetailPage() {
             ) : (
               " "
             )}
-            。取消进行中操作请前往该任务详情(任务执行器 / 取消联动为里程碑后续)。
+            。取消进行中操作请前往该任务详情发起。
           </AlertDescription>
         </Alert>
       )}
@@ -394,6 +426,69 @@ export function CertificateDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 导出内容选择面板(H6:含私钥走风险确认) */}
+      <Dialog open={exportOpen} onOpenChange={(o) => !busy && setExportOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>导出证书</DialogTitle>
+            <DialogDescription>
+              选择导出内容;PEM 文件下载(服务器形态经浏览器下载,桌面形态保存到本地路径)。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="export-parts">导出内容</Label>
+              <Select
+                value={exportParts}
+                onValueChange={(v) => {
+                  setExportParts(v);
+                  setKeyAck(false);
+                }}
+              >
+                <SelectTrigger id="export-parts" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXPORT_PRESETS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {needsKeyAck && (
+              <Alert variant="destructive">
+                <KeyRound />
+                <AlertTitle>私钥属敏感数据</AlertTitle>
+                <AlertDescription>
+                  <p>
+                    导出的私钥可解密该证书的全部流量,请务必妥善保管、切勿外泄或经不安全渠道传输。
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Switch id="key-ack" checked={keyAck} onCheckedChange={setKeyAck} />
+                    <Label htmlFor="key-ack" className="cursor-pointer font-normal">
+                      我已知晓风险,确认导出私钥
+                    </Label>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" disabled={busy} onClick={() => setExportOpen(false)}>
+              取消
+            </Button>
+            <Button disabled={busy || (needsKeyAck && !keyAck)} onClick={() => void onDownload()}>
+              {busy && <Loader2 className="animate-spin" />}
+              <Download />
+              下载
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

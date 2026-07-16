@@ -1,12 +1,13 @@
 /**
  * 任务详情(tasks/detail PRD)—— 完整信息 + 执行日志(mono、脱敏,H8)+ 重试链(前序 / 后继逐条可跳)。
- * 重试仅 failed、取消仅 queued/running(H4 禁用 + Tooltip);二次确认后端点为里程碑1 501 → toast。
+ * 重试仅 failed、取消仅 queued/running(H4 禁用 + Tooltip);二次确认后接真端点(取消驱动证书回退)。
  * 关联证书可跳其详情;证书已删除则标注(DEC3)。
  */
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ListChecks, Loader2, RotateCw, TriangleAlert, XCircle } from "lucide-react";
-import { useTask, useTaskLogs } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk, useTask, useTaskLogs } from "@/lib/queries";
 import { api, ApiError } from "@/lib/api";
 import { canCancelTask, canRetryTask } from "@/lib/task-rules";
 import { PageHeader } from "@/components/shared/page-header";
@@ -99,6 +100,7 @@ const LEVEL_CLASS: Record<string, string> = {
 export function TaskDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data, isLoading, isError, error, refetch } = useTask(id);
   const logs = useTaskLogs(id);
   const [confirm, setConfirm] = useState<"retry" | "cancel" | null>(null);
@@ -110,15 +112,16 @@ export function TaskDetailPage() {
     try {
       await api.post(`/tasks/${id}/${kind}`);
       toast.success(`${label}已发起`);
+      // 任务态变化联动证书态(回退 / 派生),失效相关缓存
       void refetch();
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "not_implemented") {
-        toast.info(`任务${label}:执行器 + 证书联动为里程碑后续,尚未接入`);
-      } else if (e instanceof ApiError) {
-        toast.error(e.message);
-      } else {
-        toast.error(`${label}失败`);
+      qc.invalidateQueries({ queryKey: qk.tasks });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
+      if (data?.certificateId) {
+        qc.invalidateQueries({ queryKey: qk.certificate(data.certificateId) });
+        qc.invalidateQueries({ queryKey: qk.certificates });
       }
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : `${label}失败`);
     } finally {
       setBusy(false);
       setConfirm(null);

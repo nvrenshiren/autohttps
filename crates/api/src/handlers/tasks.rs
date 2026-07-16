@@ -1,13 +1,12 @@
-//! tasks handlers —— list/detail/logs 真实读取;retry/cancel 打桩 501(依赖执行器 + 证书回退联动)。
+//! tasks handlers —— list/detail/logs 读取;retry(派生新任务 TT7)/ cancel(TT5/TT6 + 证书回退)真实。
 
 use crate::dto::{self, Page, TaskDetail, TaskLogEntry, TaskSummary};
-use crate::error::{ApiError, ApiResult};
+use crate::error::ApiResult;
 use crate::parse::{parse_enum_list, parse_enum_opt};
 use crate::req::{LogsQuery, TaskListQuery};
 use crate::state::AppState;
 use autohttps_core::enums::{TaskStatus, TaskTrigger, TaskType};
 use autohttps_core::services::tasks;
-use autohttps_core::ErrorCode;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -46,10 +45,21 @@ pub async fn logs(
     Ok(Json(dto::page_of(paged, dto::task_log_entry)))
 }
 
-pub async fn retry(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(ApiError::new(ErrorCode::NotImplemented, "任务重试:执行器为里程碑1 打桩"))
+/// 手动重试(B1,TT7)—— 对失败任务派生同类型新任务;原失败任务留痕。202。
+pub async fn retry(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<TaskDetail>)> {
+    let detail = tasks::retry_task(&st.ctx, &id).await?;
+    Ok((StatusCode::ACCEPTED, Json(dto::task_detail(detail))))
 }
 
-pub async fn cancel(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(ApiError::new(ErrorCode::NotImplemented, "任务取消:执行器 + 证书回退联动为里程碑1 打桩"))
+/// 取消(B2,TT5/TT6)—— queued→200 直接取消;running→202 尽力取消;驱动证书回退 T21–T24。
+pub async fn cancel(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<TaskDetail>)> {
+    let outcome = tasks::cancel_task(&st.ctx, &id).await?;
+    let code = if outcome.was_running { StatusCode::ACCEPTED } else { StatusCode::OK };
+    Ok((code, Json(dto::task_detail(outcome.detail))))
 }

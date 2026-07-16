@@ -141,6 +141,17 @@ pub struct LogsQuery {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+pub struct ExportQuery {
+    /// 逗号分隔:leaf|chain|fullchain|private_key;默认 fullchain(§2.8)。
+    pub parts: Option<String>,
+    /// MVP 仅 pem。
+    pub format: Option<String>,
+    /// 含 private_key 时须为 true,否则 422 key_export_not_acknowledged。
+    pub acknowledge_key_export: Option<bool>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountListQuery {
     pub page: Option<u64>,
     pub page_size: Option<u64>,

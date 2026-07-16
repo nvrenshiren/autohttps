@@ -1,7 +1,8 @@
 //! 内嵌 SPA(rust-embed)—— 前端 Vite 构建产物内嵌进可执行文件,axum 以静态资源提供(ARCHITECTURE §4.3)。
 //!
-//! 内嵌目录为 `frontend/dist`(需先 `npm run build`;仓库含占位 index.html 以便 cargo 先行编译)。
-//! 未命中的路径回退 `index.html`,交给前端 client-side 路由(SPA fallback)。
+//! 内嵌目录为 `frontend/dist`(需先 `npm run build` 才有真实产物)。fresh clone 未构建前端时,
+//! `build.rs` 于编译期兜底创建空占位目录,使 `cargo build` 不依赖先跑前端;此时目录为空,运行期
+//! 静态资源全部未命中 → 回退提示"请先构建前端"。命中时未匹配路径回退 `index.html`(SPA fallback)。
 
 use axum::http::{header, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};

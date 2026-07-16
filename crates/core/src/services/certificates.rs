@@ -1,7 +1,8 @@
 //! 证书服务(API certificates)—— 全局枢纽。
 //!
-//! 里程碑1:list / detail / create(全 §2.3 校验)/ delete 为**真实实现**;
-//! renew / retry / revoke / export 依赖执行器 + ACME/CA,**在 api 层打桩 501**(见 handlers)。
+//! list / detail / create(全 §2.3 校验)/ delete / revoke / renew / retry / export 为**真实实现**;
+//! 异步执行(签发/续签/吊销)委托执行器(self_signed 已接入,acme 待后续)。取消经 tasks 端点,
+//! 驱动本模块 `rollback_on_cancel`(T21–T24)。
 
 use crate::domain::enums::{
     AcmeAccountStatus, CertificateStatus, IssuanceMethod, RootCaStatus, TaskStatus, TaskTrigger,
@@ -9,12 +10,13 @@ use crate::domain::enums::{
 };
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
 use crate::persistence::entities::{
-    acme_accounts, certificate_domains, certificates, domains, root_cas, settings, tasks,
+    acme_accounts, certificate_domains, certificates, domains, internal_cert_revocations, root_cas,
+    settings, tasks,
 };
 use crate::services::context::CoreContext;
 use crate::services::pagination::{Paged, PageParams};
 use crate::services::settings::SINGLETON_ID;
-use crate::util::{new_id, now_rfc3339};
+use crate::util::{days_until, new_id, now_rfc3339};
 use sea_orm::*;
 
 pub struct DomainRefData {
@@ -62,6 +64,114 @@ pub struct IssueCertInput {
     pub domain_ids: Vec<String>,
     pub acme_account_id: Option<String>,
     pub root_ca_id: Option<String>,
+}
+
+/// 入队一个任务(TT1)。触发方式统一 `manual`(operator 发起的签发/续签/吊销/重试);
+/// 自动续签(auto)与清理(cleanup)由各自路径单独构造。
+async fn enqueue_task(
+    db: &DatabaseConnection,
+    cert_id: &str,
+    task_type: TaskType,
+    parent_task_id: Option<String>,
+    attempt_number: i32,
+    now: &str,
+) -> CoreResult<()> {
+    tasks::ActiveModel {
+        id: Set(new_id()),
+        certificate_id: Set(cert_id.to_string()),
+        task_type: Set(task_type),
+        trigger: Set(TaskTrigger::Manual),
+        status: Set(TaskStatus::Queued),
+        attempt_number: Set(attempt_number),
+        parent_task_id: Set(parent_task_id),
+        queued_at: Set(now.to_string()),
+        started_at: Set(None),
+        finished_at: Set(None),
+        result_summary: Set(None),
+        failure_reason: Set(None),
+        created_at: Set(now.to_string()),
+        updated_at: Set(now.to_string()),
+    }
+    .insert(db)
+    .await?;
+    Ok(())
+}
+
+/// 续签/取消回退所需的续签提前天数(settings SF1);无 settings 行时取默认 30。
+async fn renewal_advance_days(db: &DatabaseConnection) -> CoreResult<i64> {
+    Ok(settings::Entity::find_by_id(SINGLETON_ID)
+        .one(db)
+        .await?
+        .map(|s| s.renewal_advance_days as i64)
+        .unwrap_or(30))
+}
+
+/// 该证书当前序列号是否已被记作废(self_signed 本地作废记录;判"续签源为已吊销")。
+async fn is_current_serial_revoked(
+    db: &DatabaseConnection,
+    cert: &certificates::Model,
+) -> CoreResult<bool> {
+    let Some(serial) = cert.serial_number.as_deref() else {
+        return Ok(false);
+    };
+    let n = internal_cert_revocations::Entity::find()
+        .filter(internal_cert_revocations::Column::CertificateId.eq(&cert.id))
+        .filter(internal_cert_revocations::Column::SerialNumber.eq(serial))
+        .count(db)
+        .await?;
+    Ok(n > 0)
+}
+
+/// 由证书文件/有效期/作废记录推断其"发起前"的稳态(取消回退用)。
+/// 已作废 → revoked;否则按有效期:已过期 → expired、进入续签窗口 → expiring_soon、其余 → valid。
+fn natural_status(not_after: Option<&str>, advance_days: i64, is_revoked: bool) -> CertificateStatus {
+    if is_revoked {
+        return CertificateStatus::Revoked;
+    }
+    match days_until(not_after) {
+        None => CertificateStatus::Valid, // 有文件但无 notAfter(理论不达),保守取 valid
+        Some(d) if d < 0 => CertificateStatus::Expired,
+        Some(d) if d <= advance_days => CertificateStatus::ExpiringSoon,
+        Some(_) => CertificateStatus::Valid,
+    }
+}
+
+/// 签发来源前置校验(renew/retry 共用):self_signed 根 CA 仍 active、acme 账户仍 registered。
+/// 账户被移除置空 → 提示改选(acme_account_required)。
+async fn validate_issuance_source(
+    db: &DatabaseConnection,
+    cert: &certificates::Model,
+) -> CoreResult<()> {
+    match cert.issuance_method {
+        IssuanceMethod::SelfSigned => {
+            let rid = cert
+                .root_ca_id
+                .as_deref()
+                .ok_or_else(|| CoreError::internal("self_signed 证书缺少根 CA 引用"))?;
+            let ca = root_cas::Entity::find_by_id(rid)
+                .one(db)
+                .await?
+                .ok_or_else(|| CoreError::new(ErrorCode::InvalidRootCaReference, "根 CA 不存在"))?;
+            if ca.status != RootCaStatus::Active {
+                return Err(CoreError::new(ErrorCode::RootCaExpired, "指定的根 CA 已过期,不可签发"));
+            }
+        }
+        IssuanceMethod::Acme => {
+            let aid = cert.acme_account_id.as_deref().ok_or_else(|| {
+                CoreError::new(ErrorCode::AcmeAccountRequired, "关联 ACME 账户已被移除,请改选账户")
+            })?;
+            let acc = acme_accounts::Entity::find_by_id(aid).one(db).await?.ok_or_else(|| {
+                CoreError::new(ErrorCode::InvalidAcmeAccountReference, "引用了不存在的 ACME 账户")
+            })?;
+            if acc.status != AcmeAccountStatus::Registered {
+                return Err(CoreError::new(
+                    ErrorCode::AcmeAccountNotRegistered,
+                    "指定的 ACME 账户尚未注册成功",
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn san_domains(db: &DatabaseConnection, cert_id: &str) -> CoreResult<Vec<DomainRefData>> {
@@ -328,26 +438,9 @@ pub async fn create(ctx: &CoreContext, input: IssueCertInput) -> CoreResult<Cert
         .await?;
     }
 
-    tasks::ActiveModel {
-        id: Set(new_id()),
-        certificate_id: Set(cert_id.clone()),
-        task_type: Set(TaskType::Issue),
-        trigger: Set(TaskTrigger::Manual),
-        status: Set(TaskStatus::Queued),
-        attempt_number: Set(1),
-        parent_task_id: Set(None),
-        queued_at: Set(now.clone()),
-        started_at: Set(None),
-        finished_at: Set(None),
-        result_summary: Set(None),
-        failure_reason: Set(None),
-        created_at: Set(now.clone()),
-        updated_at: Set(now),
-    }
-    .insert(db)
-    .await?;
+    // 入队 issue 任务(TT1);执行器承接 self_signed 签发 → 驱动证书 T2–T4(acme 待后续)。
+    enqueue_task(db, &cert_id, TaskType::Issue, None, 1, &now).await?;
 
-    // TODO(实现期):任务执行器取出 issue 任务 → 委托 acme/ca → 驱动证书 T2–T4,经 SSE 回推。
     build_detail(db, cert).await
 }
 
@@ -375,26 +468,175 @@ pub async fn revoke(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
     let cert = a.update(db).await?;
 
     // 入队 revoke 任务(TT1);执行器承接 self_signed 作废
-    tasks::ActiveModel {
-        id: Set(new_id()),
-        certificate_id: Set(cert.id.clone()),
-        task_type: Set(TaskType::Revoke),
-        trigger: Set(TaskTrigger::Manual),
-        status: Set(TaskStatus::Queued),
-        attempt_number: Set(1),
-        parent_task_id: Set(None),
-        queued_at: Set(now.clone()),
-        started_at: Set(None),
-        finished_at: Set(None),
-        result_summary: Set(None),
-        failure_reason: Set(None),
-        created_at: Set(now.clone()),
-        updated_at: Set(now),
-    }
-    .insert(db)
-    .await?;
+    enqueue_task(db, &cert.id, TaskType::Revoke, None, 1, &now).await?;
 
     build_detail(db, cert).await
+}
+
+/// 续签 / 再获取(C1,§2.3 源态门控)→ 证书转 `renewing` + 入队 `renew` 任务;
+/// 执行器承接 self_signed 重签(经原根 CA、刷新同一行 serial/有效期,T12→valid,不新建实体 DC1)。202。
+pub async fn renew(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
+    let db = &ctx.db;
+    let cert = certificates::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::CertNotFound, "证书不存在"))?;
+
+    // 适用源态:valid(T7)/ expiring_soon(T9)/ expired(T17)/ revoked(T20)
+    if !cert.status.can_renew() {
+        return Err(CoreError::new(ErrorCode::InvalidCertState, "当前状态不可续签").with_details(
+            serde_json::json!({ "currentStatus": cert.status, "action": "renew" }),
+        ));
+    }
+    // 来源前置(self_signed 根 CA 仍 active / acme 账户仍 registered)
+    validate_issuance_source(db, &cert).await?;
+
+    let now = now_rfc3339();
+    let mut a: certificates::ActiveModel = cert.clone().into();
+    a.status = Set(CertificateStatus::Renewing);
+    a.last_error = Set(None);
+    a.updated_at = Set(now.clone());
+    let cert = a.update(db).await?;
+
+    enqueue_task(db, &cert.id, TaskType::Renew, None, 1, &now).await?;
+    build_detail(db, cert).await
+}
+
+/// 失败重试(B2·C3):issue_failed→T5(派生 issue)/ renewal_failed→T14(派生 renew)。
+/// 派生新任务(TT7,parent=最近同类失败任务、attempt+1),证书回进行中态。202。
+pub async fn retry(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
+    let db = &ctx.db;
+    let cert = certificates::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::CertNotFound, "证书不存在"))?;
+
+    // 适用源态:issue_failed(T5)/ renewal_failed(T14)
+    if !cert.status.can_retry() {
+        return Err(CoreError::new(ErrorCode::InvalidCertState, "当前状态不可重试").with_details(
+            serde_json::json!({ "currentStatus": cert.status, "action": "retry" }),
+        ));
+    }
+    let task_type = match cert.status {
+        CertificateStatus::IssueFailed => TaskType::Issue,
+        CertificateStatus::RenewalFailed => TaskType::Renew,
+        _ => unreachable!("can_retry 已门控"),
+    };
+    validate_issuance_source(db, &cert).await?;
+
+    // 取最近同类失败任务作重试链父;无则新链(parent=None, attempt=1)
+    let parent = tasks::Entity::find()
+        .filter(tasks::Column::CertificateId.eq(&cert.id))
+        .filter(tasks::Column::Status.eq(TaskStatus::Failed))
+        .filter(tasks::Column::TaskType.eq(task_type))
+        .order_by_desc(tasks::Column::QueuedAt)
+        .one(db)
+        .await?;
+
+    apply_retry(db, &cert, task_type, parent.as_ref()).await?;
+    let cert = certificates::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::CertNotFound, "证书不存在"))?;
+    build_detail(db, cert).await
+}
+
+/// 由 tasks 端点(POST /tasks/{id}/retry)派生重试:对指定失败任务派生同类型新任务。
+/// 与 certificates::retry 收敛于同一 core 操作(重试双入口,tasks §4)。
+pub async fn derive_retry_from_task(
+    ctx: &CoreContext,
+    cert: &certificates::Model,
+    failed_task: &tasks::Model,
+) -> CoreResult<()> {
+    apply_retry(&ctx.db, cert, failed_task.task_type, Some(failed_task)).await
+}
+
+/// 重试派生核心:置证书进行中态(issue→issuing T5 / renew→renewing T14 / revoke→revoking)、
+/// 清 last_error、派生新任务入队。签名类任务(issue/renew)先校验来源。
+async fn apply_retry(
+    db: &DatabaseConnection,
+    cert: &certificates::Model,
+    task_type: TaskType,
+    parent: Option<&tasks::Model>,
+) -> CoreResult<()> {
+    if matches!(task_type, TaskType::Issue | TaskType::Renew) {
+        validate_issuance_source(db, cert).await?;
+    }
+    let in_progress = match task_type {
+        TaskType::Issue => CertificateStatus::Issuing,
+        TaskType::Renew => CertificateStatus::Renewing,
+        TaskType::Revoke => CertificateStatus::Revoking,
+    };
+    let (parent_id, attempt) = match parent {
+        Some(p) => (Some(p.id.clone()), p.attempt_number + 1),
+        None => (None, 1),
+    };
+    let now = now_rfc3339();
+    let mut a: certificates::ActiveModel = cert.clone().into();
+    a.status = Set(in_progress);
+    a.last_error = Set(None);
+    a.updated_at = Set(now.clone());
+    a.update(db).await?;
+    enqueue_task(db, &cert.id, task_type, parent_id, attempt, &now).await?;
+    Ok(())
+}
+
+/// 取消 → 证书回退(T21–T24,证书状态机唯一真相;tasks 侧只触发)。由 tasks::cancel_task 调用。
+/// - issue 取消 → issue_failed(T21 待签发 / T22 签发中);
+/// - renew 取消 → 有 parent(retry 源)则 renewal_failed(T14 源),否则按有效期/作废推断发起前态(T23);
+/// - revoke 取消 → 按有效期推断发起前态(T24,效果同 T19);证书未变。
+/// 竞态防护:仅当证书仍处该任务对应的进行中态才回退(执行器可能已推进为终态)。
+pub async fn rollback_on_cancel(ctx: &CoreContext, task: &tasks::Model) -> CoreResult<()> {
+    let db = &ctx.db;
+    let Some(cert) = certificates::Entity::find_by_id(&task.certificate_id).one(db).await? else {
+        return Ok(()); // 证书已删(清理路径);无回退对象
+    };
+
+    // 该任务对应的"进行中态"匹配校验(防竞态覆盖执行器已推进的终态)
+    let expected = match task.task_type {
+        TaskType::Issue => {
+            matches!(cert.status, CertificateStatus::PendingIssue | CertificateStatus::Issuing)
+        }
+        TaskType::Renew => matches!(cert.status, CertificateStatus::Renewing),
+        TaskType::Revoke => matches!(cert.status, CertificateStatus::Revoking),
+    };
+    if !expected {
+        return Ok(());
+    }
+
+    let new_status = match task.task_type {
+        TaskType::Issue => CertificateStatus::IssueFailed, // T21/T22
+        TaskType::Renew => {
+            if task.parent_task_id.is_some() {
+                CertificateStatus::RenewalFailed // T14 源(retry)
+            } else {
+                let adv = renewal_advance_days(db).await?;
+                let revoked = is_current_serial_revoked(db, &cert).await?;
+                natural_status(cert.not_after.as_deref(), adv, revoked)
+            }
+        }
+        TaskType::Revoke => {
+            let adv = renewal_advance_days(db).await?;
+            let base = natural_status(cert.not_after.as_deref(), adv, false);
+            // 源为 renewal_failed(T16)近似恢复:仍有旧失败摘要且当前有效则回 renewal_failed
+            if cert.last_error.is_some()
+                && matches!(base, CertificateStatus::Valid | CertificateStatus::ExpiringSoon)
+            {
+                CertificateStatus::RenewalFailed
+            } else {
+                base
+            }
+        }
+    };
+
+    let mut a: certificates::ActiveModel = cert.clone().into();
+    a.status = Set(new_status);
+    if matches!(task.task_type, TaskType::Issue) {
+        a.last_error = Set(Some("首签任务已取消".to_string()));
+    }
+    a.updated_at = Set(now_rfc3339());
+    a.update(db).await?;
+    Ok(())
 }
 
 pub async fn delete(ctx: &CoreContext, id: &str) -> CoreResult<()> {
@@ -445,4 +687,135 @@ pub async fn delete(ctx: &CoreContext, id: &str) -> CoreResult<()> {
         .await?;
     certificates::Entity::delete_by_id(id).exec(db).await?;
     Ok(())
+}
+
+// ============ 导出(E1,§2.8)============
+
+/// 导出内容(§2.8 `parts`)。`private_key` 是唯一读密钥出口(须 acknowledge)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportPart {
+    Leaf,
+    Chain,
+    Fullchain,
+    PrivateKey,
+}
+
+impl ExportPart {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "leaf" => Some(Self::Leaf),
+            "chain" => Some(Self::Chain),
+            "fullchain" => Some(Self::Fullchain),
+            "private_key" => Some(Self::PrivateKey),
+            _ => None,
+        }
+    }
+    fn label(self) -> &'static str {
+        match self {
+            Self::Leaf => "leaf",
+            Self::Chain => "chain",
+            Self::Fullchain => "fullchain",
+            Self::PrivateKey => "private_key",
+        }
+    }
+}
+
+pub struct ExportInput {
+    pub parts: Vec<ExportPart>,
+    pub acknowledge_key_export: bool,
+}
+
+pub struct ExportBundle {
+    pub pem: String,
+    pub filename: String,
+}
+
+fn push_pem(out: &mut String, pem: &str) {
+    let trimmed = pem.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if !out.is_empty() && !out.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push_str(trimmed);
+    out.push('\n');
+}
+
+/// 导出证书材料(E1)。读 `cert_pem_ref`/`private_key_ref` → age 解密 → 拼 PEM(二进制下载)。
+/// - 无文件态(未签发/签发中/签发失败,或缺 `cert_pem_ref`)→ `409 cert_not_exportable`;
+/// - 含 `private_key` 未确认 → `422 key_export_not_acknowledged`;
+/// - 私钥导出是**唯一读密钥出口**(DTO 仍绝不含 ref)。self_signed 的 `chain` 取其根 CA 证书。
+pub async fn export(ctx: &CoreContext, id: &str, input: ExportInput) -> CoreResult<ExportBundle> {
+    let db = &ctx.db;
+    let cert = certificates::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::CertNotFound, "证书不存在"))?;
+
+    // 无文件态不可导出(§2.8:pending_issue/issuing/issue_failed 或缺文件引用)
+    let Some(cert_ref) = cert.cert_pem_ref.as_deref() else {
+        return Err(CoreError::new(ErrorCode::CertNotExportable, "证书尚无本地文件,不可导出"));
+    };
+    if !cert.status.is_exportable() {
+        return Err(CoreError::new(ErrorCode::CertNotExportable, "证书尚无本地文件,不可导出"));
+    }
+
+    let wants_key = input.parts.iter().any(|p| matches!(p, ExportPart::PrivateKey));
+    if wants_key && !input.acknowledge_key_export {
+        return Err(CoreError::new(
+            ErrorCode::KeyExportNotAcknowledged,
+            "导出私钥需确认敏感数据风险(acknowledgeKeyExport=true)",
+        ));
+    }
+
+    // 叶子证书(公开材料,age 解密)
+    let leaf_pem = String::from_utf8(ctx.secrets.load(cert_ref)?)
+        .map_err(|_| CoreError::internal("证书文件材料损坏"))?;
+
+    // 链:self_signed 取根 CA 证书;acme 的中间链在其 fullchain 落地(待后续)
+    let chain_pem = match cert.root_ca_id.as_deref() {
+        Some(rid) => root_cas::Entity::find_by_id(rid)
+            .one(db)
+            .await?
+            .map(|r| r.cert_pem)
+            .unwrap_or_default(),
+        None => String::new(),
+    };
+
+    // 私钥(敏感 AR4,仅此出口;须已确认)
+    let key_pem = if wants_key {
+        let key_ref = cert
+            .private_key_ref
+            .as_deref()
+            .ok_or_else(|| CoreError::new(ErrorCode::CertNotExportable, "证书无私钥文件,不可导出"))?;
+        String::from_utf8(ctx.secrets.load(key_ref)?)
+            .map_err(|_| CoreError::internal("私钥材料损坏"))?
+    } else {
+        String::new()
+    };
+
+    // 按请求顺序拼接(去重),各 part 之间以换行分隔
+    let mut out = String::new();
+    let mut seen: Vec<ExportPart> = Vec::new();
+    let mut labels: Vec<&str> = Vec::new();
+    for p in &input.parts {
+        if seen.contains(p) {
+            continue;
+        }
+        seen.push(*p);
+        labels.push(p.label());
+        match p {
+            ExportPart::Leaf => push_pem(&mut out, &leaf_pem),
+            ExportPart::Chain => push_pem(&mut out, &chain_pem),
+            ExportPart::Fullchain => {
+                push_pem(&mut out, &leaf_pem);
+                push_pem(&mut out, &chain_pem);
+            }
+            ExportPart::PrivateKey => push_pem(&mut out, &key_pem),
+        }
+    }
+
+    let filename = format!("certificate-{id}-{}.pem", labels.join("-"));
+    Ok(ExportBundle { pem: out, filename })
 }

@@ -1,16 +1,17 @@
-//! certificates handlers —— list/detail/create/delete 真实实现;renew/retry/revoke/export 打桩 501。
+//! certificates handlers —— list/detail/create/delete/revoke/renew/retry/export 全真实实现。
 
 use crate::dto::{self, CertificateDetail, CertificateSummary, Page};
 use crate::error::{ApiError, ApiResult};
 use crate::extract::JsonBody;
 use crate::parse::{parse_enum_list, parse_enum_opt};
-use crate::req::{CertListQuery, IssueCertificateRequest};
+use crate::req::{CertListQuery, ExportQuery, IssueCertificateRequest};
 use crate::state::AppState;
 use autohttps_core::enums::{CertificateStatus, IssuanceMethod};
-use autohttps_core::services::certificates;
+use autohttps_core::services::certificates::{self, ExportPart};
 use autohttps_core::ErrorCode;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 
 pub async fn list(
@@ -63,21 +64,22 @@ pub async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// --- 以下动作依赖任务执行器 + ACME/CA,里程碑1 打桩(TODO 实现期)---
-
-fn stub(action: &str) -> ApiError {
-    ApiError::new(
-        ErrorCode::NotImplemented,
-        format!("{action}:签发/续签/吊销执行器为里程碑1 打桩,尚未接入 ACME/CA"),
-    )
+/// 续签 / 再获取(C1,T7/T9/T17/T20 → renewing)→ 入队 renew 任务;执行器承接 self_signed 重签。202。
+pub async fn renew(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<CertificateDetail>)> {
+    let data = certificates::renew(&st.ctx, &id).await?;
+    Ok((StatusCode::ACCEPTED, Json(dto::cert_detail(data))))
 }
 
-pub async fn renew(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("续签"))
-}
-
-pub async fn retry(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("重试"))
+/// 失败重试(B2·C3,issue_failed→T5 / renewal_failed→T14)→ 派生新任务(TT7)。202。
+pub async fn retry(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<CertificateDetail>)> {
+    let data = certificates::retry(&st.ctx, &id).await?;
+    Ok((StatusCode::ACCEPTED, Json(dto::cert_detail(data))))
 }
 
 /// 吊销(D1,T8/T11/T16 → revoking)→ 入队 revoke 任务;执行器承接 self_signed 作废 → revoked。202。
@@ -89,6 +91,48 @@ pub async fn revoke(
     Ok((StatusCode::ACCEPTED, Json(dto::cert_detail(data))))
 }
 
-pub async fn export(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("导出"))
+/// 导出叶子/链/私钥(E1,§2.8)—— 二进制 PEM 下载(`application/x-pem-file`);跨状态只读动作。
+/// `parts` 非法值 → 400 validation_failed;含私钥未确认 → 422;无文件态 → 409(见服务层)。
+pub async fn export(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<ExportQuery>,
+) -> ApiResult<Response> {
+    // format:MVP 仅 pem
+    if let Some(f) = q.format.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if !f.eq_ignore_ascii_case("pem") {
+            return Err(ApiError::new(ErrorCode::ValidationFailed, format!("不支持的导出格式: {f}")));
+        }
+    }
+    let parts = parse_export_parts(q.parts.as_deref())?;
+    let input = certificates::ExportInput {
+        parts,
+        acknowledge_key_export: q.acknowledge_key_export.unwrap_or(false),
+    };
+    let bundle = certificates::export(&st.ctx, &id, input).await?;
+    let disposition = format!("attachment; filename=\"{}\"", bundle.filename);
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/x-pem-file".to_string()),
+            (header::CONTENT_DISPOSITION, disposition),
+        ],
+        bundle.pem,
+    )
+        .into_response())
+}
+
+/// 解析 `parts=<逗号分隔:leaf|chain|fullchain|private_key>`(默认 fullchain);非法值 → 400。
+fn parse_export_parts(raw: Option<&str>) -> ApiResult<Vec<ExportPart>> {
+    let raw = raw.map(str::trim).filter(|s| !s.is_empty()).unwrap_or("fullchain");
+    let mut parts = Vec::new();
+    for token in raw.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+        let p = ExportPart::parse(token).ok_or_else(|| {
+            ApiError::new(ErrorCode::ValidationFailed, format!("非法的导出内容: {token}"))
+        })?;
+        parts.push(p);
+    }
+    if parts.is_empty() {
+        return Err(ApiError::new(ErrorCode::ValidationFailed, "parts 不能为空"));
+    }
+    Ok(parts)
 }

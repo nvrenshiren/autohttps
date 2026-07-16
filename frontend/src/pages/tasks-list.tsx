@@ -1,12 +1,13 @@
 /**
  * 任务列表(tasks/list PRD)—— 队列 + 历史统一一表(DEC1);类型 / 状态 / 关联证书 / 时间四类可组合筛选
  * (F2–F5)。行内进详情(F6)。重试仅 failed、取消仅 queued/running(H4 禁用 + Tooltip);二次确认后
- * 端点为里程碑1 501 → toast 提示。无批量(H12)。四态齐备(H3)。
+ * 接真端点(取消驱动证书回退)。无批量(H12)。四态齐备(H3)。
  */
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ListChecks, MoreHorizontal, RotateCw, Search, XCircle } from "lucide-react";
-import { useTasks } from "@/lib/queries";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk, useTasks } from "@/lib/queries";
 import type { TaskSummary } from "@/bindings";
 import { TASK_TYPES } from "@/bindings";
 import { api, ApiError } from "@/lib/api";
@@ -82,6 +83,7 @@ export function TasksListPage() {
   const [page, setPage] = useState(1);
   const [confirm, setConfirm] = useState<ConfirmAction | null>(null);
   const [busy, setBusy] = useState(false);
+  const qc = useQueryClient();
 
   const statusParam = status === ALL ? undefined : status === QUEUE ? "queued,running" : status;
   const hasFilter =
@@ -123,14 +125,11 @@ export function TasksListPage() {
       await api.post(`/tasks/${task.id}/${kind}`);
       toast.success(`${label}已发起`);
       void refetch();
+      qc.invalidateQueries({ queryKey: qk.certificates });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
+      qc.invalidateQueries({ queryKey: qk.certificate(task.certificateId) });
     } catch (e) {
-      if (e instanceof ApiError && e.code === "not_implemented") {
-        toast.info(`任务${label}:执行器 + 证书联动为里程碑后续,尚未接入`);
-      } else if (e instanceof ApiError) {
-        toast.error(e.message);
-      } else {
-        toast.error(`${label}失败`);
-      }
+      toast.error(e instanceof ApiError ? e.message : `${label}失败`);
     } finally {
       setBusy(false);
       setConfirm(null);

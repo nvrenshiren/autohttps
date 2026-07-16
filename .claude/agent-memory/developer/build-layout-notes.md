@@ -13,8 +13,15 @@ metadata:
   **Why:** 里程碑1 server 必须能跑是硬指标,不该被 Tauri 系统依赖拖累。
 
 - **rust-embed 需 `frontend/dist` 目录存在**(编译期):`crates/api/src/embed.rs` `#[folder="../../frontend/dist"]`。
-  全新克隆先 `cd frontend && npm run build` 再 `cargo build`;否则 rust-embed 报"folder does not exist"。
-  已用 `.gitignore` 例外 + `frontend/dist/.gitkeep` 兜底目录存在(见 .gitignore 末尾三行)。
+  fresh clone 未跑 npm build 时目录不存在,proc-macro 展开报"folder does not exist"。
+  **真相纠正**:`.gitignore` 虽有 `!/frontend/dist/.gitkeep` 例外,但 `.gitkeep` **从未真正 commit**
+  (`git ls-files frontend/dist/` 为空),占位 index.html 也没有——所以旧"靠 .gitkeep 兜底"的说法是错的,
+  fresh clone `cargo build` 确实会挂。**现兜底机制 = `crates/api/build.rs`**:编译期(先于本 crate 编译)
+  `create_dir_all(../../frontend/dist)` + 写 `.gitkeep`,让 `cargo build` 不依赖先跑前端;不发
+  `rerun-if-changed`(用 Cargo 默认:包内文件变动即重跑,保证 `embed.rs` 变更触发 proc-macro 重展开的
+  同一次构建里先重建目录)。`frontend/vite.config.ts` 另加 `keepDistPlaceholder` 插件在 `closeBundle`
+  写回 `.gitkeep`(vite build 会清空 dist)。验证兜底:`rm -rf frontend/dist && cargo clean -p autohttps-api
+  && cargo build -p server` 应自动重建 dist 并编译通过。
 
 - **server 默认监听 `127.0.0.1:8443`**(settings 默认);Vite dev 代理 `/api`→8443。改端口用 env
   `AUTOHTTPS_ADDR=host:port`;数据目录 `AUTOHTTPS_DATA_DIR`(默认 `./data`)。REST/SSE 统一挂 `/api`
