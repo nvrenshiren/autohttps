@@ -366,6 +366,18 @@ export interface RootCaDetail extends RootCaSummary {
   certPem: string;
 }
 
+export interface CreateRootCaRequest {
+  name: string;
+  validityDays: number;
+}
+
+export interface ImportRootCaRequest {
+  name: string;
+  certPem: string;
+  privateKeyPem: string;
+  keyPassphrase?: string;
+}
+
 // ============ SSE 事件 ============
 
 export interface ServerEvent<T = unknown> {
@@ -390,3 +402,17 @@ export const CERTIFICATE_STATUSES: CertificateStatus[] = [
 ];
 
 export const ISSUANCE_METHODS: IssuanceMethod[] = ["acme", "self_signed"];
+
+export const TASK_STATUSES: TaskStatus[] = [
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+];
+
+export const TASK_TYPES: TaskType[] = ["issue", "renew", "revoke"];
+
+export const TASK_TRIGGERS: TaskTrigger[] = ["manual", "auto", "cleanup"];
+
+export const ROOT_CA_STATUSES: RootCaStatus[] = ["active", "expired"];

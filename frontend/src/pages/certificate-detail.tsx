@@ -7,6 +7,7 @@ import { useNavigate, useParams } from "react-router";
 import {
   Ban,
   Download,
+  ListChecks,
   Loader2,
   RotateCw,
   ShieldCheck,
@@ -104,6 +105,8 @@ export function CertificateDetailPage() {
       toast.success(`${label}已发起`);
       qc.invalidateQueries({ queryKey: qk.certificate(id) });
       qc.invalidateQueries({ queryKey: qk.certificates });
+      qc.invalidateQueries({ queryKey: qk.tasks });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
     } catch (e) {
       if (e instanceof ApiError && e.code === "not_implemented") {
         toast.info(`${label}:执行器为里程碑1 打桩,尚未接入 ACME/CA`);
@@ -183,6 +186,13 @@ export function CertificateDetailPage() {
         crumbs={[{ label: "证书", to: "/certificates" }, { label: primary }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/tasks?certificateId=${id}`)}
+            >
+              <ListChecks />
+              关联任务
+            </Button>
             <GatedButton
               enabled={canRenew(s) && !busy}
               reason="仅有效 / 即将到期 / 已过期 / 已吊销证书可续签"
@@ -236,8 +246,24 @@ export function CertificateDetailPage() {
           <Loader2 className="animate-spin" />
           <AlertTitle>操作进行中</AlertTitle>
           <AlertDescription>
-            当前有进行中的任务({data.activeTaskId ? <Mono>{data.activeTaskId}</Mono> : "—"})。
-            取消进行中操作请前往任务页(里程碑1 任务执行器为打桩)。
+            当前有进行中的任务
+            {data.activeTaskId ? (
+              <>
+                (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0"
+                  onClick={() => navigate(`/tasks/${data.activeTaskId}`)}
+                >
+                  <Mono>{data.activeTaskId}</Mono>
+                </Button>
+                )
+              </>
+            ) : (
+              " "
+            )}
+            。取消进行中操作请前往该任务详情(任务执行器 / 取消联动为里程碑后续)。
           </AlertDescription>
         </Alert>
       )}

@@ -4,7 +4,7 @@
  */
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Search, ShieldCheck } from "lucide-react";
+import { Plus, Search, ShieldCheck } from "lucide-react";
 import { useCertificates } from "@/lib/queries";
 import { CERTIFICATE_STATUSES, ISSUANCE_METHODS } from "@/bindings";
 import { PageHeader } from "@/components/shared/page-header";
@@ -69,6 +69,12 @@ export function CertificatesListPage() {
       <PageHeader
         title="证书"
         description="签发、续签、吊销证书的生命周期管理。"
+        actions={
+          <Button onClick={() => navigate("/certificates/issue")}>
+            <Plus />
+            发起签发
+          </Button>
+        }
       />
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -151,7 +157,13 @@ export function CertificatesListPage() {
             <EmptyState
               Icon={ShieldCheck}
               title="尚无证书"
-              description="通过「发起签发」为域名签发证书(需先配置 ACME 账户或根 CA;签发向导建设中)。"
+              description="通过「发起签发」为域名签发证书(自签需先创建根 CA,公共 ACME 需先注册账户)。"
+              action={
+                <Button onClick={() => navigate("/certificates/issue")}>
+                  <Plus />
+                  发起签发
+                </Button>
+              }
             />
           )
         ) : (

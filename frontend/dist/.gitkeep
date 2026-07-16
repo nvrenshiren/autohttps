@@ -1,2 +1,0 @@
-# 占位:保证 frontend/dist 目录在全新克隆时存在(rust-embed 编译期需要)。
-# 真实 SPA 产物由 `npm run build` 生成并覆盖本目录(其余文件被 .gitignore 忽略)。
