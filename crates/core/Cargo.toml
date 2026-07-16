@@ -1,0 +1,39 @@
+[package]
+name = "autohttps-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "autohttps 领域核心库(业务唯一真相):枚举、实体、迁移、服务"
+
+[lib]
+name = "autohttps_core"
+path = "src/lib.rs"
+
+[dependencies]
+sea-orm.workspace = true
+sea-orm-migration.workspace = true
+# 直连 sqlx 以设置每连接 PRAGMA(WAL + foreign_keys);版本随 sea-orm 1.1 的 sqlx 0.8 统一。
+sqlx = { version = "0.8", default-features = false, features = [
+    "sqlite",
+    "runtime-tokio-rustls",
+] }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+time.workspace = true
+ts-rs.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+# --- X.509 / 自签 CA(TECH 决策5:rcgen,避 openssl 原生依赖 L7)---
+# ring 后端(非 aws-lc-rs)以规避 Windows 上 cmake/nasm 构建依赖,保三平台对等。
+rcgen = { version = "0.14", default-features = false, features = ["ring", "pem", "x509-parser"] }
+x509-parser = "0.18"
+
+# --- 敏感数据静态加密(TECH 决策3:age)---
+age = { version = "0.11", default-features = false }
+rand = "0.8"
+sha2 = "0.10"

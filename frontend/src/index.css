@@ -1,0 +1,224 @@
+@import "tailwindcss";
+
+/* 类切换暗色(根节点挂 .dark;设计 §10-H7)。默认不跟随系统 prefers-color-scheme。 */
+@custom-variant dark (&:is(.dark *));
+
+/* ===== @theme inline 映射(systems/app.md §2)—— 唯一 token 落点,原型/前端禁裸色值(H1/H2) ===== */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* 语义状态色(§3 立法用)→ 生成 bg-success / text-danger-muted-foreground 等 */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-success-muted-foreground: var(--success-muted-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-muted-foreground: var(--warning-muted-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-muted: var(--danger-muted);
+  --color-danger-muted-foreground: var(--danger-muted-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-info-muted-foreground: var(--info-muted-foreground);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-muted: var(--neutral-muted);
+  --color-neutral-muted-foreground: var(--neutral-muted-foreground);
+  --color-notification: var(--notification);
+  --color-notification-foreground: var(--notification-foreground);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Cascadia Code",
+    Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* ===== 色板(systems/app.md §1.1 亮色) ===== */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.21 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 260);
+  --primary: oklch(0.55 0.17 258);
+  --primary-foreground: oklch(0.985 0.003 260);
+  --secondary: oklch(0.968 0.006 260);
+  --secondary-foreground: oklch(0.3 0.02 260);
+  --muted: oklch(0.968 0.004 260);
+  --muted-foreground: oklch(0.552 0.02 260);
+  --accent: oklch(0.962 0.008 258);
+  --accent-foreground: oklch(0.3 0.02 260);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.922 0.006 260);
+  --input: oklch(0.922 0.006 260);
+  --ring: oklch(0.55 0.17 258);
+
+  --success: oklch(0.55 0.13 150);
+  --success-foreground: oklch(0.99 0 0);
+  --success-muted: oklch(0.95 0.05 150);
+  --success-muted-foreground: oklch(0.42 0.11 150);
+  --warning: oklch(0.72 0.15 75);
+  --warning-foreground: oklch(0.26 0.05 75);
+  --warning-muted: oklch(0.95 0.06 85);
+  --warning-muted-foreground: oklch(0.48 0.09 70);
+  --danger: oklch(0.58 0.22 27);
+  --danger-foreground: oklch(0.99 0 0);
+  --danger-muted: oklch(0.95 0.04 25);
+  --danger-muted-foreground: oklch(0.51 0.19 27);
+  --info: oklch(0.58 0.13 240);
+  --info-foreground: oklch(0.99 0 0);
+  --info-muted: oklch(0.95 0.045 240);
+  --info-muted-foreground: oklch(0.45 0.13 245);
+  --neutral: oklch(0.55 0.02 260);
+  --neutral-foreground: oklch(0.99 0 0);
+  --neutral-muted: oklch(0.96 0.004 260);
+  --neutral-muted-foreground: oklch(0.44 0.015 260);
+
+  --notification: oklch(0.58 0.22 27);
+  --notification-foreground: oklch(0.99 0 0);
+
+  --chart-1: oklch(0.55 0.17 258);
+  --chart-2: oklch(0.55 0.13 150);
+  --chart-3: oklch(0.72 0.15 75);
+  --chart-4: oklch(0.58 0.22 27);
+  --chart-5: oklch(0.55 0.02 260);
+
+  --sidebar: oklch(0.985 0.003 260);
+  --sidebar-foreground: oklch(0.21 0.02 260);
+  --sidebar-primary: oklch(0.55 0.17 258);
+  --sidebar-primary-foreground: oklch(0.985 0.003 260);
+  --sidebar-accent: oklch(0.955 0.006 260);
+  --sidebar-accent-foreground: oklch(0.21 0.02 260);
+  --sidebar-border: oklch(0.922 0.006 260);
+  --sidebar-ring: oklch(0.55 0.17 258);
+
+  --radius: 0.5rem;
+}
+
+/* ===== 色板(systems/app.md §1.2 暗色) ===== */
+.dark {
+  --background: oklch(0.185 0.015 260);
+  --foreground: oklch(0.97 0.005 260);
+  --card: oklch(0.21 0.017 260);
+  --card-foreground: oklch(0.97 0.005 260);
+  --popover: oklch(0.21 0.017 260);
+  --popover-foreground: oklch(0.97 0.005 260);
+  --primary: oklch(0.62 0.16 258);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.27 0.015 260);
+  --secondary-foreground: oklch(0.97 0.005 260);
+  --muted: oklch(0.27 0.015 260);
+  --muted-foreground: oklch(0.7 0.02 260);
+  --accent: oklch(0.3 0.02 258);
+  --accent-foreground: oklch(0.97 0.005 260);
+  --destructive: oklch(0.65 0.2 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.16 258);
+
+  --success: oklch(0.68 0.14 150);
+  --success-foreground: oklch(0.18 0.02 150);
+  --success-muted: oklch(0.3 0.06 152);
+  --success-muted-foreground: oklch(0.82 0.12 150);
+  --warning: oklch(0.78 0.15 78);
+  --warning-foreground: oklch(0.24 0.04 75);
+  --warning-muted: oklch(0.33 0.06 75);
+  --warning-muted-foreground: oklch(0.86 0.12 82);
+  --danger: oklch(0.65 0.2 27);
+  --danger-foreground: oklch(0.99 0 0);
+  --danger-muted: oklch(0.32 0.09 27);
+  --danger-muted-foreground: oklch(0.83 0.13 25);
+  --info: oklch(0.66 0.14 240);
+  --info-foreground: oklch(0.16 0.02 240);
+  --info-muted: oklch(0.3 0.07 245);
+  --info-muted-foreground: oklch(0.82 0.11 240);
+  --neutral: oklch(0.7 0.02 260);
+  --neutral-foreground: oklch(0.18 0.02 260);
+  --neutral-muted: oklch(0.27 0.015 260);
+  --neutral-muted-foreground: oklch(0.78 0.02 260);
+
+  --notification: oklch(0.65 0.2 27);
+  --notification-foreground: oklch(0.99 0 0);
+
+  --chart-1: oklch(0.62 0.16 258);
+  --chart-2: oklch(0.68 0.14 150);
+  --chart-3: oklch(0.78 0.15 78);
+  --chart-4: oklch(0.65 0.2 27);
+  --chart-5: oklch(0.7 0.02 260);
+
+  --sidebar: oklch(0.21 0.017 260);
+  --sidebar-foreground: oklch(0.97 0.005 260);
+  --sidebar-primary: oklch(0.62 0.16 258);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.27 0.015 260);
+  --sidebar-accent-foreground: oklch(0.97 0.005 260);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.62 0.16 258);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    outline-color: var(--color-ring);
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 0.875rem; /* body 默认 14px(工具型密度,§4.2) */
+    line-height: 1.25rem;
+    -webkit-font-smoothing: antialiased;
+  }
+}

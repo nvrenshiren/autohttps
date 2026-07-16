@@ -1,0 +1,20 @@
+[package]
+name = "server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "autohttps 服务器守护进程(形态宿主):绑定 settings 监听地址,7×24 常驻"
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+[dependencies]
+autohttps-core.workspace = true
+autohttps-api.workspace = true
+axum.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

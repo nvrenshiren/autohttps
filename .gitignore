@@ -6,6 +6,17 @@ dist/
 build/
 *.tsbuildinfo
 
+# ...but keep the embedded-SPA target dir present so `cargo build` (rust-embed) works on a
+# fresh clone before `npm run build`. Track only the placeholder; real build products stay ignored.
+!/frontend/dist/
+/frontend/dist/*
+!/frontend/dist/.gitkeep
+
+# Runtime data (SQLite db + encrypted secrets + verification dirs — never commit)
+/data/
+.verify-data/
+.verify-run/
+
 # Caches
 .cache/
 .eslintcache

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>总览 · autohttps</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@import "tailwindcss";
+
+/* ===== @theme inline 映射(systems/app.md §2) ===== */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-success-muted-foreground: var(--success-muted-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-muted-foreground: var(--warning-muted-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-muted: var(--danger-muted);
+  --color-danger-muted-foreground: var(--danger-muted-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-info-muted-foreground: var(--info-muted-foreground);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-muted: var(--neutral-muted);
+  --color-neutral-muted-foreground: var(--neutral-muted-foreground);
+  --color-notification: var(--notification);
+  --color-notification-foreground: var(--notification-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* ===== 色板(systems/app.md §1.1 亮色) ===== */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.21 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 260);
+  --primary: oklch(0.55 0.17 258);
+  --primary-foreground: oklch(0.985 0.003 260);
+  --secondary: oklch(0.968 0.006 260);
+  --secondary-foreground: oklch(0.30 0.02 260);
+  --muted: oklch(0.968 0.004 260);
+  --muted-foreground: oklch(0.552 0.02 260);
+  --accent: oklch(0.962 0.008 258);
+  --accent-foreground: oklch(0.30 0.02 260);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.922 0.006 260);
+  --input: oklch(0.922 0.006 260);
+  --ring: oklch(0.55 0.17 258);
+  --success: oklch(0.55 0.13 150);
+  --success-foreground: oklch(0.99 0 0);
+  --success-muted: oklch(0.95 0.05 150);
+  --success-muted-foreground: oklch(0.42 0.11 150);
+  --warning: oklch(0.72 0.15 75);
+  --warning-foreground: oklch(0.26 0.05 75);
+  --warning-muted: oklch(0.95 0.06 85);
+  --warning-muted-foreground: oklch(0.48 0.09 70);
+  --danger: oklch(0.58 0.22 27);
+  --danger-foreground: oklch(0.99 0 0);
+  --danger-muted: oklch(0.95 0.04 25);
+  --danger-muted-foreground: oklch(0.51 0.19 27);
+  --info: oklch(0.58 0.13 240);
+  --info-foreground: oklch(0.99 0 0);
+  --info-muted: oklch(0.95 0.045 240);
+  --info-muted-foreground: oklch(0.45 0.13 245);
+  --neutral: oklch(0.55 0.02 260);
+  --neutral-foreground: oklch(0.99 0 0);
+  --neutral-muted: oklch(0.96 0.004 260);
+  --neutral-muted-foreground: oklch(0.44 0.015 260);
+  --notification: oklch(0.58 0.22 27);
+  --notification-foreground: oklch(0.99 0 0);
+  --sidebar: oklch(0.985 0.003 260);
+  --sidebar-foreground: oklch(0.21 0.02 260);
+  --sidebar-primary: oklch(0.55 0.17 258);
+  --sidebar-primary-foreground: oklch(0.985 0.003 260);
+  --sidebar-accent: oklch(0.955 0.006 260);
+  --sidebar-accent-foreground: oklch(0.21 0.02 260);
+  --sidebar-border: oklch(0.922 0.006 260);
+  --sidebar-ring: oklch(0.55 0.17 258);
+  --radius: 0.5rem;
+}
+
+/* ===== 色板(systems/app.md §1.2 暗色) ===== */
+.dark {
+  --background: oklch(0.185 0.015 260);
+  --foreground: oklch(0.97 0.005 260);
+  --card: oklch(0.21 0.017 260);
+  --card-foreground: oklch(0.97 0.005 260);
+  --popover: oklch(0.21 0.017 260);
+  --popover-foreground: oklch(0.97 0.005 260);
+  --primary: oklch(0.62 0.16 258);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.27 0.015 260);
+  --secondary-foreground: oklch(0.97 0.005 260);
+  --muted: oklch(0.27 0.015 260);
+  --muted-foreground: oklch(0.70 0.02 260);
+  --accent: oklch(0.30 0.02 258);
+  --accent-foreground: oklch(0.97 0.005 260);
+  --destructive: oklch(0.65 0.20 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.16 258);
+  --success: oklch(0.68 0.14 150);
+  --success-foreground: oklch(0.18 0.02 150);
+  --success-muted: oklch(0.30 0.06 152);
+  --success-muted-foreground: oklch(0.82 0.12 150);
+  --warning: oklch(0.78 0.15 78);
+  --warning-foreground: oklch(0.24 0.04 75);
+  --warning-muted: oklch(0.33 0.06 75);
+  --warning-muted-foreground: oklch(0.86 0.12 82);
+  --danger: oklch(0.65 0.20 27);
+  --danger-foreground: oklch(0.99 0 0);
+  --danger-muted: oklch(0.32 0.09 27);
+  --danger-muted-foreground: oklch(0.83 0.13 25);
+  --info: oklch(0.66 0.14 240);
+  --info-foreground: oklch(0.16 0.02 240);
+  --info-muted: oklch(0.30 0.07 245);
+  --info-muted-foreground: oklch(0.82 0.11 240);
+  --neutral: oklch(0.70 0.02 260);
+  --neutral-foreground: oklch(0.18 0.02 260);
+  --neutral-muted: oklch(0.27 0.015 260);
+  --neutral-muted-foreground: oklch(0.78 0.02 260);
+  --notification: oklch(0.65 0.20 27);
+  --notification-foreground: oklch(0.99 0 0);
+  --sidebar: oklch(0.21 0.017 260);
+  --sidebar-foreground: oklch(0.97 0.005 260);
+  --sidebar-primary: oklch(0.62 0.16 258);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.27 0.015 260);
+  --sidebar-accent-foreground: oklch(0.97 0.005 260);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.62 0.16 258);
+}
+
+/* ===== 组件类(token 驱动;JS 注入的 Badge / 图标依赖真实 CSS,不受 Tailwind 扫描影响) ===== */
+@layer base {
+  * { border-color: var(--border); }
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body { background-color: var(--background); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+}
+@layer components {
+  .badge { display:inline-flex; align-items:center; gap:.25rem; height:1.25rem; padding-inline:.5rem; border-radius:var(--radius-md); font-size:.75rem; line-height:1; font-weight:500; white-space:nowrap; }
+  .badge-success { background:var(--success-muted); color:var(--success-muted-foreground); }
+  .badge-warning { background:var(--warning-muted); color:var(--warning-muted-foreground); }
+  .badge-danger  { background:var(--danger-muted);  color:var(--danger-muted-foreground); }
+  .badge-info    { background:var(--info-muted);    color:var(--info-muted-foreground); }
+  .badge-neutral { background:var(--neutral-muted); color:var(--neutral-muted-foreground); }
+  .badge-outline { background:transparent; border:1px solid var(--border); color:var(--muted-foreground); }
+  .badge-outline-warn { background:transparent; border:1px solid var(--warning); color:var(--warning-muted-foreground); }
+  .spin { animation: spin 1s linear infinite; transform-origin:center; }
+  .tt { position:relative; }
+  .tt::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); white-space:pre; background:var(--popover); color:var(--popover-foreground); border:1px solid var(--border); border-radius:var(--radius-md); padding:4px 8px; font-size:12px; font-family:var(--font-mono); line-height:1.35; box-shadow:0 4px 14px -4px color-mix(in oklab, var(--foreground) 20%, transparent); opacity:0; pointer-events:none; transition:opacity .12s; z-index:60; }
+  .tt:hover::after { opacity:1; }
+  .tt-text::after { font-family:var(--font-sans); white-space:normal; width:max-content; max-width:230px; text-align:left; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="min-h-screen">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- ============ Sidebar (systems §8) ============ -->
+  <aside class="hidden md:flex md:flex-col w-60 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <div class="flex items-center gap-2 h-14 px-4 border-b border-sidebar-border shrink-0">
+      <span class="inline-flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground" data-icon="shield-check" data-size="18"></span>
+      <span class="font-semibold text-sm tracking-tight">autohttps</span>
+    </div>
+    <nav class="flex-1 p-2 space-y-0.5 overflow-auto">
+      <!-- 总览:活动项 + 红点(计数 = pendingCount) -->
+      <a href="#" class="relative flex items-center gap-2.5 h-9 px-2.5 rounded-md bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+        <span class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-sidebar-primary"></span>
+        <span class="relative inline-flex items-center justify-center">
+          <span class="inline-flex text-sidebar-primary" data-icon="layout-dashboard" data-size="20"></span>
+          <span class="absolute -right-1.5 -top-1.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[10px] leading-none rounded-full bg-notification text-notification-foreground">5</span>
+        </span>
+        <span>总览</span>
+      </a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="globe" data-size="20"></span><span>域名</span></a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="shield-check" data-size="20"></span><span>证书</span></a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="badge-check" data-size="20"></span><span>ACME</span></a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="landmark" data-size="20"></span><span>根 CA</span></a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="list-checks" data-size="20"></span><span>任务</span></a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="settings" data-size="20"></span><span>设置</span></a>
+    </nav>
+    <div class="p-3 border-t border-sidebar-border shrink-0">
+      <!-- 运行形态只读 chip(取自 API;形态差异为页面级标注) -->
+      <div class="flex items-center gap-2 text-xs text-muted-foreground">
+        <span class="inline-flex size-1.5 rounded-full bg-success"></span>
+        <span>运行形态:桌面</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ Main column ============ -->
+  <div class="flex-1 flex flex-col min-w-0">
+    <!-- Topbar (h-14) -->
+    <header class="flex items-center h-14 px-4 sm:px-6 border-b border-border gap-3 shrink-0">
+      <button class="md:hidden inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent" aria-label="打开菜单" data-icon="menu" data-size="18"></button>
+      <div class="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0">
+        <span class="text-foreground font-semibold text-base">总览</span>
+      </div>
+      <div class="ml-auto flex items-center gap-1">
+        <button id="themeToggle" class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent" aria-label="切换明暗主题">
+          <span id="iconMoon" class="inline-flex" data-icon="moon" data-size="18"></span>
+          <span id="iconSun" class="hidden" data-icon="sun" data-size="18"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="flex-1 overflow-auto">
+      <div class="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+
+        <!-- ===== F1 概览三指标(唯一统计卡片 · §3.4 强调色仅计数>0) ===== -->
+        <section class="grid gap-4 sm:grid-cols-3">
+          <!-- 证书总数:中性 -->
+          <div class="rounded-xl border border-border bg-card p-5">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-muted-foreground">证书总数</span>
+              <span class="text-muted-foreground" data-icon="shield-check" data-size="18"></span>
+            </div>
+            <div class="mt-2 text-3xl font-semibold text-foreground tabular-nums">24</div>
+            <div class="mt-1 text-xs text-muted-foreground">含各状态(含已吊销)</div>
+          </div>
+          <!-- 即将到期:关注级(>0 染 amber) -->
+          <div class="rounded-xl border border-border bg-card p-5">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-muted-foreground">即将到期</span>
+              <span class="text-warning" data-icon="clock" data-size="18"></span>
+            </div>
+            <div class="mt-2 text-3xl font-semibold text-warning tabular-nums">2</div>
+            <div class="mt-1 text-xs text-muted-foreground">临近到期 · 需及时续签</div>
+          </div>
+          <!-- 失败:告警级(>0 染红) -->
+          <div class="rounded-xl border border-border bg-card p-5">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-muted-foreground">失败</span>
+              <span class="text-danger" data-icon="triangle-alert" data-size="18"></span>
+            </div>
+            <div class="mt-2 text-3xl font-semibold text-danger tabular-nums">3</div>
+            <div class="mt-1 text-xs text-muted-foreground">已过期 / 签发失败 / 续签失败</div>
+          </div>
+        </section>
+
+        <!-- ===== F2 待处理清单(告警级优先,已过期居首;服务端已排序) ===== -->
+        <section class="rounded-xl border border-border bg-card overflow-hidden">
+          <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-border">
+            <div class="flex items-center gap-2">
+              <h2 class="text-base font-semibold">待处理证书</h2>
+              <span class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-md text-xs font-medium bg-danger-muted text-danger-muted-foreground">5</span>
+            </div>
+            <span class="hidden sm:inline text-xs text-muted-foreground">告警级优先 · 已过期居首</span>
+          </div>
+          <ul class="divide-y divide-border">
+            <!-- 1) 已过期(居首,告警级) -->
+            <li class="relative flex items-center gap-3 pl-6 pr-4 py-3 hover:bg-accent cursor-pointer group">
+              <span class="absolute left-0 top-0 bottom-0 w-[3px] bg-danger"></span>
+              <div class="min-w-0 flex-1">
+                <div class="font-medium truncate">legacy.example.com</div>
+                <div class="mt-1 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                  <span data-status="expired"></span>
+                  <span class="tt cursor-help" data-tip="生效 2026-04-10 08:00 UTC&#10;失效 2026-07-09 08:00 UTC">已过期 7 天</span>
+                </div>
+              </div>
+              <span class="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" data-icon="chevron-right" data-size="16"></span>
+            </li>
+            <!-- 2) 续签失败(告警级) -->
+            <li class="relative flex items-center gap-3 pl-6 pr-4 py-3 hover:bg-accent cursor-pointer group">
+              <span class="absolute left-0 top-0 bottom-0 w-[3px] bg-danger"></span>
+              <div class="min-w-0 flex-1">
+                <div class="font-medium truncate">mail.example.com</div>
+                <div class="mt-1 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                  <span data-status="renewal_failed"></span>
+                  <span class="tt cursor-help" data-tip="生效 2025-07-22 09:15 UTC&#10;失效 2026-07-20 09:15 UTC">失效 2026-07-20 · 剩 4 天</span>
+                </div>
+              </div>
+              <button class="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-primary hover:bg-primary/10 shrink-0" onclick="event.stopPropagation()">失败原因<span data-icon="arrow-up-right" data-size="13"></span></button>
+              <span class="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" data-icon="chevron-right" data-size="16"></span>
+            </li>
+            <!-- 3) 签发失败(告警级) -->
+            <li class="relative flex items-center gap-3 pl-6 pr-4 py-3 hover:bg-accent cursor-pointer group">
+              <span class="absolute left-0 top-0 bottom-0 w-[3px] bg-danger"></span>
+              <div class="min-w-0 flex-1">
+                <div class="font-medium truncate">new.internal.corp</div>
+                <div class="mt-1 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                  <span data-status="issue_failed"></span>
+                  <span>尚未签发</span>
+                </div>
+              </div>
+              <button class="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium text-primary hover:bg-primary/10 shrink-0" onclick="event.stopPropagation()">失败原因<span data-icon="arrow-up-right" data-size="13"></span></button>
+              <span class="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" data-icon="chevron-right" data-size="16"></span>
+            </li>
+            <!-- 4) 即将到期(关注级) -->
+            <li class="relative flex items-center gap-3 pl-6 pr-4 py-3 hover:bg-accent cursor-pointer group">
+              <span class="absolute left-0 top-0 bottom-0 w-[3px] bg-warning"></span>
+              <div class="min-w-0 flex-1">
+                <div class="font-medium truncate">api.example.com</div>
+                <div class="mt-1 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                  <span data-status="expiring_soon"></span>
+                  <span class="tt cursor-help" data-tip="生效 2026-04-26 10:30 UTC&#10;失效 2026-07-25 10:30 UTC">9 天后到期</span>
+                </div>
+              </div>
+              <span class="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" data-icon="chevron-right" data-size="16"></span>
+            </li>
+            <!-- 5) 即将到期(关注级) -->
+            <li class="relative flex items-center gap-3 pl-6 pr-4 py-3 hover:bg-accent cursor-pointer group">
+              <span class="absolute left-0 top-0 bottom-0 w-[3px] bg-warning"></span>
+              <div class="min-w-0 flex-1">
+                <div class="font-medium truncate">shop.example.com</div>
+                <div class="mt-1 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                  <span data-status="expiring_soon"></span>
+                  <span class="tt cursor-help" data-tip="生效 2026-04-29 14:00 UTC&#10;失效 2026-07-28 14:00 UTC">12 天后到期</span>
+                </div>
+              </div>
+              <span class="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" data-icon="chevron-right" data-size="16"></span>
+            </li>
+          </ul>
+          <p class="px-6 py-2.5 text-xs text-muted-foreground border-t border-border">共 5 项待处理 = 即将到期 2 + 失败 3(与三指标口径一致);点任一项进证书详情处置,处置完成后红点清零。</p>
+        </section>
+
+        <!-- 正向空态说明(pendingCount=0 时替换上方清单为此;此处为设计态注解,非当前渲染) -->
+        <details class="rounded-lg border border-dashed border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+          <summary class="cursor-pointer select-none">查看:全部处置完成后的「正向空态」(§7.9)</summary>
+          <div class="mt-3 flex flex-col items-center justify-center gap-1.5 py-8 text-center">
+            <span class="text-success" data-icon="circle-check" data-size="28"></span>
+            <div class="text-sm font-medium text-foreground">全部证书状态良好</div>
+            <div class="text-xs text-muted-foreground">没有需要处理的证书,红点已清零。</div>
+          </div>
+        </details>
+
+        <!-- ===== F5 常用操作入口(仅跳转;发起签发为主操作) ===== -->
+        <section>
+          <h2 class="text-base font-semibold mb-3">常用操作</h2>
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <button class="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-accent transition-colors">
+              <span class="inline-flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground shrink-0" data-icon="plus" data-size="18"></span>
+              <span class="min-w-0"><span class="block text-sm font-medium">发起签发</span><span class="block text-xs text-muted-foreground truncate">为域名签发新证书</span></span>
+            </button>
+            <button class="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-accent transition-colors">
+              <span class="inline-flex size-9 items-center justify-center rounded-md bg-secondary text-secondary-foreground shrink-0" data-icon="shield-check" data-size="18"></span>
+              <span class="min-w-0"><span class="block text-sm font-medium">查看全部证书</span><span class="block text-xs text-muted-foreground truncate">进入证书列表</span></span>
+            </button>
+            <button class="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-accent transition-colors">
+              <span class="inline-flex size-9 items-center justify-center rounded-md bg-secondary text-secondary-foreground shrink-0" data-icon="globe" data-size="18"></span>
+              <span class="min-w-0"><span class="block text-sm font-medium">域名管理</span><span class="block text-xs text-muted-foreground truncate">维护域名列表</span></span>
+            </button>
+            <button class="flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-accent transition-colors">
+              <span class="inline-flex size-9 items-center justify-center rounded-md bg-secondary text-secondary-foreground shrink-0" data-icon="list-checks" data-size="18"></span>
+              <span class="min-w-0"><span class="block text-sm font-medium">任务与历史</span><span class="block text-xs text-muted-foreground truncate">签发 / 续签 / 吊销记录</span></span>
+            </button>
+          </div>
+        </section>
+
+        <p class="text-xs text-muted-foreground/70 pt-2">
+          形态差异(§8.2 / H10):桌面形态红点同时体现在系统托盘图标角标(仅桌面);服务器形态体现在浏览器内(仅服务器)。触发规则两形态一致,此处以窗口内红点演示。
+        </p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+/* ===== 内联 lucide 图标(离线可渲染;§9 语义) ===== */
+const ICONS = {
+  'clock':'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'loader':'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  'triangle-alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  'circle-check':'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+  'shield-alert':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  'shield-check':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  'ban':'<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  'layout-dashboard':'<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+  'globe':'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  'badge-check':'<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/>',
+  'landmark':'<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
+  'list-checks':'<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  'settings':'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  'plus':'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  'arrow-up-right':'<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+  'chevron-right':'<path d="m9 18 6-6-6-6"/>',
+  'menu':'<line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/>',
+  'sun':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  'moon':'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'
+};
+function svg(name, opt){ opt = opt||{}; const s = opt.size||16; const cls = opt.cls||''; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="'+s+'" height="'+s+'" class="'+cls+'" style="display:block">'+(ICONS[name]||'')+'</svg>'; }
+function renderIcons(root){ (root||document).querySelectorAll('[data-icon]').forEach(function(el){ el.innerHTML = svg(el.getAttribute('data-icon'), { size: +el.getAttribute('data-size')||16 }); el.style.display = el.style.display || 'inline-flex'; }); }
+
+/* ===== StatusBadge 单一入口(systems §3.2 全表;禁手搓状态色) ===== */
+const STATUS = {
+  pending_issue:{l:'待签发',v:'info',i:'clock'},
+  issuing:{l:'签发中',v:'info',i:'loader',s:true},
+  issue_failed:{l:'签发失败',v:'danger',i:'triangle-alert'},
+  valid:{l:'有效',v:'success',i:'circle-check'},
+  expiring_soon:{l:'即将到期',v:'warning',i:'clock'},
+  renewing:{l:'续签中',v:'info',i:'loader',s:true},
+  renewal_failed:{l:'续签失败',v:'danger',i:'triangle-alert'},
+  expired:{l:'已过期',v:'danger',i:'shield-alert'},
+  revoking:{l:'吊销中',v:'info',i:'loader',s:true},
+  revoked:{l:'已吊销',v:'neutral',i:'ban'}
+};
+function renderStatusBadges(root){ (root||document).querySelectorAll('[data-status]').forEach(function(el){ const s = STATUS[el.getAttribute('data-status')]; if(!s) return; el.className = 'badge badge-'+s.v; el.innerHTML = '<span class="inline-flex shrink-0">'+svg(s.i,{size:12,cls:s.s?'spin':''})+'</span><span>'+s.l+'</span>'; }); }
+
+/* ===== 主题切换(§8;根节点 .dark class) ===== */
+(function(){
+  const btn = document.getElementById('themeToggle');
+  const moon = document.getElementById('iconMoon');
+  const sun = document.getElementById('iconSun');
+  btn.addEventListener('click', function(){
+    const dark = document.documentElement.classList.toggle('dark');
+    moon.classList.toggle('hidden', dark);
+    sun.classList.toggle('hidden', !dark);
+  });
+})();
+
+renderStatusBadges();
+renderIcons();
+</script>
+</body>
+</html>

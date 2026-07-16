@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "默认能力集。MVP 桌面壳不使用 Tauri IPC 业务数据通道(方案A:纯 HTTP/SSE 走回环 axum),仅需核心默认权限。",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -1,0 +1,59 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/api", "crates/server", "crates/desktop"]
+# Desktop (Tauri) pulls heavy webview/system deps; keep it out of the default set so
+# `cargo build` / `cargo run -p server` (milestone-1 must-pass) is never blocked by it.
+# Check it explicitly with `cargo check -p autohttps-desktop`.
+default-members = ["crates/core", "crates/api", "crates/server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.82"
+
+[workspace.dependencies]
+# --- persistence (TECH 决策2: SeaORM 1.x + SQLite, rustls runtime — 无 openssl, L7) ---
+sea-orm = { version = "1.1", default-features = false, features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+    "macros",
+    "with-uuid",
+] }
+sea-orm-migration = { version = "1.1", default-features = false, features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+] }
+
+# --- async runtime ---
+tokio = { version = "1", features = ["full"] }
+
+# --- HTTP surface (ARCHITECTURE §3 方案A: axum 0.8) ---
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# --- SPA embed ---
+rust-embed = { version = "8", features = ["mime-guess"] }
+mime_guess = "2"
+
+# --- serialization / types ---
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v7"] }
+time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
+ts-rs = "12"
+
+# --- errors / logging ---
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# --- internal crates ---
+autohttps-core = { path = "crates/core" }
+autohttps-api = { path = "crates/api" }
+
+[profile.dev]
+# Faster incremental link on Windows; keep debug info lean for milestone-1 iteration.
+debug = 1

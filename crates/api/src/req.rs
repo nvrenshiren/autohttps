@@ -1,0 +1,150 @@
+//! 请求体 DTO(camelCase)+ 查询参数结构。PATCH 用 double-option 区分 null(清空)与缺省(不改)。
+
+use crate::serde_helpers::double_option;
+use autohttps_core::enums::{IssuanceMethod, ValidationMethod};
+use serde::Deserialize;
+
+// ============ 请求体 ============
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueCertificateRequest {
+    pub issuance_method: IssuanceMethod,
+    pub domain_ids: Vec<String>,
+    #[serde(default)]
+    pub acme_account_id: Option<String>,
+    #[serde(default)]
+    pub root_ca_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDomainRequest {
+    pub hostname: String,
+    #[serde(default)]
+    pub group_name: Option<String>,
+    #[serde(default)]
+    pub remark: Option<String>,
+    #[serde(default)]
+    pub validation_method: Option<ValidationMethod>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDomainRequest {
+    #[serde(default, deserialize_with = "double_option")]
+    pub group_name: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub remark: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub validation_method: Option<Option<ValidationMethod>>,
+    /// 契约禁改(DECD2);出现即 422 hostname_immutable。
+    #[serde(default)]
+    pub hostname: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSettingsRequest {
+    #[serde(default)]
+    pub renewal_advance_days: Option<i32>,
+    #[serde(default)]
+    pub auto_renew_enabled: Option<bool>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub default_acme_account_id: Option<Option<String>>,
+    #[serde(default)]
+    pub autostart_enabled: Option<bool>,
+    #[serde(default)]
+    pub listen_address: Option<String>,
+    #[serde(default)]
+    pub listen_port: Option<i32>,
+    /// 只读(SF5);出现即 422 storage_path_read_only。
+    #[serde(default)]
+    pub data_storage_path: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PutHttp01ConfigRequest {
+    pub webroot_path: String,
+}
+
+// ============ 查询参数 ============
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CertListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    /// 证书状态,可多值(逗号分隔)。
+    pub status: Option<String>,
+    pub issuance_method: Option<String>,
+    pub domain: Option<String>,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub group: Option<String>,
+    pub certificate_state: Option<String>,
+    pub hostname: Option<String>,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub task_type: Option<String>,
+    /// 任务状态,可多值(逗号分隔);`queued,running` 即队列。
+    pub status: Option<String>,
+    pub certificate_id: Option<String>,
+    pub trigger: Option<String>,
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LogsQuery {
+    pub after_seq: Option<i32>,
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub status: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChallengeListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub task_id: Option<String>,
+    pub domain_id: Option<String>,
+    pub status: Option<String>,
+    pub certificate_id: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RootCaListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub status: Option<String>,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}

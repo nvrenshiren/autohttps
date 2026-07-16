@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>证书详情 · example.com · autohttps</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@import "tailwindcss";
+
+/* ===== @theme inline 映射(systems/app.md §2) ===== */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-muted: var(--success-muted);
+  --color-success-muted-foreground: var(--success-muted-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-muted-foreground: var(--warning-muted-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-muted: var(--danger-muted);
+  --color-danger-muted-foreground: var(--danger-muted-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-info-muted-foreground: var(--info-muted-foreground);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-muted: var(--neutral-muted);
+  --color-neutral-muted-foreground: var(--neutral-muted-foreground);
+  --color-notification: var(--notification);
+  --color-notification-foreground: var(--notification-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* ===== 色板(systems/app.md §1.1 亮色) ===== */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.21 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 260);
+  --primary: oklch(0.55 0.17 258);
+  --primary-foreground: oklch(0.985 0.003 260);
+  --secondary: oklch(0.968 0.006 260);
+  --secondary-foreground: oklch(0.30 0.02 260);
+  --muted: oklch(0.968 0.004 260);
+  --muted-foreground: oklch(0.552 0.02 260);
+  --accent: oklch(0.962 0.008 258);
+  --accent-foreground: oklch(0.30 0.02 260);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.922 0.006 260);
+  --input: oklch(0.922 0.006 260);
+  --ring: oklch(0.55 0.17 258);
+  --success: oklch(0.55 0.13 150);
+  --success-foreground: oklch(0.99 0 0);
+  --success-muted: oklch(0.95 0.05 150);
+  --success-muted-foreground: oklch(0.42 0.11 150);
+  --warning: oklch(0.72 0.15 75);
+  --warning-foreground: oklch(0.26 0.05 75);
+  --warning-muted: oklch(0.95 0.06 85);
+  --warning-muted-foreground: oklch(0.48 0.09 70);
+  --danger: oklch(0.58 0.22 27);
+  --danger-foreground: oklch(0.99 0 0);
+  --danger-muted: oklch(0.95 0.04 25);
+  --danger-muted-foreground: oklch(0.51 0.19 27);
+  --info: oklch(0.58 0.13 240);
+  --info-foreground: oklch(0.99 0 0);
+  --info-muted: oklch(0.95 0.045 240);
+  --info-muted-foreground: oklch(0.45 0.13 245);
+  --neutral: oklch(0.55 0.02 260);
+  --neutral-foreground: oklch(0.99 0 0);
+  --neutral-muted: oklch(0.96 0.004 260);
+  --neutral-muted-foreground: oklch(0.44 0.015 260);
+  --notification: oklch(0.58 0.22 27);
+  --notification-foreground: oklch(0.99 0 0);
+  --sidebar: oklch(0.985 0.003 260);
+  --sidebar-foreground: oklch(0.21 0.02 260);
+  --sidebar-primary: oklch(0.55 0.17 258);
+  --sidebar-primary-foreground: oklch(0.985 0.003 260);
+  --sidebar-accent: oklch(0.955 0.006 260);
+  --sidebar-accent-foreground: oklch(0.21 0.02 260);
+  --sidebar-border: oklch(0.922 0.006 260);
+  --sidebar-ring: oklch(0.55 0.17 258);
+  --radius: 0.5rem;
+}
+
+/* ===== 色板(systems/app.md §1.2 暗色) ===== */
+.dark {
+  --background: oklch(0.185 0.015 260);
+  --foreground: oklch(0.97 0.005 260);
+  --card: oklch(0.21 0.017 260);
+  --card-foreground: oklch(0.97 0.005 260);
+  --popover: oklch(0.21 0.017 260);
+  --popover-foreground: oklch(0.97 0.005 260);
+  --primary: oklch(0.62 0.16 258);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.27 0.015 260);
+  --secondary-foreground: oklch(0.97 0.005 260);
+  --muted: oklch(0.27 0.015 260);
+  --muted-foreground: oklch(0.70 0.02 260);
+  --accent: oklch(0.30 0.02 258);
+  --accent-foreground: oklch(0.97 0.005 260);
+  --destructive: oklch(0.65 0.20 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.16 258);
+  --success: oklch(0.68 0.14 150);
+  --success-foreground: oklch(0.18 0.02 150);
+  --success-muted: oklch(0.30 0.06 152);
+  --success-muted-foreground: oklch(0.82 0.12 150);
+  --warning: oklch(0.78 0.15 78);
+  --warning-foreground: oklch(0.24 0.04 75);
+  --warning-muted: oklch(0.33 0.06 75);
+  --warning-muted-foreground: oklch(0.86 0.12 82);
+  --danger: oklch(0.65 0.20 27);
+  --danger-foreground: oklch(0.99 0 0);
+  --danger-muted: oklch(0.32 0.09 27);
+  --danger-muted-foreground: oklch(0.83 0.13 25);
+  --info: oklch(0.66 0.14 240);
+  --info-foreground: oklch(0.16 0.02 240);
+  --info-muted: oklch(0.30 0.07 245);
+  --info-muted-foreground: oklch(0.82 0.11 240);
+  --neutral: oklch(0.70 0.02 260);
+  --neutral-foreground: oklch(0.18 0.02 260);
+  --neutral-muted: oklch(0.27 0.015 260);
+  --neutral-muted-foreground: oklch(0.78 0.02 260);
+  --notification: oklch(0.65 0.20 27);
+  --notification-foreground: oklch(0.99 0 0);
+  --sidebar: oklch(0.21 0.017 260);
+  --sidebar-foreground: oklch(0.97 0.005 260);
+  --sidebar-primary: oklch(0.62 0.16 258);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.27 0.015 260);
+  --sidebar-accent-foreground: oklch(0.97 0.005 260);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.62 0.16 258);
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
+  body { background-color: var(--background); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  input[type="checkbox"] { accent-color: var(--primary); width: 1rem; height: 1rem; }
+}
+@layer components {
+  .badge { display:inline-flex; align-items:center; gap:.25rem; height:1.25rem; padding-inline:.5rem; border-radius:var(--radius-md); font-size:.75rem; line-height:1; font-weight:500; white-space:nowrap; }
+  .badge-success { background:var(--success-muted); color:var(--success-muted-foreground); }
+  .badge-warning { background:var(--warning-muted); color:var(--warning-muted-foreground); }
+  .badge-danger  { background:var(--danger-muted);  color:var(--danger-muted-foreground); }
+  .badge-info    { background:var(--info-muted);    color:var(--info-muted-foreground); }
+  .badge-neutral { background:var(--neutral-muted); color:var(--neutral-muted-foreground); }
+  .badge-outline { background:transparent; border:1px solid var(--border); color:var(--muted-foreground); }
+  .badge-outline-warn { background:transparent; border:1px solid var(--warning); color:var(--warning-muted-foreground); }
+  .spin { animation: spin 1s linear infinite; transform-origin:center; }
+  .tt { position:relative; }
+  .tt::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); white-space:pre; background:var(--popover); color:var(--popover-foreground); border:1px solid var(--border); border-radius:var(--radius-md); padding:4px 8px; font-size:12px; font-family:var(--font-mono); line-height:1.35; box-shadow:0 4px 14px -4px color-mix(in oklab, var(--foreground) 20%, transparent); opacity:0; pointer-events:none; transition:opacity .12s; z-index:60; }
+  .tt:hover::after { opacity:1; }
+  .tt-text::after { font-family:var(--font-sans); white-space:normal; width:max-content; max-width:240px; text-align:left; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="min-h-screen">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- ============ Sidebar ============ -->
+  <aside class="hidden md:flex md:flex-col w-60 shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+    <div class="flex items-center gap-2 h-14 px-4 border-b border-sidebar-border shrink-0">
+      <span class="inline-flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground" data-icon="shield-check" data-size="18"></span>
+      <span class="font-semibold text-sm tracking-tight">autohttps</span>
+    </div>
+    <nav class="flex-1 p-2 space-y-0.5 overflow-auto">
+      <a href="#" class="relative flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+        <span class="relative inline-flex items-center justify-center">
+          <span data-icon="layout-dashboard" data-size="20"></span>
+          <span class="absolute -right-1.5 -top-1.5 min-w-4 h-4 px-1 inline-flex items-center justify-center text-[10px] leading-none rounded-full bg-notification text-notification-foreground">5</span>
+        </span>
+        <span>总览</span>
+      </a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="globe" data-size="20"></span><span>域名</span></a>
+      <a href="#" class="relative flex items-center gap-2.5 h-9 px-2.5 rounded-md bg-sidebar-accent text-sidebar-accent-foreground font-medium">
+        <span class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-sidebar-primary"></span>
+        <span class="text-sidebar-primary" data-icon="shield-check" data-size="20"></span><span>证书</span>
+      </a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="badge-check" data-size="20"></span><span>ACME</span></a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="landmark" data-size="20"></span><span>根 CA</span></a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="list-checks" data-size="20"></span><span>任务</span></a>
+      <a href="#" class="flex items-center gap-2.5 h-9 px-2.5 rounded-md text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><span data-icon="settings" data-size="20"></span><span>设置</span></a>
+    </nav>
+    <div class="p-3 border-t border-sidebar-border shrink-0">
+      <div class="flex items-center gap-2 text-xs text-muted-foreground">
+        <span class="inline-flex size-1.5 rounded-full bg-success"></span><span>运行形态:桌面</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ Main column ============ -->
+  <div class="flex-1 flex flex-col min-w-0">
+    <header class="flex items-center h-14 px-4 sm:px-6 border-b border-border gap-3 shrink-0">
+      <button class="md:hidden inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent" aria-label="打开菜单" data-icon="menu" data-size="18"></button>
+      <div class="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0">
+        <a href="#" class="hover:text-foreground shrink-0">证书</a>
+        <span class="opacity-60 shrink-0" data-icon="chevron-right" data-size="14"></span>
+        <span class="text-foreground font-medium truncate">example.com</span>
+      </div>
+      <div class="ml-auto flex items-center gap-1">
+        <button id="themeToggle" class="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent" aria-label="切换明暗主题">
+          <span id="iconMoon" class="inline-flex" data-icon="moon" data-size="18"></span>
+          <span id="iconSun" class="hidden" data-icon="sun" data-size="18"></span>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-auto">
+      <div class="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
+
+        <!-- ===== 页首:主域名 + 状态 + 操作行(有效证书:续签/导出/吊销/删除 均可用) ===== -->
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h1 class="text-xl font-semibold truncate">example.com</h1>
+              <span data-status="valid"></span>
+            </div>
+            <p class="text-sm text-muted-foreground mt-1">ACME 证书 · 2 个关联域名(含 1 个通配符)</p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:opacity-90"><span data-icon="rotate-cw" data-size="15"></span>续签</button>
+            <button onclick="document.getElementById('exportPreview').scrollIntoView({behavior:'smooth',block:'center'})" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-input text-sm font-medium hover:bg-accent"><span data-icon="download" data-size="15"></span>导出</button>
+            <button onclick="document.getElementById('revokePreview').scrollIntoView({behavior:'smooth',block:'center'})" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm font-medium text-danger hover:bg-danger-muted"><span data-icon="ban" data-size="15"></span>吊销</button>
+            <button onclick="document.getElementById('deletePreview').scrollIntoView({behavior:'smooth',block:'center'})" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm font-medium text-danger hover:bg-danger-muted"><span data-icon="trash-2" data-size="15"></span>删除</button>
+          </div>
+        </div>
+
+        <!-- ===== F1 完整信息 ===== -->
+        <section class="rounded-xl border border-border bg-card">
+          <div class="px-6 py-4 border-b border-border"><h2 class="text-base font-semibold">证书信息</h2></div>
+          <div class="p-6 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+
+            <!-- 关联域名(整行) -->
+            <div class="sm:col-span-2">
+              <dt class="text-[13px] font-medium text-muted-foreground mb-1.5">关联域名(SAN)</dt>
+              <dd class="flex flex-wrap items-center gap-2">
+                <a href="#" class="inline-flex items-center gap-1 text-sm font-medium hover:text-primary hover:underline">example.com<span class="text-muted-foreground" data-icon="arrow-up-right" data-size="13"></span></a>
+                <a href="#" class="inline-flex items-center gap-1.5 text-sm font-medium hover:text-primary hover:underline">*.example.com<span class="badge badge-outline">通配符</span><span class="text-muted-foreground" data-icon="arrow-up-right" data-size="13"></span></a>
+              </dd>
+            </div>
+
+            <!-- 当前状态 -->
+            <div>
+              <dt class="text-[13px] font-medium text-muted-foreground mb-1.5">当前状态</dt>
+              <dd><span data-status="valid"></span></dd>
+            </div>
+            <!-- 签发方式与来源 -->
+            <div>
+              <dt class="text-[13px] font-medium text-muted-foreground mb-1.5">签发方式与来源</dt>
+              <dd class="flex items-center gap-2 flex-wrap text-sm">
+                <span class="badge badge-outline"><span data-icon="key-round" data-size="12"></span>ACME</span>
+                <span>Let's Encrypt</span>
+                <span class="badge badge-outline">生产</span>
+              </dd>
+            </div>
+
+            <!-- 有效期 -->
+            <div>
+              <dt class="text-[13px] font-medium text-muted-foreground mb-1.5">有效期</dt>
+              <dd class="text-sm">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-[13px]">2026-06-20</span><span class="text-muted-foreground">→</span><span class="font-mono text-[13px]">2026-09-18</span>
+                </div>
+                <div class="mt-1 text-xs text-muted-foreground">64 天后到期</div>
+              </dd>
+            </div>
+            <!-- 签发时间 -->
+            <div>
+              <dt class="text-[13px] font-medium text-muted-foreground mb-1.5">最近签发</dt>
+              <dd class="text-sm"><span class="tt cursor-help" data-tip="2026-06-20 08:00 UTC">26 天前</span></dd>
+            </div>
+
+            <!-- 序列号(可复制,§7.10) -->
+            <div class="sm:col-span-2">
+              <dt class="text-[13px] font-medium text-muted-foreground mb-1.5">序列号</dt>
+              <dd class="flex items-center gap-2">
+                <code class="tt flex-1 min-w-0 truncate inline-flex items-center h-9 px-2.5 rounded-md border border-input bg-muted/40 font-mono text-[13px]" data-tip="03:AC:7F:1E:8B:D2:44:90:5C:F1:6A:33:9E:22:B0:71">03:AC:7F:1E:8B:D2:44:90:5C:F1:6A:33:9E:22:B0:71</code>
+                <button class="copybtn inline-flex size-9 items-center justify-center rounded-md border border-input hover:bg-accent shrink-0" data-copy="03:AC:7F:1E:8B:D2:44:90:5C:F1:6A:33:9E:22:B0:71" aria-label="复制序列号"><span class="copy-i" data-icon="copy" data-size="15"></span></button>
+              </dd>
+            </div>
+            <!-- 指纹(可复制,§7.10) -->
+            <div class="sm:col-span-2">
+              <dt class="text-[13px] font-medium text-muted-foreground mb-1.5">指纹(SHA-256)</dt>
+              <dd class="flex items-center gap-2">
+                <code class="tt flex-1 min-w-0 truncate inline-flex items-center h-9 px-2.5 rounded-md border border-input bg-muted/40 font-mono text-[13px]" data-tip="A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D:7E:8F:90:A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D:7E:8F:90">A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D:7E:8F:90:…</code>
+                <button class="copybtn inline-flex size-9 items-center justify-center rounded-md border border-input hover:bg-accent shrink-0" data-copy="A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D:7E:8F:90:A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D:7E:8F:90" aria-label="复制指纹"><span class="copy-i" data-icon="copy" data-size="15"></span></button>
+              </dd>
+            </div>
+
+            <!-- 证书链概要(整行,mono) -->
+            <div class="sm:col-span-2">
+              <dt class="text-[13px] font-medium text-muted-foreground mb-1.5">证书链概要</dt>
+              <dd>
+                <div class="rounded-md border border-border bg-muted/40 p-3 font-mono text-[13px] leading-relaxed">
+                  <div>叶子证书 &nbsp;CN=example.com</div>
+                  <div class="text-muted-foreground">&nbsp;└─ 中间 CA &nbsp;Let's Encrypt R11</div>
+                  <div class="text-muted-foreground">&nbsp;&nbsp;&nbsp;&nbsp;└─ 根 CA &nbsp;&nbsp;ISRG Root X1</div>
+                </div>
+              </dd>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 交互与状态设计态(说明:以下为该页在不同状态 / 操作下的设计态,运行时按当前状态动态呈现) ===== -->
+        <section class="space-y-3">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-semibold">交互与状态设计态</h2>
+            <span class="text-xs text-muted-foreground">运行时按证书当前状态动态呈现;此处平铺以便审阅</span>
+          </div>
+
+          <div class="grid gap-4 lg:grid-cols-2">
+            <!-- A. 导出面板 Dialog(H6:私钥风险 Alert + 勾选确认) -->
+            <div id="exportPreview" class="rounded-xl border border-border bg-popover shadow-lg overflow-hidden">
+              <div class="flex items-center justify-between px-5 py-3.5 border-b border-border">
+                <h3 class="font-semibold">导出证书</h3>
+                <button class="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent" aria-label="关闭" data-icon="x" data-size="16"></button>
+              </div>
+              <div class="p-5 space-y-4">
+                <p class="text-sm text-muted-foreground">选择导出内容(格式:PEM):</p>
+                <div class="space-y-2.5">
+                  <label class="flex items-center gap-2.5 text-sm cursor-pointer"><input type="checkbox" />叶子证书(leaf)</label>
+                  <label class="flex items-center gap-2.5 text-sm cursor-pointer"><input type="checkbox" checked />证书链(fullchain)</label>
+                  <label class="flex items-center gap-2.5 text-sm cursor-pointer"><input type="checkbox" id="pkck" />私钥(private key)</label>
+                </div>
+                <div id="pkAlert" style="display:none" class="flex items-start gap-2.5 rounded-lg border border-danger/40 bg-danger-muted p-3 text-danger-muted-foreground">
+                  <span class="mt-0.5 shrink-0" data-icon="triangle-alert" data-size="16"></span>
+                  <div class="text-xs">
+                    <div class="font-semibold">私钥是高度敏感数据</div>
+                    <div class="mt-0.5 opacity-90">导出后请妥善保管;泄露将危及所有依赖该证书的服务。</div>
+                    <label class="mt-2 flex items-center gap-2 font-medium cursor-pointer"><input type="checkbox" id="ackck" />我已了解导出私钥的风险</label>
+                  </div>
+                </div>
+                <p class="text-xs text-muted-foreground">桌面形态保存到本地路径 · 服务器形态浏览器下载(仅对应形态,H10)。</p>
+              </div>
+              <div class="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-border">
+                <button class="h-9 px-4 rounded-md border border-input text-sm hover:bg-accent">取消</button>
+                <button id="exportBtn" class="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"><span data-icon="download" data-size="15"></span>导出</button>
+              </div>
+            </div>
+
+            <!-- B. 破坏性二次确认 AlertDialog(H5:吊销;删除同范式) -->
+            <div id="revokePreview" class="rounded-xl border border-border bg-popover shadow-lg overflow-hidden">
+              <div class="p-5">
+                <div class="flex items-center gap-2.5 mb-3">
+                  <span class="inline-flex size-9 items-center justify-center rounded-full bg-danger-muted text-danger-muted-foreground shrink-0" data-icon="ban" data-size="18"></span>
+                  <h3 class="font-semibold text-base">吊销该证书?</h3>
+                </div>
+                <p class="text-sm text-muted-foreground">吊销后,CA 将把该证书标记为作废,依赖它的服务会中断,且<span class="text-foreground font-medium">此操作不可撤销</span>。吊销中若失败会回退到当前状态并提示错误。</p>
+              </div>
+              <div class="flex items-center justify-end gap-2 px-5 pb-5">
+                <button class="h-9 px-4 rounded-md border border-input text-sm hover:bg-accent">取消</button>
+                <button class="inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90"><span data-icon="ban" data-size="15"></span>确认吊销</button>
+              </div>
+              <div id="deletePreview" class="px-5 pb-5 -mt-1">
+                <div class="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
+                  删除采用同一 <span class="font-medium text-foreground">AlertDialog</span> 范式:写清「移除条目与本地文件、退出状态机、历史任务只读保留」,确认按钮同为 <span class="text-danger font-medium">destructive</span>;删除成功后返回证书列表。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- C. 操作可用性随状态(H4:禁用 + Tooltip 给因;F8:失败原因入口) -->
+          <div class="rounded-xl border border-border bg-card overflow-hidden">
+            <div class="px-6 py-4 border-b border-border">
+              <h3 class="font-semibold">操作可用性随状态(H4)</h3>
+              <p class="text-xs text-muted-foreground mt-0.5">同一批按钮在不同状态下的可用 / 禁用;禁用按钮悬停显示原因。</p>
+            </div>
+            <div class="divide-y divide-border">
+
+              <!-- 已过期:可续签/导出/删除;吊销禁用 -->
+              <div class="flex items-center gap-3 flex-wrap px-6 py-4">
+                <span data-status="expired"></span>
+                <span class="text-sm text-muted-foreground w-40 shrink-0">legacy.example.com</span>
+                <div class="flex items-center gap-2 flex-wrap ml-auto">
+                  <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"><span data-icon="rotate-cw" data-size="14"></span>续签</button>
+                  <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm hover:bg-accent"><span data-icon="download" data-size="14"></span>导出</button>
+                  <span class="tt tt-text inline-flex" data-tip="已过期证书不可吊销;可续签重新获取或删除。">
+                    <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-sm text-muted-foreground opacity-50 cursor-not-allowed" disabled><span data-icon="ban" data-size="14"></span>吊销</button>
+                  </span>
+                  <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium text-danger hover:bg-danger-muted"><span data-icon="trash-2" data-size="14"></span>删除</button>
+                </div>
+              </div>
+
+              <!-- 续签中(进行中):导出可用;删除禁用 + 查看任务 -->
+              <div class="flex items-center gap-3 flex-wrap px-6 py-4">
+                <span data-status="renewing"></span>
+                <span class="text-sm text-muted-foreground w-40 shrink-0">cdn.example.com</span>
+                <div class="flex items-center gap-2 flex-wrap ml-auto">
+                  <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm hover:bg-accent"><span data-icon="arrow-up-right" data-size="14"></span>查看任务</button>
+                  <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm hover:bg-accent"><span data-icon="download" data-size="14"></span>导出</button>
+                  <span class="tt tt-text inline-flex" data-tip="进行中不可删除;请先在任务处取消或等任务结束。">
+                    <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-sm text-muted-foreground opacity-50 cursor-not-allowed" disabled><span data-icon="trash-2" data-size="14"></span>删除</button>
+                  </span>
+                </div>
+              </div>
+
+              <!-- 续签失败:重试续签(主操作)+ 失败原因 Alert + 查看任务(F8) -->
+              <div class="px-6 py-4 space-y-3">
+                <div class="flex items-center gap-3 flex-wrap">
+                  <span data-status="renewal_failed"></span>
+                  <span class="text-sm text-muted-foreground w-40 shrink-0">mail.example.com</span>
+                  <div class="flex items-center gap-2 flex-wrap ml-auto">
+                    <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"><span data-icon="rotate-cw" data-size="14"></span>重试续签</button>
+                    <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium text-danger hover:bg-danger-muted"><span data-icon="ban" data-size="14"></span>吊销</button>
+                    <button class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium text-danger hover:bg-danger-muted"><span data-icon="trash-2" data-size="14"></span>删除</button>
+                  </div>
+                </div>
+                <!-- F8:失败原因 Alert + 查看关联任务 -->
+                <div class="flex items-start gap-2.5 rounded-lg border border-danger/40 bg-danger-muted p-3 text-danger-muted-foreground">
+                  <span class="mt-0.5 shrink-0" data-icon="triangle-alert" data-size="16"></span>
+                  <div class="text-xs flex-1">
+                    <div class="font-semibold">上次续签失败</div>
+                    <div class="mt-0.5"><span class="font-mono">ACME 服务器速率限制,续签被拒</span> · <span class="tt cursor-help" data-tip="2026-07-14 03:22 UTC">2 天前</span></div>
+                  </div>
+                  <button class="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium border border-danger/50 hover:bg-danger/10 shrink-0">查看任务<span data-icon="arrow-up-right" data-size="13"></span></button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <p class="text-xs text-muted-foreground/80">
+            说明:不适用当前状态的操作(如非签发失败态的「重试首签」、非已吊销态的「重新签发」)在运行时<span class="text-foreground">隐藏</span>而非禁用;受状态阻断的操作(上表)保留但<span class="text-foreground">禁用并给因</span>(H4)。
+          </p>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- toast(复制反馈,§7.7) -->
+<div id="toast" class="fixed bottom-4 right-4 z-[100] hidden items-center gap-2 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg px-3.5 py-2.5 text-sm">
+  <span class="text-success shrink-0" data-icon="circle-check" data-size="16"></span><span id="toastMsg">已复制</span>
+</div>
+
+<script>
+const ICONS = {
+  'clock':'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'loader':'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  'triangle-alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  'circle-check':'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+  'shield-alert':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  'shield-check':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  'ban':'<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  'layout-dashboard':'<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+  'globe':'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  'badge-check':'<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/>',
+  'landmark':'<line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>',
+  'list-checks':'<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  'settings':'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  'plus':'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  'arrow-up-right':'<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
+  'chevron-right':'<path d="m9 18 6-6-6-6"/>',
+  'menu':'<line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/>',
+  'rotate-cw':'<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+  'download':'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  'trash-2':'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+  'copy':'<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  'check':'<polyline points="20 6 9 17 4 12"/>',
+  'key-round':'<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+  'x':'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'sun':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  'moon':'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'
+};
+function svg(name, opt){ opt = opt||{}; const s = opt.size||16; const cls = opt.cls||''; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="'+s+'" height="'+s+'" class="'+cls+'" style="display:block">'+(ICONS[name]||'')+'</svg>'; }
+function renderIcons(root){ (root||document).querySelectorAll('[data-icon]').forEach(function(el){ el.innerHTML = svg(el.getAttribute('data-icon'), { size: +el.getAttribute('data-size')||16 }); el.style.display = el.style.display || 'inline-flex'; }); }
+
+const STATUS = {
+  pending_issue:{l:'待签发',v:'info',i:'clock'},
+  issuing:{l:'签发中',v:'info',i:'loader',s:true},
+  issue_failed:{l:'签发失败',v:'danger',i:'triangle-alert'},
+  valid:{l:'有效',v:'success',i:'circle-check'},
+  expiring_soon:{l:'即将到期',v:'warning',i:'clock'},
+  renewing:{l:'续签中',v:'info',i:'loader',s:true},
+  renewal_failed:{l:'续签失败',v:'danger',i:'triangle-alert'},
+  expired:{l:'已过期',v:'danger',i:'shield-alert'},
+  revoking:{l:'吊销中',v:'info',i:'loader',s:true},
+  revoked:{l:'已吊销',v:'neutral',i:'ban'}
+};
+function renderStatusBadges(root){ (root||document).querySelectorAll('[data-status]').forEach(function(el){ const s = STATUS[el.getAttribute('data-status')]; if(!s) return; el.className = 'badge badge-'+s.v; el.innerHTML = '<span class="inline-flex shrink-0">'+svg(s.i,{size:12,cls:s.s?'spin':''})+'</span><span>'+s.l+'</span>'; }); }
+
+/* 主题切换 */
+(function(){
+  const btn = document.getElementById('themeToggle');
+  const moon = document.getElementById('iconMoon');
+  const sun = document.getElementById('iconSun');
+  btn.addEventListener('click', function(){
+    const dark = document.documentElement.classList.toggle('dark');
+    moon.classList.toggle('hidden', dark);
+    sun.classList.toggle('hidden', !dark);
+  });
+})();
+
+/* 复制反馈 toast(§7.10 / §7.7) */
+function showToast(msg){ const t=document.getElementById('toast'); document.getElementById('toastMsg').textContent=msg; t.style.display='inline-flex'; clearTimeout(window.__tt); window.__tt=setTimeout(function(){ t.style.display='none'; },1600); }
+function wireCopy(){ document.querySelectorAll('.copybtn').forEach(function(b){ b.addEventListener('click', function(){ const v=b.getAttribute('data-copy'); if(navigator.clipboard){ navigator.clipboard.writeText(v).catch(function(){}); } const i=b.querySelector('.copy-i'); if(i){ i.innerHTML=svg('check',{size:15}); setTimeout(function(){ i.innerHTML=svg('copy',{size:15}); },1200); } showToast('已复制'); }); }); }
+
+/* 导出面板:私钥风险 Alert + 勾选确认(H6) */
+(function(){
+  const pk=document.getElementById('pkck'), ack=document.getElementById('ackck'), alertBox=document.getElementById('pkAlert'), btn=document.getElementById('exportBtn');
+  function sync(){ const need=pk.checked; alertBox.style.display = need ? 'flex' : 'none'; const ok = !need || ack.checked; btn.disabled=!ok; btn.classList.toggle('opacity-50', !ok); btn.classList.toggle('cursor-not-allowed', !ok); }
+  pk.addEventListener('change', sync); ack.addEventListener('change', sync); sync();
+})();
+
+renderStatusBadges();
+renderIcons();
+wireCopy();
+</script>
+</body>
+</html>
