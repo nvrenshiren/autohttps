@@ -1,0 +1,32 @@
+{
+  "endpoints": ["app"],
+  "pipeline": ["product-manager", "architect", "designer", "developer", "qa"],
+  "docs": {
+    "prd": "docs/prd",
+    "architecture": "docs/architecture",
+    "design": "docs/design",
+    "acceptance": "docs/acceptance"
+  },
+  "codeRoots": {},
+  "cli": "npx -y @dawipong/opcflow",
+  "machineChecks": {
+    "enabled": false
+  },
+  "protocolLints": [],
+  "moduleMapping": {},
+  "feedbackHalfLifeDays": 15,
+  "gates": {
+    "approvalMode": "warn",
+    "writeGate": "observe"
+  },
+  "git": {
+    "taskTrailer": "off",
+    "trailerKey": "Task"
+  },
+  "platforms": ["claude", "opencode"],
+  "language": "zh",
+  "model": {
+    "claude": "MiniMax-M3",
+    "opencode": "minimax-cn-coding-plan/MiniMax-M3"
+  }
+}

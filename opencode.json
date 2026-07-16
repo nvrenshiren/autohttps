@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "opcflow": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@dawipong/opcflow",
+        "mcp"
+      ],
+      "enabled": true
+    }
+  }
+}

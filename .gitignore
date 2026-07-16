@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Caches
+.cache/
+.eslintcache
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment (keep example files tracked)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Editors / IDE
+.vscode/
+.idea/
+*.sw?
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# opcflow workbench (runtime orchestration state; SQLite WAL db)
+.workbench/
+
+# Rust build output (cargo workspace, added in later phases)
+target/
