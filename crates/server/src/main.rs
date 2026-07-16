@@ -47,6 +47,9 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!(recovered_tasks = recovered, "崩溃恢复:遗留 running 任务已置失败(可重试)");
     }
 
+    // 任务执行器(tokio worker):消费持久队列,承接 self_signed 签发/吊销(扫描器/ACME 打桩)
+    autohttps_core::services::executor::spawn(ctx.clone());
+
     // 监听地址:AUTOHTTPS_ADDR > settings 监听地址:端口 > 默认
     let settings = autohttps_core::services::settings::get_or_init(&ctx).await?;
     let addr = std::env::var("AUTOHTTPS_ADDR").unwrap_or_else(|_| {

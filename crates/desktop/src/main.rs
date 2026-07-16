@@ -45,6 +45,9 @@ async fn boot() -> anyhow::Result<(Router, TcpListener)> {
         tracing::warn!(recovered_tasks = recovered, "崩溃恢复:遗留 running 任务已置失败(可重试)");
     }
 
+    // 任务执行器(tokio worker):消费持久队列,承接 self_signed 签发/吊销(扫描器/ACME 打桩)
+    autohttps_core::services::executor::spawn(ctx.clone());
+
     let listener = TcpListener::bind(LOOPBACK_ADDR).await?;
     Ok((autohttps_api::app(ctx), listener))
 }

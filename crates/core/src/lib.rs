@@ -5,6 +5,7 @@
 //!
 //! 里程碑1 范围:CRUD/查询真实落库;ACME 签发、自签 CA、执行器、扫描器、age 加密、SSE 推送**打桩**。
 
+pub mod ca;
 pub mod domain;
 pub mod persistence;
 pub mod secrets;

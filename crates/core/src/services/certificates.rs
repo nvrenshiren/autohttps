@@ -351,6 +351,52 @@ pub async fn create(ctx: &CoreContext, input: IssueCertInput) -> CoreResult<Cert
     build_detail(db, cert).await
 }
 
+/// 吊销(D1,T8/T11/T16 → revoking):校验源态 → 证书转 `revoking` + 入队 `revoke` 任务;
+/// 实际作废(记根 CA 本地作废记录 + `revoking→revoked` T18)由执行器完成。202 已受理。
+pub async fn revoke(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
+    let db = &ctx.db;
+    let cert = certificates::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::CertNotFound, "证书不存在"))?;
+
+    // 适用源态:valid(T8)/ expiring_soon(T11)/ renewal_failed(T16);权威转移表不含 expired
+    if !cert.status.can_revoke() {
+        return Err(CoreError::new(ErrorCode::InvalidCertState, "当前状态不可吊销").with_details(
+            serde_json::json!({ "currentStatus": cert.status, "action": "revoke" }),
+        ));
+    }
+
+    let now = now_rfc3339();
+    // 证书 → revoking(T8/T11/T16)
+    let mut a: certificates::ActiveModel = cert.clone().into();
+    a.status = Set(CertificateStatus::Revoking);
+    a.updated_at = Set(now.clone());
+    let cert = a.update(db).await?;
+
+    // 入队 revoke 任务(TT1);执行器承接 self_signed 作废
+    tasks::ActiveModel {
+        id: Set(new_id()),
+        certificate_id: Set(cert.id.clone()),
+        task_type: Set(TaskType::Revoke),
+        trigger: Set(TaskTrigger::Manual),
+        status: Set(TaskStatus::Queued),
+        attempt_number: Set(1),
+        parent_task_id: Set(None),
+        queued_at: Set(now.clone()),
+        started_at: Set(None),
+        finished_at: Set(None),
+        result_summary: Set(None),
+        failure_reason: Set(None),
+        created_at: Set(now.clone()),
+        updated_at: Set(now),
+    }
+    .insert(db)
+    .await?;
+
+    build_detail(db, cert).await
+}
+
 pub async fn delete(ctx: &CoreContext, id: &str) -> CoreResult<()> {
     let db = &ctx.db;
     let cert = certificates::Entity::find_by_id(id)

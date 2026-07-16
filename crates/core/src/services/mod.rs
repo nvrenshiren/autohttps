@@ -9,6 +9,7 @@ pub mod certificates;
 pub mod context;
 pub mod dashboard;
 pub mod domains;
+pub mod executor;
 pub mod local_ca;
 pub mod pagination;
 pub mod settings;

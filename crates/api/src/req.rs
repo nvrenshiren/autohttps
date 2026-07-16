@@ -69,6 +69,25 @@ pub struct PutHttp01ConfigRequest {
     pub webroot_path: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRootCaRequest {
+    pub name: String,
+    /// 有效期(自 now 天数);服务层算 notBefore/notAfter。
+    pub validity_days: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportRootCaRequest {
+    pub name: String,
+    pub cert_pem: String,
+    pub private_key_pem: String,
+    /// 私钥受口令保护时提供(MVP 未支持加密私钥)。
+    #[serde(default)]
+    pub key_passphrase: Option<String>,
+}
+
 // ============ 查询参数 ============
 
 #[derive(Deserialize, Default)]

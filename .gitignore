@@ -14,8 +14,7 @@ build/
 
 # Runtime data (SQLite db + encrypted secrets + verification dirs — never commit)
 /data/
-.verify-data/
-.verify-run/
+.verify-*/
 
 # Caches
 .cache/

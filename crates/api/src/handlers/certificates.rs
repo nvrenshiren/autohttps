@@ -80,8 +80,13 @@ pub async fn retry(Path(_id): Path<String>) -> ApiResult<StatusCode> {
     Err(stub("重试"))
 }
 
-pub async fn revoke(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("吊销"))
+/// 吊销(D1,T8/T11/T16 → revoking)→ 入队 revoke 任务;执行器承接 self_signed 作废 → revoked。202。
+pub async fn revoke(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<CertificateDetail>)> {
+    let data = certificates::revoke(&st.ctx, &id).await?;
+    Ok((StatusCode::ACCEPTED, Json(dto::cert_detail(data))))
 }
 
 pub async fn export(Path(_id): Path<String>) -> ApiResult<StatusCode> {

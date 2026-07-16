@@ -9,7 +9,7 @@
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
 use rcgen::{
     CertificateParams, DnType, ExtendedKeyUsagePurpose, Issuer, IsCa, KeyPair, KeyUsagePurpose,
-    SanType, SerialNumber,
+    PublicKeyData, SanType, SerialNumber,
 };
 use sha2::{Digest, Sha256};
 use time::format_description::well_known::Rfc3339;
