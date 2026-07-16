@@ -9,11 +9,13 @@ use crate::domain::enums::{
     TaskType, ValidationMethod,
 };
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
+use crate::domain::events::DomainEvent;
 use crate::persistence::entities::{
     acme_accounts, certificate_domains, certificates, domains, internal_cert_revocations, root_cas,
     settings, tasks,
 };
 use crate::services::context::CoreContext;
+use crate::services::dashboard;
 use crate::services::pagination::{Paged, PageParams};
 use crate::services::settings::SINGLETON_ID;
 use crate::util::{days_until, new_id, now_rfc3339};
@@ -66,21 +68,23 @@ pub struct IssueCertInput {
     pub root_ca_id: Option<String>,
 }
 
-/// 入队一个任务(TT1)。触发方式统一 `manual`(operator 发起的签发/续签/吊销/重试);
-/// 自动续签(auto)与清理(cleanup)由各自路径单独构造。
+/// 入队一个任务(TT1)并发 `task_status_changed`(queued)。触发方式由调用方给出:operator 发起的
+/// 签发/续签/吊销/重试用 `manual`;扫描器自动续签用 `auto`(SF2);清理用 `cleanup`(见 delete)。
 async fn enqueue_task(
-    db: &DatabaseConnection,
+    ctx: &CoreContext,
     cert_id: &str,
     task_type: TaskType,
+    trigger: TaskTrigger,
     parent_task_id: Option<String>,
     attempt_number: i32,
     now: &str,
 ) -> CoreResult<()> {
+    let task_id = new_id();
     tasks::ActiveModel {
-        id: Set(new_id()),
+        id: Set(task_id.clone()),
         certificate_id: Set(cert_id.to_string()),
         task_type: Set(task_type),
-        trigger: Set(TaskTrigger::Manual),
+        trigger: Set(trigger),
         status: Set(TaskStatus::Queued),
         attempt_number: Set(attempt_number),
         parent_task_id: Set(parent_task_id),
@@ -92,8 +96,13 @@ async fn enqueue_task(
         created_at: Set(now.to_string()),
         updated_at: Set(now.to_string()),
     }
-    .insert(db)
+    .insert(&ctx.db)
     .await?;
+    ctx.emit(DomainEvent::TaskStatusChanged {
+        task_id,
+        certificate_id: cert_id.to_string(),
+        status: TaskStatus::Queued,
+    });
     Ok(())
 }
 
@@ -428,6 +437,7 @@ pub async fn create(ctx: &CoreContext, input: IssueCertInput) -> CoreResult<Cert
         updated_at: Set(now.clone()),
     };
     let cert = cert.insert(db).await?;
+    emit_cert(ctx, &cert_id, CertificateStatus::PendingIssue);
 
     for d in &found {
         certificate_domains::ActiveModel {
@@ -439,7 +449,8 @@ pub async fn create(ctx: &CoreContext, input: IssueCertInput) -> CoreResult<Cert
     }
 
     // 入队 issue 任务(TT1);执行器承接 self_signed 签发 → 驱动证书 T2–T4(acme 待后续)。
-    enqueue_task(db, &cert_id, TaskType::Issue, None, 1, &now).await?;
+    enqueue_task(ctx, &cert_id, TaskType::Issue, TaskTrigger::Manual, None, 1, &now).await?;
+    dashboard::emit_changed(ctx).await;
 
     build_detail(db, cert).await
 }
@@ -466,9 +477,11 @@ pub async fn revoke(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
     a.status = Set(CertificateStatus::Revoking);
     a.updated_at = Set(now.clone());
     let cert = a.update(db).await?;
+    emit_cert(ctx, &cert.id, CertificateStatus::Revoking);
 
     // 入队 revoke 任务(TT1);执行器承接 self_signed 作废
-    enqueue_task(db, &cert.id, TaskType::Revoke, None, 1, &now).await?;
+    enqueue_task(ctx, &cert.id, TaskType::Revoke, TaskTrigger::Manual, None, 1, &now).await?;
+    dashboard::emit_changed(ctx).await;
 
     build_detail(db, cert).await
 }
@@ -497,8 +510,10 @@ pub async fn renew(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
     a.last_error = Set(None);
     a.updated_at = Set(now.clone());
     let cert = a.update(db).await?;
+    emit_cert(ctx, &cert.id, CertificateStatus::Renewing);
 
-    enqueue_task(db, &cert.id, TaskType::Renew, None, 1, &now).await?;
+    enqueue_task(ctx, &cert.id, TaskType::Renew, TaskTrigger::Manual, None, 1, &now).await?;
+    dashboard::emit_changed(ctx).await;
     build_detail(db, cert).await
 }
 
@@ -533,7 +548,8 @@ pub async fn retry(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
         .one(db)
         .await?;
 
-    apply_retry(db, &cert, task_type, parent.as_ref()).await?;
+    apply_retry(ctx, &cert, task_type, parent.as_ref()).await?;
+    dashboard::emit_changed(ctx).await;
     let cert = certificates::Entity::find_by_id(id)
         .one(db)
         .await?
@@ -548,17 +564,18 @@ pub async fn derive_retry_from_task(
     cert: &certificates::Model,
     failed_task: &tasks::Model,
 ) -> CoreResult<()> {
-    apply_retry(&ctx.db, cert, failed_task.task_type, Some(failed_task)).await
+    apply_retry(ctx, cert, failed_task.task_type, Some(failed_task)).await
 }
 
 /// 重试派生核心:置证书进行中态(issue→issuing T5 / renew→renewing T14 / revoke→revoking)、
 /// 清 last_error、派生新任务入队。签名类任务(issue/renew)先校验来源。
 async fn apply_retry(
-    db: &DatabaseConnection,
+    ctx: &CoreContext,
     cert: &certificates::Model,
     task_type: TaskType,
     parent: Option<&tasks::Model>,
 ) -> CoreResult<()> {
+    let db = &ctx.db;
     if matches!(task_type, TaskType::Issue | TaskType::Renew) {
         validate_issuance_source(db, cert).await?;
     }
@@ -577,8 +594,27 @@ async fn apply_retry(
     a.last_error = Set(None);
     a.updated_at = Set(now.clone());
     a.update(db).await?;
-    enqueue_task(db, &cert.id, task_type, parent_id, attempt, &now).await?;
+    emit_cert(ctx, &cert.id, in_progress);
+    enqueue_task(ctx, &cert.id, task_type, TaskTrigger::Manual, parent_id, attempt, &now).await?;
     Ok(())
+}
+
+/// 扫描器自动续签(T9 / SF2:`trigger=auto`)。来源校验失败(self_signed 根 CA 非 active /
+/// acme 账户非 registered)则**跳过**(返回 `false`,避免失败循环空转);否则置证书 `renewing`
+/// + 入队 auto `renew` 任务。self_signed 由执行器承接重签;acme 任务留 queued(执行仍桩)。
+pub async fn auto_renew(ctx: &CoreContext, cert: &certificates::Model) -> CoreResult<bool> {
+    if validate_issuance_source(&ctx.db, cert).await.is_err() {
+        return Ok(false);
+    }
+    let now = now_rfc3339();
+    let mut a: certificates::ActiveModel = cert.clone().into();
+    a.status = Set(CertificateStatus::Renewing);
+    a.last_error = Set(None);
+    a.updated_at = Set(now.clone());
+    a.update(&ctx.db).await?;
+    emit_cert(ctx, &cert.id, CertificateStatus::Renewing);
+    enqueue_task(ctx, &cert.id, TaskType::Renew, TaskTrigger::Auto, None, 1, &now).await?;
+    Ok(true)
 }
 
 /// 取消 → 证书回退(T21–T24,证书状态机唯一真相;tasks 侧只触发)。由 tasks::cancel_task 调用。
@@ -636,7 +672,16 @@ pub async fn rollback_on_cancel(ctx: &CoreContext, task: &tasks::Model) -> CoreR
     }
     a.updated_at = Set(now_rfc3339());
     a.update(db).await?;
+    emit_cert(ctx, &cert.id, new_status);
     Ok(())
+}
+
+/// 发 `certificate_status_changed`(证书状态机唯一真相在 core,事件仅为失效信号,不搬实体)。
+fn emit_cert(ctx: &CoreContext, cert_id: &str, status: CertificateStatus) {
+    ctx.emit(DomainEvent::CertificateStatusChanged {
+        certificate_id: cert_id.to_string(),
+        status,
+    });
 }
 
 pub async fn delete(ctx: &CoreContext, id: &str) -> CoreResult<()> {
@@ -663,6 +708,7 @@ pub async fn delete(ctx: &CoreContext, id: &str) -> CoreResult<()> {
         .all(db)
         .await?;
     for t in unfinished {
+        let (tid, cid) = (t.id.clone(), t.certificate_id.clone());
         let mut a: tasks::ActiveModel = t.into();
         a.status = Set(TaskStatus::Cancelled);
         a.trigger = Set(TaskTrigger::Cleanup);
@@ -670,6 +716,11 @@ pub async fn delete(ctx: &CoreContext, id: &str) -> CoreResult<()> {
         a.result_summary = Set(Some("证书删除,清理未完成任务".into()));
         a.updated_at = Set(now.clone());
         a.update(db).await?;
+        ctx.emit(DomainEvent::TaskStatusChanged {
+            task_id: tid,
+            certificate_id: cid,
+            status: TaskStatus::Cancelled,
+        });
     }
 
     // 清除敏感/文件材料(按 *_ref)
@@ -686,6 +737,8 @@ pub async fn delete(ctx: &CoreContext, id: &str) -> CoreResult<()> {
         .exec(db)
         .await?;
     certificates::Entity::delete_by_id(id).exec(db).await?;
+    // 删除移除了一张证书 → 待处理集合可能变动,发红点合并信号。
+    dashboard::emit_changed(ctx).await;
     Ok(())
 }
 

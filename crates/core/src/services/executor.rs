@@ -11,11 +11,13 @@
 use crate::ca;
 use crate::domain::enums::{CertificateStatus, IssuanceMethod, RootCaStatus, TaskStatus, TaskType};
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
+use crate::domain::events::DomainEvent;
 use crate::persistence::entities::{
     certificate_domains, certificates, domains, internal_cert_revocations, root_cas,
     task_log_entries, tasks,
 };
 use crate::services::context::CoreContext;
+use crate::services::dashboard;
 use crate::util::{new_id, now_rfc3339};
 use sea_orm::*;
 use std::time::Duration;
@@ -89,6 +91,7 @@ async fn claim_and_run(
     a.started_at = Set(Some(now.clone()));
     a.updated_at = Set(now);
     let task = a.update(db).await?;
+    emit_task(ctx, &task, TaskStatus::Running);
 
     log(ctx, &task.id, "info", &format!("开始执行 {} 任务", task_type_label(task.task_type))).await?;
 
@@ -99,13 +102,16 @@ async fn claim_and_run(
     };
 
     match result {
-        Ok(summary) => succeed_task(ctx, &task, &summary).await,
+        Ok(summary) => succeed_task(ctx, &task, &summary).await?,
         Err(e) => {
             // 驱动证书失败态(证书状态机唯一真相)
             drive_cert_failure(ctx, &cert, task.task_type, &e.message).await?;
-            fail_task(ctx, &task, &e.message).await
+            fail_task(ctx, &task, &e.message).await?;
         }
     }
+    // 一次执行完成 → 证书可能进/出待处理集合,发红点合并信号。
+    dashboard::emit_changed(ctx).await;
+    Ok(())
 }
 
 /// self_signed 签发(T2 issuing → T3 valid):用指定根 CA 签发叶子(SAN=证书关联域名)。
@@ -177,6 +183,7 @@ async fn run_issue_self_signed(
     }
     .update(db)
     .await?;
+    emit_cert(ctx, &cert.id, CertificateStatus::Valid);
 
     Ok(format!("签发成功(序列号 {})", leaf.serial_number))
 }
@@ -251,6 +258,7 @@ async fn run_renew_self_signed(
     }
     .update(db)
     .await?;
+    emit_cert(ctx, &cert.id, CertificateStatus::Valid);
 
     // 清理旧文件材料(避免孤儿密文;换新私钥后旧私钥应销毁)
     if let Some(r) = old_cert_ref {
@@ -330,6 +338,7 @@ async fn drive_cert_failure(
     }
     .update(&ctx.db)
     .await?;
+    emit_cert(ctx, &cert.id, new_status);
     Ok(())
 }
 
@@ -347,6 +356,7 @@ async fn update_cert_status(
     }
     .update(&ctx.db)
     .await?;
+    emit_cert(ctx, cert_id, status);
     Ok(())
 }
 
@@ -359,7 +369,8 @@ async fn succeed_task(ctx: &CoreContext, task: &tasks::Model, summary: &str) -> 
     a.finished_at = Set(Some(now.clone()));
     a.result_summary = Set(Some(summary.to_string()));
     a.updated_at = Set(now);
-    a.update(&ctx.db).await?;
+    let task = a.update(&ctx.db).await?;
+    emit_task(ctx, &task, TaskStatus::Succeeded);
     Ok(())
 }
 
@@ -373,11 +384,13 @@ async fn fail_task(ctx: &CoreContext, task: &tasks::Model, reason: &str) -> Core
     a.failure_reason = Set(Some(reason.to_string()));
     a.result_summary = Set(Some("执行失败".to_string()));
     a.updated_at = Set(now);
-    a.update(&ctx.db).await?;
+    let task = a.update(&ctx.db).await?;
+    emit_task(ctx, &task, TaskStatus::Failed);
     Ok(())
 }
 
 /// 追加一条执行日志(seq 自增,单 worker 顺序稳定)。**脱敏**:message 绝不含密钥材料(AR4/L6)。
+/// 追加后发 `task_log_appended`(前端据 seq 增量拉 `?afterSeq`)。
 async fn log(ctx: &CoreContext, task_id: &str, level: &str, message: &str) -> CoreResult<()> {
     let db = &ctx.db;
     let seq = task_log_entries::Entity::find()
@@ -395,7 +408,25 @@ async fn log(ctx: &CoreContext, task_id: &str, level: &str, message: &str) -> Co
     }
     .insert(db)
     .await?;
+    ctx.emit(DomainEvent::TaskLogAppended { task_id: task_id.to_string(), seq });
     Ok(())
+}
+
+/// 发 `certificate_status_changed`(证书状态机唯一真相在 core,事件仅为失效信号)。
+fn emit_cert(ctx: &CoreContext, cert_id: &str, status: CertificateStatus) {
+    ctx.emit(DomainEvent::CertificateStatusChanged {
+        certificate_id: cert_id.to_string(),
+        status,
+    });
+}
+
+/// 发 `task_status_changed`(payload:taskId + 关联 certificateId + 新状态)。
+fn emit_task(ctx: &CoreContext, task: &tasks::Model, status: TaskStatus) {
+    ctx.emit(DomainEvent::TaskStatusChanged {
+        task_id: task.id.clone(),
+        certificate_id: task.certificate_id.clone(),
+        status,
+    });
 }
 
 /// 证书 SAN 域名 hostname 列表。

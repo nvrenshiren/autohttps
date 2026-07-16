@@ -1,7 +1,8 @@
 //! Boot 序列(ARCHITECTURE §7)—— 进程启动 → 开始服务前,由 server/desktop bin 统一调用。
 //!
-//! 里程碑1 实现:**任务崩溃恢复**(遗留 `running` → `failed` 可重试)为真实逻辑;
-//! **启动即全量扫描 / 自动续签** 依赖扫描器 + 执行器,打桩(TODO)。
+//! 实现:1) **任务崩溃恢复**(遗留 `running` → `failed` 可重试);2) **启动即全量扫描**
+//! (证书 T6/T10、根 CA L3)+ 3) 依 settings **自动续签**(经任务队列)。执行器/扫描周期任务
+//! 由 bin 在本序列之后 spawn。
 
 use crate::domain::enums::TaskStatus;
 use crate::domain::error::CoreResult;
@@ -35,8 +36,14 @@ pub async fn recover_tasks(ctx: &CoreContext) -> CoreResult<u64> {
 }
 
 /// 完整 boot 序列。返回崩溃恢复校正的任务数(供日志)。
+///
+/// 顺序要点(§7):先崩溃恢复(running→failed),使随后的扫描基于校正后的状态判定;再启动即全量
+/// 扫描 + 自动续签(经任务队列)。此时执行器/扫描周期任务尚未 spawn(由 bin 在本序列之后启动),
+/// 自动续签入队的任务会被随后 spawn 的执行器接管。
 pub async fn run(ctx: &CoreContext) -> CoreResult<u64> {
     let recovered = recover_tasks(ctx).await?;
-    // TODO(实现期):启动即全量扫描(certificates T6/T10、local-ca L3)+ 依 settings 自动续签(经任务队列)。
+    // 启动即检测:全量扫描(T6/T10 + L3)+ 依 settings 自动续签。
+    let report = crate::scan::scan_once(ctx).await?;
+    tracing::info!(?report, "boot 启动即全量扫描完成");
     Ok(recovered)
 }

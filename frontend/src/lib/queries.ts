@@ -9,6 +9,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { api, qs } from "@/lib/api";
+import { useUiStore } from "@/stores/ui";
 import type {
   AcmeAccountSummary,
   AppInfo,
@@ -31,6 +32,15 @@ import type {
   UpdateDomainRequest,
   UpdateSettingsRequest,
 } from "@/bindings";
+
+/**
+ * SSE 断线时的低频轮询兜底(common/events.md §5)。SSE 连上时纯靠事件 `invalidate`(返回 false 不轮询);
+ * 断开且未及时重连时对"关键列表"(dashboard / 证书 / 任务)启用 refetchInterval,恢复后自动停轮询。
+ */
+const FALLBACK_POLL_MS = 15_000;
+function useFallbackInterval(): number | false {
+  return useUiStore((s) => (s.sseConnected ? false : FALLBACK_POLL_MS));
+}
 
 export const qk = {
   appInfo: ["app-info"] as const,
@@ -62,6 +72,7 @@ export function useDashboard() {
   return useQuery({
     queryKey: qk.dashboard,
     queryFn: () => api.get<DashboardOverview>("/dashboard"),
+    refetchInterval: useFallbackInterval(),
   });
 }
 
@@ -94,6 +105,7 @@ export function useCertificates(f: CertFilter) {
           }),
       ),
     placeholderData: keepPreviousData,
+    refetchInterval: useFallbackInterval(),
   });
 }
 
@@ -101,6 +113,7 @@ export function useCertificate(id: string) {
   return useQuery({
     queryKey: qk.certificate(id),
     queryFn: () => api.get<CertificateDetail>(`/certificates/${id}`),
+    refetchInterval: useFallbackInterval(),
   });
 }
 
@@ -245,6 +258,7 @@ export function useTasks(f: TaskFilter) {
           }),
       ),
     placeholderData: keepPreviousData,
+    refetchInterval: useFallbackInterval(),
   });
 }
 
@@ -252,6 +266,7 @@ export function useTask(id: string) {
   return useQuery({
     queryKey: qk.task(id),
     queryFn: () => api.get<TaskDetail>(`/tasks/${id}`),
+    refetchInterval: useFallbackInterval(),
   });
 }
 
@@ -259,6 +274,7 @@ export function useTaskLogs(id: string) {
   return useQuery({
     queryKey: qk.taskLogs(id),
     queryFn: () => api.get<Page<TaskLogEntry>>(`/tasks/${id}/logs` + qs({ pageSize: 500 })),
+    refetchInterval: useFallbackInterval(),
   });
 }
 

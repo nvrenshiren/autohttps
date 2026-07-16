@@ -4,7 +4,7 @@
 //! REST/SSE 统一挂在 `/api` 基路径下(避免与 SPA client-side 路由如 `/certificates` 冲突);
 //! 前端 api 客户端以 `/api` 为 baseURL。资源命名遵 common §7。
 //!
-//! 里程碑1:读取/CRUD 真实落库;签发/续签/吊销执行、ACME、自签 CA、SSE 推送**打桩**。
+//! 进度:读取/CRUD、签发/续签/吊销执行、自签 CA、扫描器、**SSE 实时推送**均已实现;ACME 全线仍打桩。
 
 pub mod dto;
 pub mod embed;
@@ -102,5 +102,5 @@ pub fn app(ctx: CoreContext) -> Router {
         .layer(TraceLayer::new_for_http())
 }
 
-/// 桩:里程碑1 SSE 广播尚无 core 事件源。保留供实现期 core 服务经 `AppState.events` 发出事件。
-pub use events::{EventType, ServerEvent};
+/// SSE wire 契约(单一定义,导出 TS):事件类型枚举 + 包络 + core `DomainEvent` → 包络的映射。
+pub use events::{to_server_event, EventType, ServerEvent};

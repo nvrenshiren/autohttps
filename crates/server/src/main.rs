@@ -41,14 +41,16 @@ async fn main() -> anyhow::Result<()> {
         env!("CARGO_PKG_VERSION").to_string(),
     );
 
-    // boot:崩溃恢复(running→failed 可重试);扫描/自动续签打桩
+    // boot:崩溃恢复(running→failed 可重试)+ 启动即全量扫描(T6/T10 + L3)+ 依 settings 自动续签
     let recovered = autohttps_core::boot::run(&ctx).await?;
     if recovered > 0 {
         tracing::warn!(recovered_tasks = recovered, "崩溃恢复:遗留 running 任务已置失败(可重试)");
     }
 
-    // 任务执行器(tokio worker):消费持久队列,承接 self_signed 签发/吊销(扫描器/ACME 打桩)
+    // 任务执行器(tokio worker):消费持久队列,承接 self_signed 签发/续签/吊销(ACME 执行仍桩)
     autohttps_core::services::executor::spawn(ctx.clone());
+    // 扫描调度器(周期任务):到期判定(证书 T6/T10、根 CA L3)+ 自动续签触发
+    autohttps_core::scan::spawn(ctx.clone());
 
     // 监听地址:AUTOHTTPS_ADDR > settings 监听地址:端口 > 默认
     let settings = autohttps_core::services::settings::get_or_init(&ctx).await?;

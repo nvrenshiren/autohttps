@@ -3,9 +3,11 @@
 
 use crate::domain::enums::{TaskStatus, TaskTrigger, TaskType};
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
+use crate::domain::events::DomainEvent;
 use crate::persistence::entities::{certificate_domains, certificates, domains, task_log_entries, tasks};
 use crate::services::certificates as cert_svc;
 use crate::services::context::CoreContext;
+use crate::services::dashboard;
 use crate::services::pagination::{Paged, PageParams};
 use crate::util::now_rfc3339;
 use sea_orm::*;
@@ -205,9 +207,15 @@ pub async fn cancel_task(ctx: &CoreContext, id: &str) -> CoreResult<CancelOutcom
     a.result_summary = Set(Some("任务已取消".to_string()));
     a.updated_at = Set(now);
     let task = a.update(db).await?;
+    ctx.emit(DomainEvent::TaskStatusChanged {
+        task_id: task.id.clone(),
+        certificate_id: task.certificate_id.clone(),
+        status: TaskStatus::Cancelled,
+    });
 
-    // 驱动证书回退(T21–T24);证书状态机唯一真相,本模块只触发。
+    // 驱动证书回退(T21–T24);证书状态机唯一真相,本模块只触发(其内部发 certificate_status_changed)。
     cert_svc::rollback_on_cancel(ctx, &task).await?;
+    dashboard::emit_changed(ctx).await;
 
     let detail = get(ctx, id).await?;
     Ok(CancelOutcome { was_running, detail })
@@ -234,8 +242,9 @@ pub async fn retry_task(ctx: &CoreContext, id: &str) -> CoreResult<TaskDetailDat
         .await?
         .ok_or_else(|| CoreError::new(ErrorCode::CertificateDeleted, "关联证书已删除,不可重试"))?;
 
-    // 派生 + 驱动证书回进行中态(收敛于 certificates 服务)
+    // 派生 + 驱动证书回进行中态(收敛于 certificates 服务;其内部发 certificate/task 事件)
     cert_svc::derive_retry_from_task(ctx, &cert, &task).await?;
+    dashboard::emit_changed(ctx).await;
 
     get(ctx, id).await
 }

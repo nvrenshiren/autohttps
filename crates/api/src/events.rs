@@ -1,9 +1,13 @@
-//! 全局 SSE 事件类型(common/events.md §4)—— 单一定义,导出 TS。
+//! 全局 SSE 事件类型(common/events.md §4)—— **wire 契约单一定义**,导出 TS。
 //!
-//! 里程碑1:`GET /events` 为**心跳骨架**(见 handlers/events.rs),core 尚未发事件(执行器/扫描器打桩)。
-//! `EventType` 与广播通道已就位,实现期由 core 服务经 `AppState.events` 发出。
+//! `GET /events`(见 handlers/events.rs)订阅 core 的领域事件广播(`CoreContext.events`),经
+//! [`to_server_event`] 映射为本模块的 `ServerEvent`(camelCase payload)后推给前端。core 只发语义
+//! 事件(`DomainEvent`,不感知 wire),api 独占 wire 契约 —— 分层不倒挂。
 
+use autohttps_core::domain::events::DomainEvent;
+use autohttps_core::util::now_rfc3339;
 use serde::Serialize;
+use serde_json::json;
 use ts_rs::TS;
 
 /// 事件类型(与 SSE `event:` 字段一致)。状态字段取值严格取 §4.3 wire 值。
@@ -43,4 +47,30 @@ pub struct ServerEvent {
     /// 事件发生时间(RFC3339 UTC)。
     pub at: String,
     pub payload: serde_json::Value,
+}
+
+/// 把 core 的语义事件映射为对外 SSE 包络。payload 键 **camelCase**(同 REST DTO),状态字段取
+/// 枚举 wire 值(serde snake_case,§4.3);**绝不含 `*_ref`/密钥**(L6)。
+pub fn to_server_event(ev: &DomainEvent) -> ServerEvent {
+    let (event_type, payload) = match ev {
+        DomainEvent::CertificateStatusChanged { certificate_id, status } => (
+            EventType::CertificateStatusChanged,
+            json!({ "certificateId": certificate_id, "status": status }),
+        ),
+        DomainEvent::TaskStatusChanged { task_id, certificate_id, status } => (
+            EventType::TaskStatusChanged,
+            json!({ "taskId": task_id, "certificateId": certificate_id, "status": status }),
+        ),
+        DomainEvent::TaskLogAppended { task_id, seq } => {
+            (EventType::TaskLogAppended, json!({ "taskId": task_id, "seq": seq }))
+        }
+        DomainEvent::RootCaStatusChanged { root_ca_id, status } => (
+            EventType::RootCaStatusChanged,
+            json!({ "rootCaId": root_ca_id, "status": status }),
+        ),
+        DomainEvent::DashboardChanged { pending_count } => {
+            (EventType::DashboardChanged, json!({ "pendingCount": pending_count }))
+        }
+    };
+    ServerEvent { event_type, at: now_rfc3339(), payload }
 }

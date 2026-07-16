@@ -45,8 +45,10 @@ async fn boot() -> anyhow::Result<(Router, TcpListener)> {
         tracing::warn!(recovered_tasks = recovered, "崩溃恢复:遗留 running 任务已置失败(可重试)");
     }
 
-    // 任务执行器(tokio worker):消费持久队列,承接 self_signed 签发/吊销(扫描器/ACME 打桩)
+    // 任务执行器(tokio worker):消费持久队列,承接 self_signed 签发/续签/吊销(ACME 执行仍桩)
     autohttps_core::services::executor::spawn(ctx.clone());
+    // 扫描调度器(周期任务):到期判定(证书 T6/T10、根 CA L3)+ 自动续签触发
+    autohttps_core::scan::spawn(ctx.clone());
 
     let listener = TcpListener::bind(LOOPBACK_ADDR).await?;
     Ok((autohttps_api::app(ctx), listener))
@@ -60,7 +62,7 @@ fn main() {
         )
         .init();
 
-    // 进程内 tokio 运行时承载 axum(回环)+ 任务执行器 + 扫描器(后两者里程碑1 打桩)。
+    // 进程内 tokio 运行时承载 axum(回环)+ 任务执行器 + 扫描调度器(boot 内 spawn)。
     let rt = tokio::runtime::Runtime::new().expect("创建 tokio 运行时失败");
     let (app, listener) = rt
         .block_on(boot())

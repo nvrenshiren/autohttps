@@ -2,6 +2,7 @@
 
 use crate::domain::enums::{CertificateStatus, IssuanceMethod};
 use crate::domain::error::CoreResult;
+use crate::domain::events::DomainEvent;
 use crate::persistence::entities::{certificate_domains, certificates, domains, tasks};
 use crate::services::context::CoreContext;
 use sea_orm::*;
@@ -108,4 +109,28 @@ pub async fn overview(ctx: &CoreContext) -> CoreResult<DashboardData> {
         pending_count: expiring_soon_count + failed_count,
         pending_items,
     })
+}
+
+/// 待处理计数(红点口径)= 即将到期 + 失败(issue_failed/renewal_failed/expired),同 `overview`。
+/// 供 `dashboard_changed` 事件携带的 `pendingCount`;不拉明细,仅两次 count。
+pub async fn pending_count(ctx: &CoreContext) -> CoreResult<u64> {
+    let db = &ctx.db;
+    let expiring_soon_count = certificates::Entity::find()
+        .filter(certificates::Column::Status.eq(CertificateStatus::ExpiringSoon))
+        .count(db)
+        .await?;
+    let failed_count = certificates::Entity::find()
+        .filter(certificates::Column::Status.is_in(FAILED))
+        .count(db)
+        .await?;
+    Ok(expiring_soon_count + failed_count)
+}
+
+/// 发 `dashboard_changed`(粗粒度红点合并信号)。在待处理集合可能变动的操作末尾调用。
+/// 计数失败仅告警、不阻断业务(事件是失效信号,前端仍会重取权威 `GET /dashboard`)。
+pub async fn emit_changed(ctx: &CoreContext) {
+    match pending_count(ctx).await {
+        Ok(pc) => ctx.emit(DomainEvent::DashboardChanged { pending_count: pc as i64 }),
+        Err(e) => tracing::warn!(error = %e, "dashboard_changed:pendingCount 计算失败,跳过本次红点信号"),
+    }
 }
