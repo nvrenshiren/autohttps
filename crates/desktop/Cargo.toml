@@ -21,6 +21,9 @@ tokio.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-tauri = { version = "2", features = [] }
-# 单实例:防同一形态跑两份争同一 SQLite(ARCHITECTURE §4.2)
+# tray-icon:系统托盘常驻 + 红点角标;image-png:从内嵌 PNG 解码托盘图标(Image::from_bytes)
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# 单实例:防同一形态跑两份争同一 SQLite(ARCHITECTURE §4.2);第二次启动聚焦已存在窗口
 tauri-plugin-single-instance = "2"
+# 开机自启:对应 settings.autostartEnabled(仅桌面,ARCHITECTURE §4.2)
+tauri-plugin-autostart = "2"

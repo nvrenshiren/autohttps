@@ -113,5 +113,8 @@ pub async fn update(ctx: &CoreContext, input: UpdateSettingsInput) -> CoreResult
         active.listen_port = Set(Some(v));
     }
     active.updated_at = Set(now_rfc3339());
-    Ok(active.update(db).await?)
+    let saved = active.update(db).await?;
+    // 内部信号:桌面壳据此即时同步开机自启到 OS(不上 SSE wire)。
+    ctx.emit(crate::domain::events::DomainEvent::SettingsChanged);
+    Ok(saved)
 }

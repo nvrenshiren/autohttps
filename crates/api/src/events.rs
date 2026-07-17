@@ -51,8 +51,13 @@ pub struct ServerEvent {
 
 /// 把 core 的语义事件映射为对外 SSE 包络。payload 键 **camelCase**(同 REST DTO),状态字段取
 /// 枚举 wire 值(serde snake_case,§4.3);**绝不含 `*_ref`/密钥**(L6)。
-pub fn to_server_event(ev: &DomainEvent) -> ServerEvent {
+///
+/// 返回 `None` = 该领域事件是**内部信号**、不投递到 SSE wire(如 `SettingsChanged` 仅供桌面壳
+/// 同步开机自启)。wire 契约(EventType/包络)不因内部事件而扩张。
+pub fn to_server_event(ev: &DomainEvent) -> Option<ServerEvent> {
     let (event_type, payload) = match ev {
+        // 内部信号:不上 wire(桌面壳专用,见 core `DomainEvent::SettingsChanged`)。
+        DomainEvent::SettingsChanged => return None,
         DomainEvent::CertificateStatusChanged { certificate_id, status } => (
             EventType::CertificateStatusChanged,
             json!({ "certificateId": certificate_id, "status": status }),
@@ -85,5 +90,5 @@ pub fn to_server_event(ev: &DomainEvent) -> ServerEvent {
             (EventType::DashboardChanged, json!({ "pendingCount": pending_count }))
         }
     };
-    ServerEvent { event_type, at: now_rfc3339(), payload }
+    Some(ServerEvent { event_type, at: now_rfc3339(), payload })
 }

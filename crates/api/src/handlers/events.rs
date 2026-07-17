@@ -18,11 +18,11 @@ pub async fn stream(
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let rx = st.ctx.events.subscribe();
     let stream = BroadcastStream::new(rx).filter_map(|msg| match msg {
-        Ok(ev) => {
-            let se = to_server_event(&ev);
+        // 内部信号(to_server_event 返回 None,如 SettingsChanged):不投递到 wire。
+        Ok(ev) => to_server_event(&ev).map(|se| {
             let data = serde_json::to_string(&se).unwrap_or_default();
-            Some(Ok(Event::default().event(se.event_type.as_str()).data(data)))
-        }
+            Ok(Event::default().event(se.event_type.as_str()).data(data))
+        }),
         // 订阅者落后被丢弃(Lagged):忽略;前端 onopen 重连后主动全量重取兜底(common/events §5)。
         Err(_) => None,
     });

@@ -31,4 +31,8 @@ pub enum DomainEvent {
     },
     /// 红点更新:待处理集合 / 三指标变化时的**粗粒度合并信号**;`pending_count` 口径同 `GET /dashboard`。
     DashboardChanged { pending_count: i64 },
+    /// 设置已变更(粗粒度**内部信号**)。桌面壳据此把 `autostart_enabled` 即时同步到 OS 开机自启,
+    /// 无需重启;方案 A 下前端只经 HTTP 改设置,壳无 IPC 通路,故复用领域事件总线。
+    /// **不映射到 SSE wire**(内部消费,见 api `to_server_event` 返回 None)。
+    SettingsChanged,
 }
