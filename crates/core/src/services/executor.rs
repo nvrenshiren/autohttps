@@ -82,17 +82,19 @@ pub async fn tick(ctx: &CoreContext) -> CoreResult<bool> {
         .all(db)
         .await?;
 
-    for task in queued {
-        let cert = certificates::Entity::find_by_id(&task.certificate_id).one(db).await?;
-        let Some(cert) = cert else {
-            // 证书已删除(删除会清理未完成任务;此为兜底)→ 置失败,不再纠缠
-            fail_task(ctx, &task, "关联证书已删除,任务无法执行").await?;
-            return Ok(true);
-        };
-        claim_and_run(ctx, task, cert).await?;
+    // 每次处理队首一个 queued 任务;外层循环反复 tick 排空(见 spawn)。
+    // 挂起的 DNS-01 任务转 running、不再被本查询取出,故不会阻塞队列。
+    let Some(task) = queued.into_iter().next() else {
+        return Ok(false); // 当前无 queued 任务 → 休眠
+    };
+    let cert = certificates::Entity::find_by_id(&task.certificate_id).one(db).await?;
+    let Some(cert) = cert else {
+        // 证书已删除(删除会清理未完成任务;此为兜底)→ 置失败,不再纠缠
+        fail_task(ctx, &task, "关联证书已删除,任务无法执行").await?;
         return Ok(true);
-    }
-    Ok(false)
+    };
+    claim_and_run(ctx, task, cert).await?;
+    Ok(true)
 }
 
 /// 认领任务(TT2 queued→running)并执行,据结果推进任务与证书状态机。
