@@ -14,7 +14,7 @@ use sea_orm::*;
 /// boot 序列第 1 步:任务崩溃恢复(tasks §3.3 底线:不卡死)。
 ///
 /// 遗留 `running`(上一进程执行中崩溃)→ 校正 `failed`(可重试);实际结果由后续证书扫描据实校正
-/// (DT2)。`queued` 保持不动(等执行器接管;里程碑1 执行器打桩,故 queued 会静置)。
+/// (DT2)。`queued` 保持不动(交执行器 worker 接管消费)。
 pub async fn recover_tasks(ctx: &CoreContext) -> CoreResult<u64> {
     let db = &ctx.db;
     let running = tasks::Entity::find()

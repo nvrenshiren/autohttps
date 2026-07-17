@@ -15,7 +15,7 @@ pub enum ErrorCode {
     ValidationFailed,
     NotFound,
     InternalError,
-    /// 里程碑1 打桩:依赖 ACME/CA/加密的动作尚未落地(non-contract,实现期移除)
+    /// 通用未实现动作码(501,non-contract);各功能均已落地,当前无产出方,保留作将来占位。
     NotImplemented,
 
     // --- certificates ---

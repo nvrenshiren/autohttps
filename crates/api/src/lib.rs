@@ -4,7 +4,7 @@
 //! REST/SSE 统一挂在 `/api` 基路径下(避免与 SPA client-side 路由如 `/certificates` 冲突);
 //! 前端 api 客户端以 `/api` 为 baseURL。资源命名遵 common §7。
 //!
-//! 进度:读取/CRUD、签发/续签/吊销执行、自签 CA、扫描器、**SSE 实时推送**均已实现;ACME 全线仍打桩。
+//! 进度:读取/CRUD、签发/续签/吊销执行、自签 CA、扫描器、SSE 实时推送、ACME 全线(账户/挑战/取证)均已实现。
 
 pub mod dto;
 pub mod embed;

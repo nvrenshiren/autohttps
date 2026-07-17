@@ -575,6 +575,18 @@ pub fn http01_config(m: autohttps_core::persistence::entities::http01_validation
     Http01Config { domain_id: m.domain_id, webroot_path: m.webroot_path, updated_at: m.updated_at }
 }
 
+/// DNS-01 提交前本地预检结果(acme api §2.3)。
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct DnsPrecheckResult {
+    pub propagated: bool,
+    pub observed_values: Vec<String>,
+}
+
+pub fn dns_precheck_result(o: acme::DnsPrecheckOutcome) -> DnsPrecheckResult {
+    DnsPrecheckResult { propagated: o.propagated, observed_values: o.observed_values }
+}
+
 pub fn challenge_summary(row: acme::ChallengeRow) -> ChallengeSummary {
     let c = row.challenge;
     ChallengeSummary {

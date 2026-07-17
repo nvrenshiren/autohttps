@@ -49,5 +49,13 @@ instant-acme = { version = "0.8", default-features = false, features = [
 ] }
 # 吊销请求需 `CertificateDer`(instant-acme 未 re-export;版本随 rustls/instant-acme 全树对齐)。
 rustls-pki-types = "1"
+
+# --- DNS-01 本地预检(acme flows §4.3:提交前查 TXT 是否生效)---
+# 仅默认 features(system-config + tokio):纯 UDP/TCP 查询,不启用任何 TLS/DNSSEC/DoH backend,
+# 故**不引入 aws-lc-rs 亦不引入 rustls**(保 Windows 构建无 cmake/nasm 依赖,L7)。
+hickory-resolver = { version = "0.25", default-features = false, features = [
+    "system-config",
+    "tokio",
+] }
 p12-keystore = "0.2.1"
 pem = "3.0.6"

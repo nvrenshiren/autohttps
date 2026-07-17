@@ -352,6 +352,12 @@ export interface ChallengeDetail extends ChallengeSummary {
   httpFileContent: string | null;
 }
 
+// DNS-01 提交前本地预检结果(GET /acme/challenges/{id}/dns-precheck)。
+export interface DnsPrecheckResult {
+  propagated: boolean;
+  observedValues: string[];
+}
+
 // ============ local-ca ============
 
 export interface RootCaSummary {

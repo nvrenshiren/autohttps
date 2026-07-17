@@ -1,9 +1,11 @@
-//! acme handlers —— 账户/挑战 list+detail、http01 get/put 真实读取;在线交互动作打桩 501。
+//! acme handlers —— 账户/挑战 list+detail、http01 get/put、账户动作(注册/编辑/重试/移除)、
+//! 挑战动作(dns-precheck 本地预检 / confirm / retry)均为真实实现。
 
 use crate::dto::{
-    self, AcmeAccountDetail, AcmeAccountSummary, ChallengeDetail, ChallengeSummary, Http01Config, Page,
+    self, AcmeAccountDetail, AcmeAccountSummary, ChallengeDetail, ChallengeSummary, DnsPrecheckResult,
+    Http01Config, Page,
 };
-use crate::error::{ApiError, ApiResult};
+use crate::error::ApiResult;
 use crate::extract::JsonBody;
 use crate::parse::parse_enum_opt;
 use crate::req::{
@@ -13,7 +15,6 @@ use crate::req::{
 use crate::state::AppState;
 use autohttps_core::enums::{AcmeAccountStatus, ChallengeStatus};
 use autohttps_core::services::acme;
-use autohttps_core::ErrorCode;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -145,10 +146,12 @@ pub async fn challenge_retry(
     Ok(StatusCode::ACCEPTED)
 }
 
-// --- 仍打桩:DNS-01 提交前本地预检(B4 可选,需 hickory-resolver;确认流不依赖之)---
-pub async fn dns_precheck(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(ApiError::new(
-        ErrorCode::NotImplemented,
-        "DNS-01 本地预检(dns-precheck)留后续:需 hickory-resolver;确认流不依赖之",
-    ))
+/// DNS-01 提交前本地预检(B4 可选)→ 本地解析器查 `_acme-challenge.<域名>` TXT 是否已生效。
+/// 只读、不改挑战状态;仅 DNS-01 适用(否则 `422 not_dns01_challenge`);查不到即 `propagated:false`。→ 200。
+pub async fn dns_precheck(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<DnsPrecheckResult>> {
+    let outcome = acme::dns_precheck(&st.ctx, &id).await?;
+    Ok(Json(dto::dns_precheck_result(outcome)))
 }

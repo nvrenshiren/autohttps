@@ -51,7 +51,7 @@ pub async fn create(
         acme_account_id: body.acme_account_id,
         root_ca_id: body.root_ca_id,
     };
-    // 创建 pending_issue 条目 + 入队 issue 任务;终态经 SSE 回推(执行器打桩)。202 已受理。
+    // 创建 pending_issue 条目 + 入队 issue 任务;终态由执行器处理后经 SSE 回推。202 已受理。
     let data = certificates::create(&st.ctx, input).await?;
     Ok((StatusCode::ACCEPTED, Json(dto::cert_detail(data))))
 }

@@ -6,8 +6,8 @@
 //!   `expiring_soon → expired`(T10,过 `not_after`);
 //! - 根 CA `active → expired`(local-ca L3,过有效期);
 //! - `autoRenewEnabled` 开:对 `expiring_soon` 发起续签任务(auto 触发,T9)、对 `renewal_failed`
-//!   且**未过期**者随扫描周期再尝试(依附扫描,无独立重试参数,SF2)。self_signed 由执行器跑通;
-//!   acme 证书扫描判定照做但续签**执行仍桩**(任务留 queued,见 executor)。
+//!   且**未过期**者随扫描周期再尝试(依附扫描,无独立重试参数,SF2)。续签由执行器承接:self_signed
+//!   直接重签;acme HTTP-01 自动完成、DNS-01 挂起于 `awaiting_manual` 等用户 confirm(见 executor)。
 //!
 //! 扫描周期为实现机制、**不暴露配置**(settings SF3);合理默认见 [`SCAN_INTERVAL`]。
 

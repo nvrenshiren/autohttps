@@ -601,7 +601,7 @@ async fn apply_retry(
 
 /// 扫描器自动续签(T9 / SF2:`trigger=auto`)。来源校验失败(self_signed 根 CA 非 active /
 /// acme 账户非 registered)则**跳过**(返回 `false`,避免失败循环空转);否则置证书 `renewing`
-/// + 入队 auto `renew` 任务。self_signed 由执行器承接重签;acme 任务留 queued(执行仍桩)。
+/// + 入队 auto `renew` 任务。执行器承接重签(self_signed 直接重签;acme HTTP-01 自动完成、DNS-01 挂起于 `awaiting_manual` 等用户 confirm)。
 pub async fn auto_renew(ctx: &CoreContext, cert: &certificates::Model) -> CoreResult<bool> {
     if validate_issuance_source(&ctx.db, cert).await.is_err() {
         return Ok(false);

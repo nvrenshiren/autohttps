@@ -1,9 +1,9 @@
 //! ACME 服务(API acme)—— 账户 / 挑战 list+detail、http01 配置 get/put 为真实读取。
 //! 账户注册(A1)/ 编辑邮箱(A3)/ 注册重试(A4)/ 移除(A5)、DNS-01 挑战确认(B4)/ 重试(B5)
 //! 均已去桩;ACME order 机制(建单/挑战推进/finalize/吊销)在 `executor`,本模块委派。
-//! `dns-precheck`(B4 可选,需 hickory-resolver)仍在 api 层打桩。
+//! `dns-precheck`(B4 可选)用 hickory-resolver 本地查 TXT 预检,已实现(见 [`dns_precheck`])。
 
-use crate::domain::enums::AcmeAccountStatus;
+use crate::domain::enums::{AcmeAccountStatus, ValidationMethod};
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
 use crate::domain::events::DomainEvent;
 use crate::persistence::entities::{
@@ -481,6 +481,71 @@ pub async fn confirm_challenge(ctx: &CoreContext, id: &str) -> CoreResult<Challe
 /// 挑战失败重试(B5,CT7)→ 重建订单取新挑战(委派证书重试;派生新任务)。
 pub async fn retry_challenge(ctx: &CoreContext, id: &str) -> CoreResult<()> {
     crate::services::executor::retry_challenge(ctx, id).await
+}
+
+// ============ DNS-01 提交前本地预检(B4 可选,acme api §2.3 / flows §4.3)============
+
+/// dns-precheck 结果(acme api §2.3 `{ propagated, observedValues }`)。
+pub struct DnsPrecheckOutcome {
+    /// 待添加的 `dns_txt_value` 是否已出现在实测 TXT 记录中(即已生效)。
+    pub propagated: bool,
+    /// 本地解析器实测到的该 TXT 名下的全部记录值(供 UI 对照排障)。
+    pub observed_values: Vec<String>,
+}
+
+/// DNS-01 提交前本地预检(B4 可选):用系统 DNS 解析器查该挑战 `dns_txt_name`(即 `_acme-challenge.<域名>`)
+/// 的 TXT 记录,判断待添加的 `dns_txt_value` 是否已生效。**只读、不改挑战状态**(acme api §2.3)。
+///
+/// - 仅 DNS-01 挑战适用,否则 `not_dns01_challenge`(422)。
+/// - 查询失败(NXDOMAIN / 超时 / 无记录 / 解析器不可用)**不视为挑战失败**,如实返回
+///   `propagated=false` + 空 `observed_values`(flows §4.3 本地预检语义;失败仅告警日志,不上抛 HTTP 错误)。
+pub async fn dns_precheck(ctx: &CoreContext, id: &str) -> CoreResult<DnsPrecheckOutcome> {
+    let challenge = challenges::Entity::find_by_id(id)
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::ChallengeNotFound, "挑战不存在"))?;
+    if challenge.validation_method != ValidationMethod::Dns01 {
+        return Err(CoreError::new(
+            ErrorCode::NotDns01Challenge,
+            "本地预检仅适用于 DNS-01 挑战",
+        ));
+    }
+    // 查 TXT(名取挑战已算好的 dns_txt_name;为空则无可查 → 视为未生效)。
+    let observed = match challenge.dns_txt_name.as_deref().map(str::trim) {
+        Some(name) if !name.is_empty() => query_txt_records(name).await,
+        _ => Vec::new(),
+    };
+    let expected = challenge.dns_txt_value.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let propagated = expected.is_some_and(|e| observed.iter().any(|v| v.as_str() == e));
+    Ok(DnsPrecheckOutcome { propagated, observed_values: observed })
+}
+
+/// 用系统 DNS 解析器查 `name` 的全部 TXT 记录值。**任何失败(初始化 / NXDOMAIN / 超时 / 无记录)
+/// 均吞为空 Vec** —— 预检语义下"查不到"即"未生效",不作为 HTTP 错误上抛(acme api §2.3);失败仅日志。
+async fn query_txt_records(name: &str) -> Vec<String> {
+    let resolver = match hickory_resolver::TokioResolver::builder_tokio() {
+        Ok(b) => b.build(),
+        Err(e) => {
+            tracing::warn!(error = %e, "DNS 预检:初始化系统解析器失败(视为未生效)");
+            return Vec::new();
+        }
+    };
+    // 补足末尾点 → 绝对域名,避免解析器追加本地 search 域造成误查。
+    let fqdn = if name.ends_with('.') { name.to_string() } else { format!("{name}.") };
+    match resolver.txt_lookup(fqdn.clone()).await {
+        // 单条 TXT 记录的多个字符串按 wire 顺序拼接为完整值(ACME 值单串,拼接对其无影响)。
+        Ok(lookup) => lookup
+            .iter()
+            .map(|txt| {
+                let bytes: Vec<u8> = txt.txt_data().iter().flat_map(|s| s.iter().copied()).collect();
+                String::from_utf8_lossy(&bytes).into_owned()
+            })
+            .collect(),
+        Err(e) => {
+            tracing::debug!(name = %fqdn, error = %e, "DNS 预检:未查到 TXT(NXDOMAIN/超时/无记录,视为未生效)");
+            Vec::new()
+        }
+    }
 }
 
 /// MVP 最小邮箱校验:恰含一个 `@`,本地/域部分非空,域含 `.` 且首尾非 `.`。
