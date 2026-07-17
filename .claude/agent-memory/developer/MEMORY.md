@@ -5,3 +5,4 @@
 - [Windows 自验证踩坑](win-e2e-verification-gotchas.md) — Python 读 UTF-8 用 -X utf8;原生 Python 不认 MSYS /tmp;重建前杀 server.exe
 - [instant-acme 0.8 集成](instant-acme-integration.md) — features 要 ring;builder_with_root 信任 Pebble CA;finalize() 取叶子密钥;Pebble 随机有效期
 - [Tauri v2 桌面壳集成](tauri-desktop-shell.md) — 托盘句柄可跨线程;壳任务用 axum 的 rt.handle;回环端口固定 38443;自启 Rust 侧驱动+SettingsChanged
+- [Tauri 远程 URL IPC 授权 + 打包](tauri-remote-ipc-and-packaging.md) — 回环页=远程URL,JS IPC 需 remote.urls capability;fs 空scope=拒绝;tauri build 自下载 NSIS/WiX

@@ -17,7 +17,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
-import { useCertificate, useDeleteCertificate } from "@/lib/queries";
+import { useAppInfo, useCertificate, useDeleteCertificate } from "@/lib/queries";
 import type { CertificateStatus } from "@/bindings";
 import { api, ApiError } from "@/lib/api";
 import { downloadFile } from "@/lib/download";
@@ -124,6 +124,7 @@ export function CertificateDetailPage() {
   const qc = useQueryClient();
   const { data, isLoading, isError, error, refetch } = useCertificate(id);
   const del = useDeleteCertificate();
+  const isDesktop = useAppInfo().data?.runMode === "desktop";
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -161,9 +162,13 @@ export function CertificateDetailPage() {
     const q = `parts=${exportParts}${needsKeyAck ? "&acknowledgeKeyExport=true" : ""}`;
     setBusy(true);
     try {
-      await downloadFile(`/certificates/${id}/export?${q}`, `${primary}-${suffix}.pem`);
-      toast.success("导出完成");
-      setExportOpen(false);
+      const saved = await downloadFile(`/certificates/${id}/export?${q}`, `${primary}-${suffix}.pem`, {
+        desktop: isDesktop,
+      });
+      if (saved) {
+        toast.success("导出完成");
+        setExportOpen(false);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "导出失败");
     } finally {

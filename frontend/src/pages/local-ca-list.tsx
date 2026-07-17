@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Download, Landmark, Plus } from "lucide-react";
-import { useRootCas } from "@/lib/queries";
+import { useAppInfo, useRootCas } from "@/lib/queries";
 import type { RootCaSummary } from "@/bindings";
 import { ApiError } from "@/lib/api";
 import { downloadFile } from "@/lib/download";
@@ -33,6 +33,7 @@ const COLS = 6;
 
 export function RootCaListPage() {
   const navigate = useNavigate();
+  const isDesktop = useAppInfo().data?.runMode === "desktop";
   const [page, setPage] = useState(1);
   const [exportingId, setExportingId] = useState<string | null>(null);
 
@@ -49,8 +50,10 @@ export function RootCaListPage() {
   const onExport = async (ca: RootCaSummary) => {
     setExportingId(ca.id);
     try {
-      await downloadFile(`/root-cas/${ca.id}/export`, `root-ca-${ca.name || ca.id}.pem`);
-      toast.success("已导出根 CA 证书");
+      const saved = await downloadFile(`/root-cas/${ca.id}/export`, `root-ca-${ca.name || ca.id}.pem`, {
+        desktop: isDesktop,
+      });
+      if (saved) toast.success("已导出根 CA 证书");
     } catch (e) {
       toast.error(e instanceof ApiError || e instanceof Error ? e.message : "导出失败");
     } finally {

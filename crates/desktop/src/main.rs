@@ -13,8 +13,9 @@
 //! - **开机自启**(tauri-plugin-autostart;启动即把 settings.autostartEnabled 同步到 OS,
 //!   并订阅 SettingsChanged 即时同步运行期改动)。
 //!
-//! 导出(证书/根 CA)当前走 webview 下载兜底(WebView2 对 `<a download>` 原生触发保存);
-//! 原生保存对话框(tauri-plugin-dialog/-fs)留 TODO(见 frontend/src/lib/download.ts)。
+//! 导出(证书/根 CA):桌面形态走**原生保存对话框**(tauri-plugin-dialog `save()` 选路径 +
+//! tauri-plugin-fs `writeFile` 写盘);服务器形态无此二插件、仍走 webview `<a download>` 兜底。
+//! 分流在前端 `frontend/src/lib/download.ts` 按 `/app-info` 的 runMode 判定(方案A 交付通道分流)。
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -214,6 +215,10 @@ fn main() {
             MacosLauncher::LaunchAgent,
             None,
         ))
+        // 原生保存对话框 + 文件写入:桌面导出走 save() 选路径 + writeFile 写盘(前端 lib/download.ts
+        // 按 runMode=desktop 分流)。权限/scope 见 capabilities/default.json(远程回环 URL 授权)。
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(move |app| {
             // setup 给的是 &mut App;下面各 Manager 取用都只需不可变引用,重借为 &App 让泛型 &M 推断干净。
             let app = &*app;
