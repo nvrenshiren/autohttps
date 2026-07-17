@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type-check + build (tsc --noEmit && vite build)
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          if-no-files-found: error
+
+  rust:
+    name: Rust (check + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      # core / api / server exclude the Tauri desktop crate, which needs
+      # platform WebView/GTK system libraries; the desktop bundle is built
+      # locally via `tauri build`.
+      - name: Format check
+        run: cargo fmt --all --check
+        continue-on-error: true
+      - name: Clippy
+        run: cargo clippy -p autohttps-core -p autohttps-api -p server
+        continue-on-error: true
+      - name: Check
+        run: cargo check -p autohttps-core -p autohttps-api -p server
+      - name: Test
+        run: cargo test -p autohttps-core -p autohttps-api -p server

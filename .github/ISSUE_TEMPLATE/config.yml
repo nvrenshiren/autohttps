@@ -1,0 +1,7 @@
+# 禁止空白 issue,引导使用模板或 Discussions
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题 / 讨论
+    # 仓库上线 GitHub 后请把 URL 改为实际的 Discussions 地址
+    url: https://github.com/Dawi/autohttps/discussions
+    about: 使用问题、想法与提问请到 Discussions,而不是开 issue。

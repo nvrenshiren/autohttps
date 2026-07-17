@@ -1,0 +1,29 @@
+name: 功能建议 (Feature request)
+description: 提出一个新功能或改进
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 这个建议想解决什么痛点 / 场景?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 你希望它怎么工作?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选 / 现有替代
+      description: 有没有考虑过其他做法,或现在如何绕过?
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 范围确认
+      options:
+        - label: 我已确认这不在 README「非目标」列出的范围内(自动部署 / 多渠道通知 / Web UI 鉴权 / DNS-01 厂商 API)

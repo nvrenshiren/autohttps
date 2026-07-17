@@ -10,6 +10,8 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-555)
 
+**中文** · [English](README.en.md)
+
 让「维护一批域名 + 一组证书」这件事变得省心 —— 启动即检测、到期前自动续、失败有清晰提示。
 
 </div>
@@ -111,4 +113,4 @@ MVP 核心功能完整可用(自签 + ACME 两条主线,桌面 + 服务器两形
 
 ## 📄 License
 
-待作者指定(常用 MIT)—— 确定后补 `LICENSE` 文件。
+[MIT](LICENSE)
