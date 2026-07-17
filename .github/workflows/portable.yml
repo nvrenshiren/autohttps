@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write # 滚动更新 nightly prerelease 需要
+  contents: write # 创建 Release 需要
 
 jobs:
   windows-portable:
@@ -38,11 +38,18 @@ jobs:
       - name: Build desktop (release)
         run: cargo build --release -p desktop
 
+      # 版本号 = tauri.conf.json version + CI 运行序号(semver 预发布),如 0.1.0-dev.42
+      - name: Resolve version
+        shell: pwsh
+        run: |
+          $base = (Get-Content crates/desktop/tauri.conf.json | ConvertFrom-Json).version
+          $ver = "$base-dev.${{ github.run_number }}"
+          echo "APP_VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append
+
       - name: Package portable zip
         shell: pwsh
         run: |
-          $sha = "${{ github.sha }}".Substring(0, 7)
-          $name = "autohttps-windows-x86_64-$sha-portable"
+          $name = "autohttps-windows-x86_64-v${{ env.APP_VERSION }}-portable"
           New-Item -ItemType Directory -Path "dist/$name" | Out-Null
           Copy-Item target/release/desktop.exe "dist/$name/autohttps.exe"
           Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip"
@@ -54,11 +61,11 @@ jobs:
           path: dist/${{ env.PKG_NAME }}.zip
           if-no-files-found: error
 
-      # 滚动 nightly prerelease:每次 push 覆盖,始终指向最新 portable 包
-      - name: Update nightly prerelease
+      # 每次 push 一个新 prerelease,首页 Releases 栏可见最新版
+      - name: Create prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: nightly
-          name: Nightly (${{ github.sha }})
+          tag_name: v${{ env.APP_VERSION }}
+          name: v${{ env.APP_VERSION }}
           prerelease: true
           files: dist/${{ env.PKG_NAME }}.zip
