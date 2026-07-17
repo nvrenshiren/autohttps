@@ -29,6 +29,30 @@ pub struct DomainDetailData {
     pub certificates: Vec<DomainCertProjection>,
 }
 
+/// `certificateState` 过滤 —— 按域名"最紧急"证书态投影(`worst_projection`)判定。
+/// 词表(契约 domains §3):`CertificateStatus` wire 值(可逗号多值)+ `none`(无任何关联证书),不新增枚举。
+/// 设计 §3.3 的"失败"桶由前端展开为 `expired,issue_failed,renewal_failed` 多值(与 tasks 队列=`queued,running` 同约定)。
+#[derive(Default)]
+pub struct CertStateFilter {
+    pub statuses: Vec<CertificateStatus>,
+    pub include_none: bool,
+}
+
+impl CertStateFilter {
+    /// 空词表 ⇒ 不过滤(返回全部)。
+    fn is_active(&self) -> bool {
+        !self.statuses.is_empty() || self.include_none
+    }
+
+    /// 域名 worst-projection 是否命中:None(无证书)⇒ `none`;Some(s) ⇒ s ∈ statuses。
+    fn matches(&self, worst: Option<CertificateStatus>) -> bool {
+        match worst {
+            None => self.include_none,
+            Some(s) => self.statuses.contains(&s),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct DomainListFilter {
     pub page: Option<u64>,
@@ -37,8 +61,8 @@ pub struct DomainListFilter {
     pub hostname: Option<String>,
     pub sort: Option<String>,
     pub order: Option<String>,
-    /// TODO(里程碑1 打桩):certificateState(证书态投影)服务端过滤尚未接线;需按"最紧急"投影过滤。
-    pub certificate_state: Option<String>,
+    /// 证书态投影过滤(见 [`CertStateFilter`]);空 ⇒ 不过滤。
+    pub certificate_state: CertStateFilter,
 }
 
 pub struct CreateDomainInput {
@@ -148,6 +172,23 @@ pub async fn list(ctx: &CoreContext, filter: DomainListFilter) -> CoreResult<Pag
         }
     };
     query = query.order_by(col, order.unwrap_or(default_order));
+
+    // certificateState 过滤:投影(worst_projection)是应用层派生量、非 DB 列,故取符合 group/hostname/sort
+    // 的全量 → 建行(含投影)→ 按投影过滤 → 在 Rust 内分页;total 基于过滤后结果(数据量小,清晰优先)。
+    if filter.certificate_state.is_active() {
+        let models = query.all(db).await?;
+        let mut rows = Vec::with_capacity(models.len());
+        for m in models {
+            let row = build_row(db, m).await?;
+            if filter.certificate_state.matches(row.worst_status) {
+                rows.push(row);
+            }
+        }
+        let total = rows.len() as u64;
+        let skip = (page.zero_based() * page.page_size) as usize;
+        let items = rows.into_iter().skip(skip).take(page.page_size as usize).collect();
+        return Ok(Paged { items, page: page.page, page_size: page.page_size, total });
+    }
 
     let paginator = query.paginate(db, page.page_size);
     let total = paginator.num_items().await?;

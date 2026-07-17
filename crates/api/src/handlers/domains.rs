@@ -3,12 +3,30 @@
 use crate::dto::{self, DomainDetail, DomainSummary, Page};
 use crate::error::ApiResult;
 use crate::extract::JsonBody;
+use crate::parse::parse_enum;
 use crate::req::{CreateDomainRequest, DomainListQuery, UpdateDomainRequest};
 use crate::state::AppState;
+use autohttps_core::enums::CertificateStatus;
 use autohttps_core::services::domains;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
+
+/// `certificateState` 词表(契约 §3):`CertificateStatus` wire 值(逗号多值)+ `none`(无证书)。
+/// 投影"失败"桶 = `expired,issue_failed,renewal_failed`(前端展开)。非法值 → 400 validation_failed。
+fn parse_cert_state(raw: &Option<String>) -> ApiResult<domains::CertStateFilter> {
+    let mut f = domains::CertStateFilter::default();
+    if let Some(raw) = raw.as_deref() {
+        for tok in raw.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            if tok == "none" {
+                f.include_none = true;
+            } else {
+                f.statuses.push(parse_enum::<CertificateStatus>("certificateState", tok)?);
+            }
+        }
+    }
+    Ok(f)
+}
 
 pub async fn list(
     State(st): State<AppState>,
@@ -21,7 +39,7 @@ pub async fn list(
         hostname: q.hostname,
         sort: q.sort,
         order: q.order,
-        certificate_state: q.certificate_state,
+        certificate_state: parse_cert_state(&q.certificate_state)?,
     };
     let paged = domains::list(&st.ctx, filter).await?;
     Ok(Json(dto::page_of(paged, dto::domain_summary)))

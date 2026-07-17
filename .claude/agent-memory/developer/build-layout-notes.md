@@ -1,6 +1,6 @@
 ---
 name: build-layout-notes
-description: 工作区构建落位:默认成员排除 desktop;rust-embed 需 frontend/dist 存在;server 默认 8443
+description: 工作区构建落位:默认成员排除 desktop;rust-embed 需 frontend/dist 存在;server 默认 8443;CI 硬门禁仅 check+test(fmt/clippy 非阻断)
 metadata:
   type: project
 ---
@@ -38,3 +38,12 @@ metadata:
 - **时间列存 String(RFC3339)**:SeaORM 实体的时间列用 `String`(非 `TimeDateTimeWithTimeZone`),直接
   等于 wire 表示、避免时区漂移;DB `_overview §1` 的 "TEXT·RFC3339" 即此。`sea_orm(db_type="Text")`
   对 DeriveActiveEnum 可用(1.1 实测通过)。
+
+- **CI 硬门禁只有 `cargo check` + `cargo test`;`.github/workflows/ci.yml` 的 `cargo fmt --all --check`
+  与 `cargo clippy` 两步都 `continue-on-error: true`(仅信息、不阻断)**。本机 rustc/clippy/rustfmt
+  (实测 1.95/1.9,2026-04 stable)比仓库写就时的目标版本新,会对**全仓预存代码**刷一堆 fmt diff
+  (默认 rustfmt 把项目惯用的紧凑单行 struct 字面量展开成多行,dto.rs/executor.rs 等我从没碰的文件全中)
+  + clippy error(如 `services/executor.rs` 的 `never_loop`)——这些都是**预存、CI 容忍**的假 blocker。
+  **别去 `cargo fmt` 重排全仓、别改无关文件的 clippy**(会炸出巨型无关 diff、毁掉作者紧凑风格)。
+  判"我的改动是否干净":`cargo check --workspace` 绿 + `cargo test` 绿 + 对自己改的文件 scoped grep
+  fmt/clippy 输出确认不出现即可。
