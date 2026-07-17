@@ -386,6 +386,7 @@ dependencies = [
  "instant-acme",
  "rand",
  "rcgen",
+ "rustls-pki-types",
  "sea-orm",
  "sea-orm-migration",
  "serde",

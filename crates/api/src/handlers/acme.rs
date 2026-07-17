@@ -7,7 +7,8 @@ use crate::error::{ApiError, ApiResult};
 use crate::extract::JsonBody;
 use crate::parse::parse_enum_opt;
 use crate::req::{
-    AccountListQuery, ChallengeListQuery, PutHttp01ConfigRequest, RegisterAcmeAccountRequest,
+    AccountListQuery, ChallengeListQuery, PatchAcmeAccountRequest, PutHttp01ConfigRequest,
+    RegisterAcmeAccountRequest,
 };
 use crate::state::AppState;
 use autohttps_core::enums::{AcmeAccountStatus, ChallengeStatus};
@@ -98,26 +99,56 @@ pub async fn account_create(
     Ok((StatusCode::ACCEPTED, Json(dto::acme_account_detail(row))))
 }
 
-// --- 其余在线交互动作:本切片仍打桩(DNS-01 手动流 / 账户编辑重试移除 留后续)---
+/// 编辑联系邮箱(A3,跨状态动作)。仅 `registered` 可编辑,否则 409 account_state_invalid。→ 200。
+pub async fn account_patch(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+    JsonBody(body): JsonBody<PatchAcmeAccountRequest>,
+) -> ApiResult<Json<AcmeAccountDetail>> {
+    let row = acme::patch_account(&st.ctx, &id, body.contact_email).await?;
+    Ok(Json(dto::acme_account_detail(row)))
+}
 
-fn stub(action: &str) -> ApiError {
-    ApiError::new(ErrorCode::NotImplemented, format!("{action}:ACME 在线交互留后续切片"))
+/// 注册失败重试(A4,AT4)。仅 `registration_failed` → `registering`;终态经 SSE 回推。→ **202**。
+pub async fn account_retry(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<AcmeAccountDetail>)> {
+    let row = acme::retry_account(&st.ctx, &id).await?;
+    Ok((StatusCode::ACCEPTED, Json(dto::acme_account_detail(row))))
 }
-pub async fn account_patch(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("编辑账户"))
+
+/// 移除账户(A5,AT5)。证书/settings 引用置空(SET NULL)、清账户密钥。→ **204**。
+pub async fn account_delete(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    acme::delete_account(&st.ctx, &id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
-pub async fn account_retry(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("账户注册重试"))
+
+/// DNS-01 确认已添加 TXT(B4,CT4)→ 通知 CA 校验、全部就绪续推 finalize;终态经 SSE。→ **202** + 挑战详情。
+pub async fn challenge_confirm(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<ChallengeDetail>)> {
+    let row = acme::confirm_challenge(&st.ctx, &id).await?;
+    Ok((StatusCode::ACCEPTED, Json(dto::challenge_detail(row))))
 }
-pub async fn account_delete(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("移除账户"))
+
+/// 挑战失败重试(B5,CT7)→ 重建订单取新挑战(委派证书重试,派生新任务)。→ **202**。
+pub async fn challenge_retry(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    acme::retry_challenge(&st.ctx, &id).await?;
+    Ok(StatusCode::ACCEPTED)
 }
-pub async fn challenge_confirm(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("确认 DNS-01 TXT"))
-}
-pub async fn challenge_retry(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("挑战重试"))
-}
+
+// --- 仍打桩:DNS-01 提交前本地预检(B4 可选,需 hickory-resolver;确认流不依赖之)---
 pub async fn dns_precheck(Path(_id): Path<String>) -> ApiResult<StatusCode> {
-    Err(stub("DNS-01 预检"))
+    Err(ApiError::new(
+        ErrorCode::NotImplemented,
+        "DNS-01 本地预检(dns-precheck)留后续:需 hickory-resolver;确认流不依赖之",
+    ))
 }

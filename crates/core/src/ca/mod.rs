@@ -63,6 +63,16 @@ pub fn parse_leaf_metadata(chain_pem: &str) -> CoreResult<LeafMetadata> {
     })
 }
 
+/// 从 ACME 证书链 PEM 取**首块(叶子)**的 DER 字节(吊销请求 `RevocationRequest.certificate` 用)。
+///
+/// ACME `certificate` 端点返回 `叶子 + 中间` 的 PEM 链;吊销只需叶子 DER。
+pub fn leaf_der_from_chain(chain_pem: &str) -> CoreResult<Vec<u8>> {
+    let pem = x509_parser::pem::parse_x509_pem(chain_pem.as_bytes())
+        .map_err(|_| CoreError::internal("无法解析证书链 PEM(吊销取叶子)"))?
+        .1;
+    Ok(pem.contents)
+}
+
 fn now() -> OffsetDateTime {
     OffsetDateTime::now_utc()
 }

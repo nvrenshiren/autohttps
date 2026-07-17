@@ -4,10 +4,14 @@
 //! `queued→running→succeeded/failed`(TT2–TT4),据结果驱动证书状态机(唯一真相在 core,不复述)。
 //!
 //! **本切片范围**:承接 `self_signed` 的 `issue`(T2→T3/T4)、`renew`(T12/T13,经原根 CA 重签、
-//! 刷新同一行 serial/有效期,不新建实体 DC1)与 `revoke`(T18/T19);**acme 的 `issue`(HTTP-01)**
-//! 经 instant-acme 跑通(建单→取挑战→放 webroot 文件→通知就绪→轮询→finalize→取证)。**acme 的
-//! `renew`/`revoke` 执行仍留后续**(遇到即跳过,保持 queued)。日志脱敏(AR4/L6):
-//! `task_log_entries.message` **绝不含任何密钥材料**。
+//! 刷新同一行 serial/有效期,不新建实体 DC1)与 `revoke`(T18/T19);**acme 的 `issue`/`renew`
+//! (HTTP-01 + DNS-01 手动)与 `revoke`** 经 instant-acme 跑通:
+//! - issue/renew:建单→每域名取挑战→HTTP-01 放 webroot 文件通知就绪 / DNS-01 计算 TXT 置
+//!   `awaiting_manual` **挂起等待手动**→(全部就绪后)轮询→finalize→取证(renew 刷新同一行 DC1)。
+//! - revoke:向 CA 发吊销请求(revoke_cert)→ 证书 `revoking→revoked`(T18)。
+//! **挂起等待手动**(DNS-01):任务遇 `awaiting_manual` 即让出 worker(任务留 `running`,不占 worker);
+//! `POST /acme/challenges/{id}/confirm` 重建订单通知 CA 校验、全部通过后续推 finalize(见 [`confirm_challenge`])。
+//! 日志脱敏(AR4/L6):`task_log_entries.message` **绝不含任何密钥材料**。
 
 use crate::ca;
 use crate::domain::enums::{
@@ -24,10 +28,21 @@ use crate::services::acme;
 use crate::services::context::CoreContext;
 use crate::services::dashboard;
 use crate::util::{new_id, now_rfc3339};
-use instant_acme::{ChallengeType, Identifier, NewOrder, OrderStatus, RetryPolicy};
+use instant_acme::{
+    ChallengeType, Identifier, NewOrder, Order, OrderStatus, RetryPolicy, RevocationRequest,
+};
+use rustls_pki_types::CertificateDer;
 use sea_orm::*;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+
+/// 单个可执行任务的执行结果:完成(→ 成功任务)或挂起等待手动(DNS-01,任务留 `running`)。
+enum ExecOutcome {
+    /// 执行完成,携带任务结果摘要 → `running → succeeded`(TT3)。
+    Done(String),
+    /// DNS-01 挑战进入 `awaiting_manual`,任务让出 worker、保持 `running`,等 confirm 续推(不卡死)。
+    Suspended,
+}
 
 /// 内网叶子证书默认有效期(天)。浏览器对服务器证书有效期上限约 398 天,取 365 稳妥。
 const LEAF_VALIDITY_DAYS: i64 = 365;
@@ -39,7 +54,7 @@ const SCAN_BATCH: u64 = 50;
 /// 启动后台执行器循环(server/desktop boot 之后调用)。返回 JoinHandle(通常无需 join,自行常驻)。
 pub fn spawn(ctx: CoreContext) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        tracing::info!("任务执行器已启动(self_signed issue/renew/revoke + acme issue)");
+        tracing::info!("任务执行器已启动(self_signed + acme issue/renew/revoke,DNS-01 手动挂起)");
         loop {
             match tick(&ctx).await {
                 // 处理了一个 → 立即继续排空,不休眠
@@ -54,10 +69,10 @@ pub fn spawn(ctx: CoreContext) -> tokio::task::JoinHandle<()> {
     })
 }
 
-/// 处理一个可执行任务;返回是否处理了任务(`false`=当前无本切片可执行任务,应休眠)。
+/// 处理一个可执行任务;返回是否处理了任务(`false`=当前无 `queued` 任务,应休眠)。
 ///
-/// 可执行 = 关联证书存在且:`self_signed`(issue/renew/revoke 三类均承接)或 `acme` 的 `issue`。
-/// acme 的 renew/revoke 执行仍留后续,遇到即保持 `queued`(跳过)。
+/// 可执行 = 关联证书存在(`self_signed` / `acme` 的 issue/renew/revoke 均承接)。DNS-01 挂起的任务
+/// 停在 `running`(非 `queued`),不会被本扫描重复取出,confirm 续推(见 [`confirm_challenge`])。
 pub async fn tick(ctx: &CoreContext) -> CoreResult<bool> {
     let db = &ctx.db;
     let queued = tasks::Entity::find()
@@ -74,14 +89,6 @@ pub async fn tick(ctx: &CoreContext) -> CoreResult<bool> {
             fail_task(ctx, &task, "关联证书已删除,任务无法执行").await?;
             return Ok(true);
         };
-        let executable = match cert.issuance_method {
-            IssuanceMethod::SelfSigned => true,
-            // acme:本切片仅 issue;renew/revoke 保持 queued(执行留后续)
-            IssuanceMethod::Acme => matches!(task.task_type, TaskType::Issue),
-        };
-        if !executable {
-            continue;
-        }
         claim_and_run(ctx, task, cert).await?;
         return Ok(true);
     }
@@ -109,23 +116,30 @@ async fn claim_and_run(
 
     let result = match (cert.issuance_method, task.task_type) {
         (IssuanceMethod::SelfSigned, TaskType::Issue) => {
-            run_issue_self_signed(ctx, &task, &cert).await
+            run_issue_self_signed(ctx, &task, &cert).await.map(ExecOutcome::Done)
         }
         (IssuanceMethod::SelfSigned, TaskType::Renew) => {
-            run_renew_self_signed(ctx, &task, &cert).await
+            run_renew_self_signed(ctx, &task, &cert).await.map(ExecOutcome::Done)
         }
         (IssuanceMethod::SelfSigned, TaskType::Revoke) => {
-            run_revoke_self_signed(ctx, &task, &cert).await
+            run_revoke_self_signed(ctx, &task, &cert).await.map(ExecOutcome::Done)
         }
-        (IssuanceMethod::Acme, TaskType::Issue) => run_issue_acme(ctx, &task, &cert).await,
-        // acme renew/revoke 在 tick 已被过滤(保持 queued),不应到达此处
-        (IssuanceMethod::Acme, other) => {
-            Err(CoreError::internal(format!("acme {other:?} 执行尚未实现")))
+        // acme issue/renew 同一 order 流程(首签/续签不区分,acme DA5);可能挂起等待手动(DNS-01)。
+        (IssuanceMethod::Acme, TaskType::Issue | TaskType::Renew) => {
+            run_acme_issue_or_renew(ctx, &task, &cert).await
+        }
+        (IssuanceMethod::Acme, TaskType::Revoke) => {
+            run_revoke_acme(ctx, &task, &cert).await.map(ExecOutcome::Done)
         }
     };
 
     match result {
-        Ok(summary) => succeed_task(ctx, &task, &summary).await?,
+        Ok(ExecOutcome::Done(summary)) => succeed_task(ctx, &task, &summary).await?,
+        // DNS-01 挂起:任务保持 `running`(让出 worker,不置终态),等 confirm 续推。
+        Ok(ExecOutcome::Suspended) => {
+            log(ctx, &task.id, "info", "DNS-01 挑战等待手动添加 TXT,任务挂起(worker 已让出),等确认后续推")
+                .await?;
+        }
         Err(e) => {
             // 驱动证书失败态(证书状态机唯一真相)
             drive_cert_failure(ctx, &cert, task.task_type, &e.message).await?;
@@ -338,73 +352,58 @@ async fn run_revoke_self_signed(
     Ok(format!("已吊销(序列号 {serial})"))
 }
 
-/// acme 签发(T2 issuing → T3 valid,HTTP-01)。经 instant-acme:建单 → 每域名取 HTTP-01 挑战、放
-/// webroot 验证文件、建挑战记录、通知就绪 → 轮询订单至 ready → finalize(自动生成叶子密钥+CSR)→ 取证。
-/// 挑战状态机走 CT1(pending)→ CT2(validating)→ CT5(passed);任一失败整体失败交回 issue_failed(§3.4)。
-async fn run_issue_acme(
+/// acme 签发/续签(同一 order 流程,首签/续签不区分 acme DA5)。issue:T2 issuing→T3 valid;
+/// renew:T12 renewing→valid(刷新同一行 serial/有效期,不新建实体 DC1)。经 instant-acme:建单 →
+/// 每域名取挑战(HTTP-01 放 webroot 文件、通知就绪 CT2;DNS-01 计算 TXT 置 `awaiting_manual` CT3
+/// **挂起等待手动**)→ 全部就绪则 finalize 取证;任一域名 DNS-01 挂起则 `ExecOutcome::Suspended`
+/// (任务让出 worker,confirm 续推)。任一失败整体失败交回 issue_failed/renewal_failed(§3.4)。
+async fn run_acme_issue_or_renew(
     ctx: &CoreContext,
     task: &tasks::Model,
     cert: &certificates::Model,
-) -> CoreResult<String> {
+) -> CoreResult<ExecOutcome> {
     let db = &ctx.db;
+    let is_renew = matches!(task.task_type, TaskType::Renew);
 
-    // T2:pending_issue → issuing
-    update_cert_status(ctx, &cert.id, CertificateStatus::Issuing).await?;
-    log(ctx, &task.id, "info", "证书置为签发中(ACME)").await?;
+    // T2/T12:进行中态(issue→issuing / renew→renewing;renew 幂等确认,兼容重试链直达)
+    let in_progress =
+        if is_renew { CertificateStatus::Renewing } else { CertificateStatus::Issuing };
+    update_cert_status(ctx, &cert.id, in_progress).await?;
+    log(ctx, &task.id, "info", if is_renew { "证书置为续签中(ACME)" } else { "证书置为签发中(ACME)" })
+        .await?;
 
     // ACME 账户(须 registered、有账户密钥)
-    let account_id = cert
-        .acme_account_id
-        .clone()
-        .ok_or_else(|| CoreError::new(ErrorCode::AcmeAccountRequired, "acme 证书缺少 ACME 账户"))?;
-    let account_row = acme_accounts::Entity::find_by_id(&account_id)
-        .one(db)
-        .await?
-        .ok_or_else(|| CoreError::new(ErrorCode::InvalidAcmeAccountReference, "ACME 账户不存在"))?;
-    if account_row.status != AcmeAccountStatus::Registered {
-        return Err(CoreError::new(
-            ErrorCode::AcmeAccountNotRegistered,
-            "指定的 ACME 账户尚未注册成功",
-        ));
-    }
+    let account_row = load_registered_account(ctx, cert).await?;
     log(ctx, &task.id, "info", &format!("使用 ACME 账户「{}」", account_row.contact_email)).await?;
 
-    // SAN 域名(需 id/hostname/验证方式);本切片仅 HTTP-01
+    // SAN 域名(需 id/hostname/验证方式;HTTP-01 与 DNS-01 均支持)
     let san = acme_san_domains(db, &cert.id).await?;
     if san.is_empty() {
         return Err(CoreError::internal("证书无关联域名(SAN 为空),无法签发"));
     }
     for d in &san {
-        match d.validation_method {
-            Some(ValidationMethod::Http01) => {}
-            Some(ValidationMethod::Dns01) => {
-                return Err(CoreError::internal(format!(
-                    "域名 {} 为 DNS-01,手动验证流本切片未实现(留后续)",
-                    d.hostname
-                )))
-            }
-            None => {
-                return Err(CoreError::new(
-                    ErrorCode::DomainValidationMethodRequired,
-                    format!("域名 {} 未设置验证方式", d.hostname),
-                ))
-            }
+        if d.validation_method.is_none() {
+            return Err(CoreError::new(
+                ErrorCode::DomainValidationMethodRequired,
+                format!("域名 {} 未设置验证方式", d.hostname),
+            ));
         }
     }
     let hostnames: Vec<String> = san.iter().map(|d| d.hostname.clone()).collect();
     log(ctx, &task.id, "info", &format!("SAN: {}", hostnames.join(", "))).await?;
 
-    // 载入账户 + 建订单(SAN 域名)
+    // 载入账户 + 建订单(SAN 域名)。捕获 order URL 存挑战 `authorization_url`,供 confirm/retry 重建订单。
     let acme_account = acme::load_acme_account(ctx, &account_row).await?;
     let identifiers: Vec<Identifier> =
         hostnames.iter().map(|h| Identifier::Dns(h.clone())).collect();
     let mut order =
         acme_account.new_order(&NewOrder::new(&identifiers)).await.map_err(acme::map_acme_err)?;
+    let order_url = order.url().to_string();
     log(ctx, &task.id, "info", "已向 CA 建立订单").await?;
 
-    // 每域名:取 HTTP-01 挑战 → 放 webroot 文件 → 建挑战记录(pending)→ 通知就绪(validating)。
-    // 收集 (challenge_id, domain_id, 文件系统路径) 供后续标记 passed + 清理。
-    let mut placed: Vec<(String, String, PathBuf)> = Vec::new();
+    // 每域名:建挑战记录(pending CT1)→ HTTP-01 放文件+通知就绪(validating CT2)/ DNS-01 计算 TXT
+    // 置 awaiting_manual(CT3,挂起)。任一域名进入 awaiting_manual → 本次整体挂起。
+    let mut any_awaiting = false;
     {
         let mut authorizations = order.authorizations();
         while let Some(result) = authorizations.next().await {
@@ -415,74 +414,161 @@ async fn run_issue_acme(
                 .find(|d| d.hostname == identifier)
                 .ok_or_else(|| CoreError::internal(format!("授权域名 {identifier} 不在证书 SAN 中")))?;
 
-            let Some(mut challenge) = authz.challenge(ChallengeType::Http01) else {
-                return Err(CoreError::internal(format!("域名 {identifier} 无 HTTP-01 挑战")));
-            };
-            let token = challenge.token.clone();
-            let key_auth = challenge.key_authorization().as_str().to_string();
-            let authorization_url = challenge.url.clone();
-            let needs_ready = matches!(challenge.status, instant_acme::ChallengeStatus::Pending);
+            match domain.validation_method {
+                Some(ValidationMethod::Http01) => {
+                    let Some(mut challenge) = authz.challenge(ChallengeType::Http01) else {
+                        return Err(CoreError::internal(format!("域名 {identifier} 无 HTTP-01 挑战")));
+                    };
+                    let token = challenge.token.clone();
+                    let key_auth = challenge.key_authorization().as_str().to_string();
+                    let needs_ready =
+                        matches!(challenge.status, instant_acme::ChallengeStatus::Pending);
 
-            // 放验证文件到 webroot/.well-known/acme-challenge/<token>(always-valid 下可达性不重要,仍走流程)
-            let webroot = resolve_webroot(ctx, db, &domain.id).await?;
-            let file_path = write_challenge_file(&webroot, &token, &key_auth)?;
-            let url_path = format!("/.well-known/acme-challenge/{token}");
+                    // 放验证文件(always-valid 下可达性不重要,仍走流程);清理由 finalize 依 token 重算路径。
+                    let webroot = resolve_webroot(ctx, db, &domain.id).await?;
+                    write_challenge_file(&webroot, &token, &key_auth)?;
+                    let url_path = format!("/.well-known/acme-challenge/{token}");
 
-            // 建挑战记录(CT1,pending)
-            let challenge_id =
-                insert_challenge(ctx, &task.id, &domain.id, &url_path, &key_auth, &authorization_url)
+                    let challenge_id = insert_challenge(
+                        ctx,
+                        &task.id,
+                        &domain.id,
+                        ValidationMethod::Http01,
+                        ChallengeFields {
+                            http_file_path: Some(url_path),
+                            http_file_content: Some(key_auth),
+                            authorization_url: Some(order_url.clone()),
+                            ..Default::default()
+                        },
+                    )
                     .await?;
-            log(ctx, &task.id, "info", &format!("域名 {identifier}:HTTP-01 验证文件已放置")).await?;
+                    log(ctx, &task.id, "info", &format!("域名 {identifier}:HTTP-01 验证文件已放置")).await?;
 
-            // 通知 CA 就绪(CT2,pending→validating)
-            if needs_ready {
-                challenge.set_ready().await.map_err(acme::map_acme_err)?;
+                    if needs_ready {
+                        challenge.set_ready().await.map_err(acme::map_acme_err)?;
+                    }
+                    update_challenge_status(
+                        ctx,
+                        &challenge_id,
+                        &task.id,
+                        &domain.id,
+                        ChallengeStatus::Validating,
+                        None,
+                    )
+                    .await?;
+                }
+                Some(ValidationMethod::Dns01) => {
+                    let Some(challenge) = authz.challenge(ChallengeType::Dns01) else {
+                        return Err(CoreError::internal(format!("域名 {identifier} 无 DNS-01 挑战")));
+                    };
+                    // DNS-01 待添加 TXT:记录名 `_acme-challenge.<base>`(通配符去 `*.`),值为 key_auth 摘要。
+                    let txt_name = dns_txt_name(&domain.hostname);
+                    let txt_value = challenge.key_authorization().dns_value();
+
+                    let challenge_id = insert_challenge(
+                        ctx,
+                        &task.id,
+                        &domain.id,
+                        ValidationMethod::Dns01,
+                        ChallengeFields {
+                            dns_txt_name: Some(txt_name.clone()),
+                            dns_txt_value: Some(txt_value),
+                            authorization_url: Some(order_url.clone()),
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+                    // CT3:pending → awaiting_manual(不 set_ready,挂起等用户加 TXT 后 confirm)
+                    update_challenge_status(
+                        ctx,
+                        &challenge_id,
+                        &task.id,
+                        &domain.id,
+                        ChallengeStatus::AwaitingManual,
+                        None,
+                    )
+                    .await?;
+                    log(
+                        ctx,
+                        &task.id,
+                        "info",
+                        &format!("域名 {identifier}:DNS-01 待手动添加 TXT 记录 {txt_name},等待确认"),
+                    )
+                    .await?;
+                    any_awaiting = true;
+                }
+                None => unreachable!("上文已校验验证方式非空"),
             }
-            update_challenge_status(
-                ctx,
-                &challenge_id,
-                &task.id,
-                &domain.id,
-                ChallengeStatus::Validating,
-                None,
-            )
-            .await?;
-
-            placed.push((challenge_id, domain.id.clone(), file_path));
         }
     }
 
-    // 轮询订单至 ready(Pebble PEBBLE_VA_ALWAYS_VALID 下快速通过)
+    // 任一域名 DNS-01 挂起 → 整体挂起(任务让出 worker,confirm 续推 finalize)。
+    if any_awaiting {
+        return Ok(ExecOutcome::Suspended);
+    }
+
+    // 全部就绪(纯 HTTP-01)→ 轮询 + finalize + 取证 + 落证书(finalize 内含失败时挑战置 failed)。
+    let summary = finalize_acme_order(ctx, task, cert, &mut order).await?;
+    Ok(ExecOutcome::Done(summary))
+}
+
+/// 驱动一个已就绪(全部挑战已通知 CA)的 ACME 订单到取证并落证书(issue/renew 共用,confirm 续推亦用)。
+///
+/// 轮询订单至 ready → 全部挑战置 passed(CT5)→ finalize(自动生成叶子密钥+CSR)→ 取证(链 PEM)→
+/// 清理 HTTP-01 验证文件 → 落材料 + 刷新证书行至 valid(renew 清旧文件材料,DC1)。失败时把本任务
+/// 全部挑战置 failed(CT6)并回传 Err(上层驱动证书失败态)。返回任务结果摘要。
+async fn finalize_acme_order(
+    ctx: &CoreContext,
+    task: &tasks::Model,
+    cert: &certificates::Model,
+    order: &mut Order,
+) -> CoreResult<String> {
+    let db = &ctx.db;
     let poll = RetryPolicy::default();
+
+    // 轮询订单至 ready(Pebble always-valid 下快速通过)
     let ready = match order.poll_ready(&poll).await {
         Ok(status) => status,
         Err(e) => {
             let err = acme::map_acme_err(e);
-            fail_challenges(ctx, task, &placed, "订单验证失败").await;
+            fail_task_challenges(ctx, &task.id, "订单验证失败").await;
             return Err(err);
         }
     };
     if ready != OrderStatus::Ready {
-        fail_challenges(ctx, task, &placed, "挑战未通过").await;
+        fail_task_challenges(ctx, &task.id, "挑战未通过").await;
         return Err(CoreError::internal(format!("订单验证未通过(状态 {ready:?})")));
     }
 
     // 全部域名验证通过(CT5,passed)
-    for (challenge_id, domain_id, _) in &placed {
-        update_challenge_status(ctx, challenge_id, &task.id, domain_id, ChallengeStatus::Passed, None)
+    let ch_rows = task_challenges(db, &task.id).await?;
+    for ch in &ch_rows {
+        update_challenge_status(ctx, &ch.id, &task.id, &ch.domain_id, ChallengeStatus::Passed, None)
             .await?;
     }
     log(ctx, &task.id, "info", "全部域名验证通过").await?;
 
-    // finalize(instant-acme 自动生成叶子密钥 + CSR;返回叶子私钥 PEM)→ 取证(链 PEM)
-    let leaf_key_pem = order.finalize().await.map_err(acme::map_acme_err)?;
-    let chain_pem = order.poll_certificate(&poll).await.map_err(acme::map_acme_err)?;
+    // finalize(返回叶子私钥 PEM)→ 取证(链 PEM:叶子+中间)
+    let leaf_key_pem = match order.finalize().await {
+        Ok(k) => k,
+        Err(e) => {
+            let err = acme::map_acme_err(e);
+            fail_task_challenges(ctx, &task.id, "取证失败").await;
+            return Err(err);
+        }
+    };
+    let chain_pem = match order.poll_certificate(&poll).await {
+        Ok(c) => c,
+        Err(e) => {
+            let err = acme::map_acme_err(e);
+            fail_task_challenges(ctx, &task.id, "取证失败").await;
+            return Err(err);
+        }
+    };
     log(ctx, &task.id, "info", "已从 CA 取得证书").await?;
 
-    // 清理验证文件(成功/失败均清理,flows §4.2 步骤4)
-    for (_, _, file_path) in &placed {
-        let _ = std::fs::remove_file(file_path);
-    }
+    // 清理 HTTP-01 验证文件(成功/失败均清理,flows §4.2 步骤4;依 token 重算路径)
+    cleanup_http_challenge_files(ctx, db, &ch_rows).await;
 
     // 解析叶子标识/有效期(链首块为叶子)
     let meta = ca::parse_leaf_metadata(&chain_pem)?;
@@ -495,12 +581,14 @@ async fn run_issue_acme(
     .await?;
 
     // 落材料:证书链(公开)+ 叶子私钥(敏感 AR4)密文落盘,库内只存 ref
+    let old_cert_ref = cert.cert_pem_ref.clone();
+    let old_key_ref = cert.private_key_ref.clone();
     let cert_ref = new_id();
     ctx.secrets.store(&cert_ref, chain_pem.as_bytes())?;
     let key_ref = new_id();
     ctx.secrets.store(&key_ref, leaf_key_pem.as_bytes())?;
 
-    // T3:issuing → valid
+    // T3/T12:进行中 → valid(刷新同一行标识/有效期/引用,清 last_error;DC1 不新建实体)
     let now = now_rfc3339();
     certificates::ActiveModel {
         id: Set(cert.id.clone()),
@@ -520,7 +608,224 @@ async fn run_issue_acme(
     .await?;
     emit_cert(ctx, &cert.id, CertificateStatus::Valid);
 
-    Ok(format!("签发成功(序列号 {})", meta.serial_number))
+    // renew:清理旧文件材料(issue 时旧 ref 为空,天然跳过)
+    if let Some(r) = old_cert_ref {
+        let _ = ctx.secrets.remove(&r);
+    }
+    if let Some(r) = old_key_ref {
+        let _ = ctx.secrets.remove(&r);
+    }
+
+    let verb = if matches!(task.task_type, TaskType::Renew) { "续签" } else { "签发" };
+    Ok(format!("{verb}成功(序列号 {})", meta.serial_number))
+}
+
+/// acme 吊销(T18 revoking → revoked)。向 CA 发吊销请求(revoke_cert):取证书链叶子 DER →
+/// `Account::revoke`。成功后证书 `revoking→revoked`。失败上层回退证书(T19,drive_cert_failure)。
+async fn run_revoke_acme(
+    ctx: &CoreContext,
+    task: &tasks::Model,
+    cert: &certificates::Model,
+) -> CoreResult<String> {
+    // 保持/确认 revoking(证书服务发起时已置)
+    update_cert_status(ctx, &cert.id, CertificateStatus::Revoking).await?;
+    log(ctx, &task.id, "info", "证书置为吊销中(ACME)").await?;
+
+    // 账户(须 registered)+ 证书链叶子 DER
+    let account_row = load_registered_account(ctx, cert).await?;
+    let cert_ref = cert
+        .cert_pem_ref
+        .as_deref()
+        .ok_or_else(|| CoreError::internal("证书无本地文件,无法向 CA 吊销"))?;
+    let chain_pem = String::from_utf8(ctx.secrets.load(cert_ref)?)
+        .map_err(|_| CoreError::internal("证书文件材料损坏"))?;
+    let leaf_der = ca::leaf_der_from_chain(&chain_pem)?;
+
+    // 向 CA 发吊销请求(reason 缺省;instant-acme 用账户密钥授权)
+    let acme_account = acme::load_acme_account(ctx, &account_row).await?;
+    let certificate = CertificateDer::from(leaf_der);
+    let req = RevocationRequest { certificate: &certificate, reason: None };
+    acme_account.revoke(&req).await.map_err(acme::map_acme_err)?;
+    log(ctx, &task.id, "info", "已向 CA 提交吊销请求").await?;
+
+    // T18:revoking → revoked
+    update_cert_status(ctx, &cert.id, CertificateStatus::Revoked).await?;
+
+    let serial = cert.serial_number.clone().unwrap_or_default();
+    Ok(format!("已吊销(序列号 {serial})"))
+}
+
+/// 载入证书关联的 ACME 账户行,校验为 `registered`(issue/renew/revoke 共用前置)。
+async fn load_registered_account(
+    ctx: &CoreContext,
+    cert: &certificates::Model,
+) -> CoreResult<acme_accounts::Model> {
+    let account_id = cert
+        .acme_account_id
+        .clone()
+        .ok_or_else(|| CoreError::new(ErrorCode::AcmeAccountRequired, "acme 证书缺少 ACME 账户"))?;
+    let account_row = acme_accounts::Entity::find_by_id(&account_id)
+        .one(&ctx.db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::InvalidAcmeAccountReference, "ACME 账户不存在"))?;
+    if account_row.status != AcmeAccountStatus::Registered {
+        return Err(CoreError::new(
+            ErrorCode::AcmeAccountNotRegistered,
+            "指定的 ACME 账户尚未注册成功",
+        ));
+    }
+    Ok(account_row)
+}
+
+/// DNS-01 确认(去桩,CT4)——用户已加 TXT,通知 CA 校验;全部挑战不再等待手动即续推 finalize。
+///
+/// 单挑战 `awaiting_manual → validating`(set_ready 通知 CA);若本任务已无 `awaiting_manual`/`pending`
+/// 挑战(全部就绪),重建订单驱动 finalize → 证书 valid、任务 succeeded;否则等其余挑战确认。
+/// worker 不参与本流程(挂起任务停在 `running`),由本函数(api 请求线程)推进,不卡死执行器。
+pub(crate) async fn confirm_challenge(ctx: &CoreContext, challenge_id: &str) -> CoreResult<()> {
+    let db = &ctx.db;
+    let challenge = challenges::Entity::find_by_id(challenge_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::ChallengeNotFound, "挑战不存在"))?;
+    if challenge.status != ChallengeStatus::AwaitingManual {
+        return Err(CoreError::new(
+            ErrorCode::ChallengeNotAwaitingManual,
+            "仅等待手动配置的挑战可确认",
+        ));
+    }
+    let (task, cert, account_row) = challenge_task_context(ctx, &challenge).await?;
+    let hostname = domains::Entity::find_by_id(&challenge.domain_id)
+        .one(db)
+        .await?
+        .map(|d| d.hostname)
+        .ok_or_else(|| CoreError::internal("挑战关联域名已删除,无法确认"))?;
+    let order_url = challenge
+        .authorization_url
+        .clone()
+        .ok_or_else(|| CoreError::internal("挑战缺少订单引用,无法确认"))?;
+
+    // 重建订单 → 定位本域名授权的 DNS-01 挑战 → 通知 CA 就绪(set_ready)。
+    let acme_account = acme::load_acme_account(ctx, &account_row).await?;
+    let mut order = acme_account.order(order_url).await.map_err(acme::map_acme_err)?;
+    set_ready_for_domain(&mut order, &hostname, ChallengeType::Dns01).await?;
+
+    // CT4:awaiting_manual → validating
+    update_challenge_status(
+        ctx,
+        &challenge.id,
+        &task.id,
+        &challenge.domain_id,
+        ChallengeStatus::Validating,
+        None,
+    )
+    .await?;
+    log(ctx, &task.id, "info", &format!("域名 {hostname}:已确认 TXT,通知 CA 校验")).await?;
+
+    // 本任务是否仍有等待手动/待验证的挑战?有则等其余确认;无则续推 finalize。
+    let pending = task_challenges(db, &task.id)
+        .await?
+        .into_iter()
+        .filter(|c| {
+            matches!(c.status, ChallengeStatus::AwaitingManual | ChallengeStatus::Pending)
+        })
+        .count();
+    if pending > 0 {
+        dashboard::emit_changed(ctx).await;
+        return Ok(());
+    }
+
+    // 全部就绪 → 续推(仅当证书仍处进行中态,防重复 finalize)。
+    if !matches!(cert.status, CertificateStatus::Issuing | CertificateStatus::Renewing) {
+        dashboard::emit_changed(ctx).await;
+        return Ok(());
+    }
+    match finalize_acme_order(ctx, &task, &cert, &mut order).await {
+        Ok(summary) => succeed_task(ctx, &task, &summary).await?,
+        Err(e) => {
+            drive_cert_failure(ctx, &cert, task.task_type, &e.message).await?;
+            fail_task(ctx, &task, &e.message).await?;
+        }
+    }
+    dashboard::emit_changed(ctx).await;
+    Ok(())
+}
+
+/// 挑战失败重试(去桩,CT7)。ACME 语义:失败挑战/订单不可原地复用,须**重建订单取新挑战**;
+/// 故委派证书重试(certificates::retry:派生新 issue/renew 任务 → 执行器重建订单、建新挑战)。
+/// 前置:挑战为 `failed`;其证书须处可重试态(issue_failed/renewal_failed),否则回传状态错误。
+pub(crate) async fn retry_challenge(ctx: &CoreContext, challenge_id: &str) -> CoreResult<()> {
+    let db = &ctx.db;
+    let challenge = challenges::Entity::find_by_id(challenge_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::ChallengeNotFound, "挑战不存在"))?;
+    if challenge.status != ChallengeStatus::Failed {
+        return Err(CoreError::new(ErrorCode::ChallengeNotRetryable, "仅失败的挑战可重试"));
+    }
+    let task = tasks::Entity::find_by_id(&challenge.task_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::TaskNotFound, "挑战所属任务不存在"))?;
+    let cert = certificates::Entity::find_by_id(&task.certificate_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::CertNotFound, "挑战所属证书不存在"))?;
+    if !cert.status.can_retry() {
+        return Err(CoreError::new(
+            ErrorCode::ChallengeNotRetryable,
+            "该挑战对应的签发未处于可重试态(请对证书发起重试)",
+        )
+        .with_details(serde_json::json!({ "currentStatus": cert.status })));
+    }
+    // 委派证书重试:派生新任务 → 执行器重建订单、取新挑战(HTTP-01 重放文件 / DNS-01 重新展示 TXT)。
+    crate::services::certificates::retry(ctx, &cert.id).await?;
+    Ok(())
+}
+
+/// 载入挑战的执行上下文(任务 + 证书 + 已注册账户),confirm 用。
+async fn challenge_task_context(
+    ctx: &CoreContext,
+    challenge: &challenges::Model,
+) -> CoreResult<(tasks::Model, certificates::Model, acme_accounts::Model)> {
+    let db = &ctx.db;
+    let task = tasks::Entity::find_by_id(&challenge.task_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::TaskNotFound, "挑战所属任务不存在"))?;
+    let cert = certificates::Entity::find_by_id(&task.certificate_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::CertNotFound, "挑战所属证书不存在"))?;
+    let account_row = load_registered_account(ctx, &cert).await?;
+    Ok((task, cert, account_row))
+}
+
+/// 在重建的订单中定位某域名授权对应类型的挑战并 `set_ready`(通知 CA 校验)。
+async fn set_ready_for_domain(
+    order: &mut Order,
+    hostname: &str,
+    r#type: ChallengeType,
+) -> CoreResult<()> {
+    let mut authorizations = order.authorizations();
+    while let Some(result) = authorizations.next().await {
+        let mut authz = result.map_err(acme::map_acme_err)?;
+        if authz.identifier().to_string() != hostname {
+            continue;
+        }
+        let mut challenge = authz
+            .challenge(r#type.clone())
+            .ok_or_else(|| CoreError::internal(format!("域名 {hostname} 无对应挑战")))?;
+        challenge.set_ready().await.map_err(acme::map_acme_err)?;
+        return Ok(());
+    }
+    Err(CoreError::internal(format!("订单中未找到域名 {hostname} 的授权")))
+}
+
+/// DNS-01 待添加 TXT 记录名:`_acme-challenge.<base>`;通配符 `*.example.com` 取 `example.com`。
+fn dns_txt_name(hostname: &str) -> String {
+    let base = hostname.strip_prefix("*.").unwrap_or(hostname);
+    format!("_acme-challenge.{base}")
 }
 
 /// 证书 SAN 域名行(acme 需 hostname + 验证方式)。
@@ -562,14 +867,24 @@ fn write_challenge_file(webroot: &Path, token: &str, key_auth: &str) -> CoreResu
     Ok(path)
 }
 
-/// 建挑战记录(CT1,pending)+ 发 `challenge_status_changed`。返回挑战 id。
+/// 挑战记录的可选展示/执行字段(HTTP-01 文件 / DNS-01 TXT / 订单引用)。
+#[derive(Default)]
+struct ChallengeFields {
+    dns_txt_name: Option<String>,
+    dns_txt_value: Option<String>,
+    http_file_path: Option<String>,
+    http_file_content: Option<String>,
+    authorization_url: Option<String>,
+}
+
+/// 建挑战记录(CT1,pending)+ 发 `challenge_status_changed`。返回挑战 id。验证方式与字段由调用方给出
+/// (HTTP-01 传文件路径/内容;DNS-01 传 TXT 名/值);`authorization_url` 存 order URL 供 confirm/retry 重建订单。
 async fn insert_challenge(
     ctx: &CoreContext,
     task_id: &str,
     domain_id: &str,
-    http_file_path: &str,
-    key_auth: &str,
-    authorization_url: &str,
+    method: ValidationMethod,
+    fields: ChallengeFields,
 ) -> CoreResult<String> {
     let id = new_id();
     let now = now_rfc3339();
@@ -577,13 +892,13 @@ async fn insert_challenge(
         id: Set(id.clone()),
         task_id: Set(task_id.to_string()),
         domain_id: Set(domain_id.to_string()),
-        validation_method: Set(ValidationMethod::Http01),
+        validation_method: Set(method),
         status: Set(ChallengeStatus::Pending),
-        dns_txt_name: Set(None),
-        dns_txt_value: Set(None),
-        http_file_path: Set(Some(http_file_path.to_string())),
-        http_file_content: Set(Some(key_auth.to_string())),
-        authorization_url: Set(Some(authorization_url.to_string())),
+        dns_txt_name: Set(fields.dns_txt_name),
+        dns_txt_value: Set(fields.dns_txt_value),
+        http_file_path: Set(fields.http_file_path),
+        http_file_content: Set(fields.http_file_content),
+        authorization_url: Set(fields.authorization_url),
         failed_reason: Set(None),
         created_at: Set(now.clone()),
         updated_at: Set(now),
@@ -592,6 +907,17 @@ async fn insert_challenge(
     .await?;
     emit_challenge(ctx, &id, task_id, domain_id, ChallengeStatus::Pending);
     Ok(id)
+}
+
+/// 本任务全部挑战行(finalize 标记 passed / 失败标记 failed / 清理文件用)。
+async fn task_challenges(
+    db: &DatabaseConnection,
+    task_id: &str,
+) -> CoreResult<Vec<challenges::Model>> {
+    Ok(challenges::Entity::find()
+        .filter(challenges::Column::TaskId.eq(task_id))
+        .all(db)
+        .await?)
 }
 
 /// 推进挑战状态(+ 可选失败原因)并发 `challenge_status_changed`。
@@ -617,24 +943,46 @@ async fn update_challenge_status(
     Ok(())
 }
 
-/// 将已建挑战整体置失败(CT6,best-effort)并清理验证文件。
-async fn fail_challenges(
-    ctx: &CoreContext,
-    task: &tasks::Model,
-    placed: &[(String, String, PathBuf)],
-    reason: &str,
-) {
-    for (challenge_id, domain_id, file_path) in placed {
+/// 将本任务全部挑战置失败(CT6,best-effort)并清理 HTTP-01 验证文件。
+async fn fail_task_challenges(ctx: &CoreContext, task_id: &str, reason: &str) {
+    let Ok(rows) = task_challenges(&ctx.db, task_id).await else {
+        return;
+    };
+    for ch in &rows {
         let _ = update_challenge_status(
             ctx,
-            challenge_id,
-            &task.id,
-            domain_id,
+            &ch.id,
+            task_id,
+            &ch.domain_id,
             ChallengeStatus::Failed,
             Some(reason),
         )
         .await;
-        let _ = std::fs::remove_file(file_path);
+    }
+    cleanup_http_challenge_files(ctx, &ctx.db, &rows).await;
+}
+
+/// 清理 HTTP-01 验证文件(best-effort)。挑战行只存 URL 路径(`/.well-known/acme-challenge/<token>`),
+/// 据 token + 域名 webroot 重算文件系统路径删除;DNS-01 挑战无文件、跳过。
+async fn cleanup_http_challenge_files(
+    ctx: &CoreContext,
+    db: &DatabaseConnection,
+    rows: &[challenges::Model],
+) {
+    for ch in rows {
+        if ch.validation_method != ValidationMethod::Http01 {
+            continue;
+        }
+        let Some(url_path) = ch.http_file_path.as_deref() else {
+            continue;
+        };
+        let Some(token) = url_path.rsplit('/').next().filter(|t| !t.is_empty()) else {
+            continue;
+        };
+        if let Ok(webroot) = resolve_webroot(ctx, db, &ch.domain_id).await {
+            let path = webroot.join(".well-known").join("acme-challenge").join(token);
+            let _ = std::fs::remove_file(path);
+        }
     }
 }
 

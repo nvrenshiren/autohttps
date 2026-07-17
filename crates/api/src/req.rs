@@ -83,6 +83,12 @@ pub struct RegisterAcmeAccountRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PatchAcmeAccountRequest {
+    pub contact_email: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateRootCaRequest {
     pub name: String,
     /// 有效期(自 now 天数);服务层算 notBefore/notAfter。

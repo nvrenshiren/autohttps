@@ -1,5 +1,7 @@
 //! ACME 服务(API acme)—— 账户 / 挑战 list+detail、http01 配置 get/put 为真实读取。
-//! 账户注册 / 挑战确认重试等在线交互在 api 层打桩 501。
+//! 账户注册(A1)/ 编辑邮箱(A3)/ 注册重试(A4)/ 移除(A5)、DNS-01 挑战确认(B4)/ 重试(B5)
+//! 均已去桩;ACME order 机制(建单/挑战推进/finalize/吊销)在 `executor`,本模块委派。
+//! `dns-precheck`(B4 可选,需 hickory-resolver)仍在 api 层打桩。
 
 use crate::domain::enums::AcmeAccountStatus;
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
@@ -353,6 +355,132 @@ async fn finalize_registration(
     model.update(&ctx.db).await?;
     ctx.emit(DomainEvent::AcmeAccountStatusChanged { account_id: account_id.to_string(), status });
     Ok(())
+}
+
+// ============ 账户编辑 / 重试 / 移除(A3/A4/A5)============
+
+/// 编辑联系邮箱(A3,跨状态动作)。仅 `registered` 可编辑(否则 account_state_invalid);邮箱格式校验。
+/// 本地更新(业务视为同一账户);best-effort 后台向 CA 同步 contact(失败仅日志,不影响结果)。
+pub async fn patch_account(
+    ctx: &CoreContext,
+    id: &str,
+    contact_email: String,
+) -> CoreResult<AccountRow> {
+    let db = &ctx.db;
+    let account = acme_accounts::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::AcmeAccountNotFound, "ACME 账户不存在"))?;
+    if account.status != AcmeAccountStatus::Registered {
+        return Err(CoreError::new(ErrorCode::AccountStateInvalid, "仅已注册账户可编辑邮箱"));
+    }
+    let email = contact_email.trim().to_string();
+    if !is_valid_email(&email) {
+        return Err(CoreError::validation("联系邮箱格式不正确"));
+    }
+    let has_key = account.account_key_ref.is_some();
+    let mut a: acme_accounts::ActiveModel = account.into();
+    a.contact_email = Set(email);
+    a.updated_at = Set(now_rfc3339());
+    let updated = a.update(db).await?;
+
+    // best-effort:后台向 CA 同步 contact(MVP 不阻塞、失败仅日志;业务仍同一账户,flows §2.3 跨状态动作)
+    if has_key {
+        let ctx2 = ctx.clone();
+        let account_for_ca = updated.clone();
+        tokio::spawn(async move {
+            let contact = format!("mailto:{}", account_for_ca.contact_email);
+            match load_acme_account(&ctx2, &account_for_ca).await {
+                Ok(acc) => {
+                    if let Err(e) = acc.update_contacts(&[contact.as_str()]).await {
+                        tracing::warn!(error = %e, account_id = %account_for_ca.id, "向 CA 同步账户 contact 失败(本地已更新)");
+                    }
+                }
+                Err(e) => tracing::warn!(error = %e, "载入 ACME 账户失败,跳过 CA contact 同步"),
+            }
+        });
+    }
+    build_account_row(db, updated).await
+}
+
+/// 注册失败重试(A4,AT4)。仅 `registration_failed` → `registering`(202)+ 后台重注册;
+/// 其他态 → account_state_invalid。可先 patch 修正邮箱再重试。
+pub async fn retry_account(ctx: &CoreContext, id: &str) -> CoreResult<AccountRow> {
+    let db = &ctx.db;
+    let account = acme_accounts::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::AcmeAccountNotFound, "ACME 账户不存在"))?;
+    if account.status != AcmeAccountStatus::RegistrationFailed {
+        return Err(CoreError::new(ErrorCode::AccountStateInvalid, "仅注册失败的账户可重试"));
+    }
+    let mut a: acme_accounts::ActiveModel = account.into();
+    a.status = Set(AcmeAccountStatus::Registering);
+    a.last_error = Set(None);
+    a.updated_at = Set(now_rfc3339());
+    let updated = a.update(db).await?;
+    ctx.emit(DomainEvent::AcmeAccountStatusChanged {
+        account_id: id.to_string(),
+        status: AcmeAccountStatus::Registering,
+    });
+
+    // 后台异步重注册(复用注册流程;终态经 SSE 回推)。
+    let ctx2 = ctx.clone();
+    let id2 = id.to_string();
+    tokio::spawn(async move { run_registration(&ctx2, &id2).await });
+
+    build_account_row(db, updated).await
+}
+
+/// 移除账户(A5,AT5)。引用该账户的证书 `acme_account_id` / settings 默认账户置空(SET NULL,
+/// 续签需改选账户);清账户密钥材料;删账户行。不存在 → acme_account_not_found。
+pub async fn delete_account(ctx: &CoreContext, id: &str) -> CoreResult<()> {
+    let db = &ctx.db;
+    let account = acme_accounts::Entity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or_else(|| CoreError::new(ErrorCode::AcmeAccountNotFound, "ACME 账户不存在"))?;
+
+    // 证书引用置空(SET NULL;续签需改选账户)
+    let now = now_rfc3339();
+    let referencing = certificates::Entity::find()
+        .filter(certificates::Column::AcmeAccountId.eq(id))
+        .all(db)
+        .await?;
+    for c in referencing {
+        let mut a: certificates::ActiveModel = c.into();
+        a.acme_account_id = Set(None);
+        a.updated_at = Set(now.clone());
+        a.update(db).await?;
+    }
+    // settings 默认账户指向置空(SET NULL)
+    if let Some(s) = settings::Entity::find_by_id(SINGLETON_ID).one(db).await? {
+        if s.default_acme_account_id.as_deref() == Some(id) {
+            let mut a: settings::ActiveModel = s.into();
+            a.default_acme_account_id = Set(None);
+            a.updated_at = Set(now.clone());
+            a.update(db).await?;
+        }
+    }
+    // 清账户密钥材料(AR4;引用即删)
+    if let Some(r) = &account.account_key_ref {
+        let _ = ctx.secrets.remove(r);
+    }
+    acme_accounts::Entity::delete_by_id(id).exec(db).await?;
+    Ok(())
+}
+
+// ============ 挑战确认 / 重试(B4/B5,委派执行器 ACME 机制)============
+
+/// DNS-01 确认已添加 TXT(B4,CT4)→ 通知 CA 校验、全部就绪续推 finalize。返回更新后的挑战详情。
+pub async fn confirm_challenge(ctx: &CoreContext, id: &str) -> CoreResult<ChallengeRow> {
+    crate::services::executor::confirm_challenge(ctx, id).await?;
+    challenge_get(ctx, id).await
+}
+
+/// 挑战失败重试(B5,CT7)→ 重建订单取新挑战(委派证书重试;派生新任务)。
+pub async fn retry_challenge(ctx: &CoreContext, id: &str) -> CoreResult<()> {
+    crate::services::executor::retry_challenge(ctx, id).await
 }
 
 /// MVP 最小邮箱校验:恰含一个 `@`,本地/域部分非空,域含 `.` 且首尾非 `.`。
