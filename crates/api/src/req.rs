@@ -71,6 +71,18 @@ pub struct PutHttp01ConfigRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RegisterAcmeAccountRequest {
+    pub directory_url: String,
+    #[serde(default)]
+    pub ca_label: Option<String>,
+    pub contact_email: String,
+    /// 须为 true(AT1 前提);缺省 false → 422 tos_not_agreed。
+    #[serde(default)]
+    pub tos_agreed: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateRootCaRequest {
     pub name: String,
     /// 有效期(自 now 天数);服务层算 notBefore/notAfter。

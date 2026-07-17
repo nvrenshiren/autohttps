@@ -68,6 +68,19 @@ pub fn to_server_event(ev: &DomainEvent) -> ServerEvent {
             EventType::RootCaStatusChanged,
             json!({ "rootCaId": root_ca_id, "status": status }),
         ),
+        DomainEvent::AcmeAccountStatusChanged { account_id, status } => (
+            EventType::AcmeAccountStatusChanged,
+            json!({ "accountId": account_id, "status": status }),
+        ),
+        DomainEvent::ChallengeStatusChanged { challenge_id, task_id, domain_id, status } => (
+            EventType::ChallengeStatusChanged,
+            json!({
+                "challengeId": challenge_id,
+                "taskId": task_id,
+                "domainId": domain_id,
+                "status": status,
+            }),
+        ),
         DomainEvent::DashboardChanged { pending_count } => {
             (EventType::DashboardChanged, json!({ "pendingCount": pending_count }))
         }

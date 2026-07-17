@@ -36,6 +36,33 @@ pub struct ImportOutcome {
     pub is_expired: bool,
 }
 
+/// 叶子证书标识/有效期(从 CA 签发的链 PEM 解析首块叶子)。
+pub struct LeafMetadata {
+    pub serial_number: String,
+    pub fingerprint: String,
+    pub not_before: String,
+    pub not_after: String,
+}
+
+/// 解析 ACME CA 返回的证书链 PEM,取**首块(叶子)**的标识与有效期(执行器 acme 取证后回填)。
+///
+/// ACME `certificate` 端点返回 `叶子 + 中间` 的 PEM 链;第一块即叶子。序列号/指纹口径与导入路径一致
+/// (十六进制大写冒号)。
+pub fn parse_leaf_metadata(chain_pem: &str) -> CoreResult<LeafMetadata> {
+    let pem = x509_parser::pem::parse_x509_pem(chain_pem.as_bytes())
+        .map_err(|_| CoreError::internal("无法解析 ACME 证书链 PEM"))?
+        .1;
+    let der = pem.contents.as_slice();
+    let (_rest, x509) = x509_parser::parse_x509_certificate(der)
+        .map_err(|_| CoreError::internal("无法解析 ACME 叶子证书"))?;
+    Ok(LeafMetadata {
+        serial_number: hex_colon(x509.raw_serial()),
+        fingerprint: fingerprint_of(der),
+        not_before: to_rfc3339(x509.validity().not_before.to_datetime()),
+        not_after: to_rfc3339(x509.validity().not_after.to_datetime()),
+    })
+}
+
 fn now() -> OffsetDateTime {
     OffsetDateTime::now_utc()
 }
