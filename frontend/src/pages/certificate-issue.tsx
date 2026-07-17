@@ -117,7 +117,12 @@ export function CertificateIssuePage() {
       {
         onSuccess: (cert) => {
           toast.success("已发起签发");
-          navigate(`/certificates/${cert.id}`);
+          // ACME:引导到验证方式向导完成域名验证(DNS-01 需手动加 TXT);自签直接看详情进度。
+          navigate(
+            method === "acme"
+              ? `/certificates/${cert.id}/challenges`
+              : `/certificates/${cert.id}`,
+          );
         },
         onError: (e) => {
           setFormError(e instanceof ApiError ? e.message : "发起签发失败");

@@ -9,15 +9,15 @@ import { DomainDetailPage } from "@/pages/domain-detail";
 import { CertificatesListPage } from "@/pages/certificates-list";
 import { CertificateIssuePage } from "@/pages/certificate-issue";
 import { CertificateDetailPage } from "@/pages/certificate-detail";
+import { ChallengeWizardPage } from "@/pages/challenge-wizard";
+import { AcmeAccountsPage } from "@/pages/acme-accounts";
 import { RootCaListPage } from "@/pages/local-ca-list";
 import { RootCaCreatePage } from "@/pages/local-ca-create";
 import { RootCaDetailPage } from "@/pages/local-ca-detail";
 import { TasksListPage } from "@/pages/tasks-list";
 import { TaskDetailPage } from "@/pages/task-detail";
 import { SettingsPage } from "@/pages/settings";
-import { ComingSoonPage } from "@/pages/coming-soon";
 import { NotFoundPage } from "@/pages/not-found";
-import { BadgeCheck } from "lucide-react";
 
 export default function App() {
   useServerEvents();
@@ -33,16 +33,8 @@ export default function App() {
           <Route path="/certificates" element={<CertificatesListPage />} />
           <Route path="/certificates/issue" element={<CertificateIssuePage />} />
           <Route path="/certificates/:id" element={<CertificateDetailPage />} />
-          <Route
-            path="/acme"
-            element={
-              <ComingSoonPage
-                title="ACME 账户"
-                Icon={BadgeCheck}
-                description="配置 ACME 账户、DNS-01 / HTTP-01 验证向导与挑战管理。后端读取接口已就绪,页面建设中。"
-              />
-            }
-          />
+          <Route path="/certificates/:id/challenges" element={<ChallengeWizardPage />} />
+          <Route path="/acme" element={<AcmeAccountsPage />} />
           <Route path="/local-ca" element={<RootCaListPage />} />
           <Route path="/local-ca/new" element={<RootCaCreatePage />} />
           <Route path="/local-ca/:id" element={<RootCaDetailPage />} />

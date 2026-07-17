@@ -67,7 +67,15 @@ function handleEvent(qc: QueryClient, raw: string) {
       if (id) qc.invalidateQueries({ queryKey: qk.rootCa(id) });
       break;
     }
-    case "challenge_status_changed":
+    case "challenge_status_changed": {
+      // payload 无 certificateId → 失效挑战根键(覆盖所有按证书维度的列表)+ 具体挑战详情。
+      qc.invalidateQueries({ queryKey: qk.challenges });
+      const chId = idOf(p, "challengeId");
+      if (chId) qc.invalidateQueries({ queryKey: qk.challenge(chId) });
+      const tid = idOf(p, "taskId");
+      if (tid) qc.invalidateQueries({ queryKey: qk.task(tid) });
+      break;
+    }
     case "acme_account_status_changed":
       qc.invalidateQueries({ queryKey: qk.acmeAccounts });
       break;

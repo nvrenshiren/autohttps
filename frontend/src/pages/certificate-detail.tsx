@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
+  BadgeCheck,
   Ban,
   Download,
   KeyRound,
@@ -225,6 +226,15 @@ export function CertificateDetailPage() {
               <ListChecks />
               关联任务
             </Button>
+            {data.issuanceMethod === "acme" && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/certificates/${id}/challenges`)}
+              >
+                <BadgeCheck />
+                查看验证
+              </Button>
+            )}
             <GatedButton
               enabled={canRenew(s) && !busy}
               reason="仅有效 / 即将到期 / 已过期 / 已吊销证书可续签"

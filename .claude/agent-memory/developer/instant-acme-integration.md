@@ -44,7 +44,13 @@ ACME 全线接入用 **instant-acme 0.8**(实测 0.8.5),核心集成点(照 api/
     本任务已无 awaiting_manual/pending 挑战且证书仍进行中 → `finalize_acme_order` 续推 → 证书 valid + 任务 succeeded。confirm/finalize 都在 executor 里(私有 helper 可复用),acme.rs 仅 thin wrapper。
   - **挑战 retry(CT7)**:ACME 失败挑战/订单不可原地复用,委派 `certificates::retry`(派生新任务重建订单取新挑战),非原地转 pending。
 - **续签/吊销/DNS-01 已全部去桩并对 Pebble 实测通过**(issue/renew HTTP-01 自动完成;DNS-01 issue+renew 挂起→confirm→valid;
-  revoke→revoked;account patch/retry/delete 去桩)。仅 `dns-precheck`(B4 可选,需 hickory-resolver)与前端 acme 页仍留桩。
+  revoke→revoked;account patch/retry/delete 去桩)。仅 `dns-precheck`(B4 可选,需 hickory-resolver)**仍留 501 桩**——
+  前端因此**不接**预检按钮(PRD 中本就可选),避免暴露 not_implemented。
+- **前端 acme 两页已实现并对 Pebble 实测通过**(账户页 `/acme` + 验证向导 `/certificates/:id/challenges`):UI 驱动全程
+  register→registered、issue DNS-01→`awaiting_manual`→读 TXT(`GET /acme/challenges/{id}` 的 dnsTxtName/Value)→confirm→
+  `passed`→证书 `valid` 实测通。`challenge_status_changed` payload **无 certificateId**,故 SSE 失效用挑战根键 `["challenges"]`
+  前缀失效(覆盖所有按证书维度列表)+ `["challenge",id]` 详情。`challenge retry` 返回 202 空体且后端**派生新任务/新挑战**
+  (非原地转 pending),故 retry 后要一并失效 certificates/tasks 列表。
 
 **Pebble 测试服踩坑**:
 - `PEBBLE_VA_ALWAYS_VALID=1` 挑战自动判过,但**仍须走 set_ready**(POST 挑战 URL)把授权从 pending 推到 valid;

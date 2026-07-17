@@ -319,6 +319,13 @@ export interface AcmeAccountDetail extends AcmeAccountSummary {
   tosAgreed: boolean;
 }
 
+export interface RegisterAcmeAccountRequest {
+  directoryUrl: string; // ACME 目录端点 URL——唯一标定「目标 CA + 环境」
+  caLabel?: string; // CA 展示名(如 "Let's Encrypt")
+  contactEmail: string;
+  tosAgreed: boolean; // 须为 true(AT1 前提)
+}
+
 export interface Http01Config {
   domainId: string;
   webrootPath: string;

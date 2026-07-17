@@ -11,10 +11,13 @@ import {
 import { api, qs } from "@/lib/api";
 import { useUiStore } from "@/stores/ui";
 import type {
+  AcmeAccountDetail,
   AcmeAccountSummary,
   AppInfo,
   CertificateDetail,
   CertificateSummary,
+  ChallengeDetail,
+  ChallengeSummary,
   CreateDomainRequest,
   CreateRootCaRequest,
   DashboardOverview,
@@ -23,6 +26,7 @@ import type {
   ImportRootCaRequest,
   IssueCertificateRequest,
   Page,
+  RegisterAcmeAccountRequest,
   RootCaDetail,
   RootCaSummary,
   SettingsView,
@@ -56,6 +60,10 @@ export const qk = {
   rootCas: ["root-cas"] as const,
   rootCa: (id: string) => ["root-ca", id] as const,
   acmeAccounts: ["acme-accounts"] as const,
+  // 挑战:根键 ["challenges"] 供 SSE 前缀失效(payload 无 certificateId,按证书维度的列表全部重取)。
+  challenges: ["challenges"] as const,
+  challengesByCert: (certificateId: string) => ["challenges", certificateId] as const,
+  challenge: (id: string) => ["challenge", id] as const,
 };
 
 // ---------- app-info / dashboard ----------
@@ -330,5 +338,104 @@ export function useAcmeAccounts(status?: string) {
     queryKey: [...qk.acmeAccounts, { status }],
     queryFn: () =>
       api.get<Page<AcmeAccountSummary>>("/acme/accounts" + qs({ status, pageSize: 100 })),
+    refetchInterval: useFallbackInterval(),
+  });
+}
+
+export function useRegisterAcmeAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RegisterAcmeAccountRequest) =>
+      api.post<AcmeAccountDetail>("/acme/accounts", body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.acmeAccounts });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+  });
+}
+
+export function useUpdateAcmeAccountEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; contactEmail: string }) =>
+      api.patch<AcmeAccountDetail>(`/acme/accounts/${vars.id}`, { contactEmail: vars.contactEmail }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.acmeAccounts }),
+  });
+}
+
+export function useRetryAcmeAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<AcmeAccountDetail>(`/acme/accounts/${id}/retry`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.acmeAccounts });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+  });
+}
+
+export function useDeleteAcmeAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.del(`/acme/accounts/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.acmeAccounts });
+      qc.invalidateQueries({ queryKey: qk.certificates }); // 引用置空(SET NULL)
+      qc.invalidateQueries({ queryKey: qk.settings }); // 默认账户指向可能被清空
+      qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+  });
+}
+
+// ---------- acme challenges(验证方式向导:按证书维度看各域名挑战 + DNS-01 确认 / 失败重试)----------
+
+export function useChallenges(certificateId: string) {
+  return useQuery({
+    queryKey: qk.challengesByCert(certificateId),
+    queryFn: () =>
+      api.get<Page<ChallengeSummary>>(
+        "/acme/challenges" +
+          qs({ certificateId, pageSize: 100, sort: "createdAt", order: "asc" }),
+      ),
+    enabled: !!certificateId,
+    refetchInterval: useFallbackInterval(),
+  });
+}
+
+/** 挑战详情(DNS-01 取 TXT 名/值供复制)。仅按需(DNS-01)拉取,HTTP-01 摘要即够。 */
+export function useChallenge(id: string, enabled = true) {
+  return useQuery({
+    queryKey: qk.challenge(id),
+    queryFn: () => api.get<ChallengeDetail>(`/acme/challenges/${id}`),
+    enabled: enabled && !!id,
+    refetchInterval: useFallbackInterval(),
+  });
+}
+
+export function useConfirmChallenge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<ChallengeDetail>(`/acme/challenges/${id}/confirm`),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: qk.challenges });
+      qc.invalidateQueries({ queryKey: qk.challenge(id) });
+      qc.invalidateQueries({ queryKey: qk.tasks });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+  });
+}
+
+/** 失败重试(CT7)—— 后端重建订单派生新任务/新挑战,故一并失效证书/任务列表。 */
+export function useRetryChallenge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/acme/challenges/${id}/retry`),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: qk.challenges });
+      qc.invalidateQueries({ queryKey: qk.challenge(id) });
+      qc.invalidateQueries({ queryKey: qk.certificates });
+      qc.invalidateQueries({ queryKey: qk.tasks });
+      qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
   });
 }

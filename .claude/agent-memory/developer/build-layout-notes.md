@@ -23,6 +23,14 @@ metadata:
   写回 `.gitkeep`(vite build 会清空 dist)。验证兜底:`rm -rf frontend/dist && cargo clean -p autohttps-api
   && cargo build -p server` 应自动重建 dist 并编译通过。
 
+- **debug 构建下 rust-embed 运行时从磁盘读 `frontend/dist`(非编译期内嵌)**:验证前端改动**无需重建
+  server 二进制**——`npm run build` 后,已在跑的(或缓存链接的)debug server 直接服务新 dist(实测served
+  bundle hash `index-XXXX.js` 恰等于 vite 刚产出的 hash;`cargo build -p server` 0.46s 缓存命中未重编)。
+  机制:rust-embed 默认在 debug 下按编译期烙进的绝对 `CARGO_MANIFEST_DIR/../../frontend/dist` 路径运行时读盘
+  (release 才真内嵌)。**省验证轮次**:自验证只改前端时,`npm run build` + 复用现有 server 即可;不必 kill+rebuild
+  (仅当改了 Rust 才需重建)。SPA client 路由(如 `/acme`、`/certificates/:id/challenges`)由 fallback 返回
+  index.html(实测 HTTP 200),前端 react-router 接管。
+
 - **server 默认监听 `127.0.0.1:8443`**(settings 默认);Vite dev 代理 `/api`→8443。改端口用 env
   `AUTOHTTPS_ADDR=host:port`;数据目录 `AUTOHTTPS_DATA_DIR`(默认 `./data`)。REST/SSE 统一挂 `/api`
   前缀(避免与 SPA client 路由如 `/certificates` 冲突);前端 api baseURL = `/api`。

@@ -26,6 +26,13 @@ export function WildcardBadge() {
   return <Badge variant="outline">通配符</Badge>;
 }
 
+/** CA 环境(§3.5:生产=中性 outline;测试=warning outline 弱提示非生产)。label 为后端展示串,可空。 */
+export function EnvironmentBadge({ environment }: { environment: string | null }) {
+  if (!environment) return <span className="text-muted-foreground">—</span>;
+  const isTest = /测试|test|staging/i.test(environment);
+  return <Badge variant={isTest ? "outline-warning" : "outline"}>{environment}</Badge>;
+}
+
 /** 创建方式(§3.5:新建 / 导入)—— 中性 outline。局部属性 wire 值 created/imported。 */
 export function CreationMethodBadge({ method }: { method: string }) {
   return <Badge variant="outline">{method === "imported" ? "导入" : "新建"}</Badge>;
