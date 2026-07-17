@@ -60,7 +60,7 @@ function Sidebar({ pendingCount }: { pendingCount: number }) {
     <aside className="flex w-14 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:w-60">
       {/* 品牌 */}
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-3 lg:px-4">
-        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs ring-1 ring-primary/20">
           <ShieldCheck className="size-[18px]" />
         </span>
         <span className="hidden text-sm font-semibold tracking-tight lg:inline">autohttps</span>
@@ -75,7 +75,7 @@ function Sidebar({ pendingCount }: { pendingCount: number }) {
             end={end}
             className={({ isActive }) =>
               cn(
-                "relative flex h-9 items-center gap-2.5 rounded-md px-2.5",
+                "relative flex h-9 items-center gap-2.5 rounded-md px-2.5 transition-colors",
                 "justify-center lg:justify-start",
                 isActive
                   ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
@@ -125,7 +125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar pendingCount={pendingCount} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 sm:px-6">
-          <span className="text-base font-semibold">{sectionTitle(location.pathname)}</span>
+          <span className="text-base font-semibold tracking-tight">{sectionTitle(location.pathname)}</span>
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
           </div>

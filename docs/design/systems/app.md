@@ -42,165 +42,165 @@
 
 > 落点:`frontend/src/index.css`(或等价全局样式)。**明暗两套**:`:root` = 亮色,`.dark` = 暗色(明暗切换机制见 §10-H7)。
 > 命名遵 shadcn 约定;在其上**扩展**语义状态色(`--success/--warning/--danger/--info/--neutral` 各含 base / foreground / muted / muted-foreground 四元)。
-> 中性色系走冷调 slate(hue≈260),品牌主色为蓝(hue≈258,信任 / 基础设施 / HTTPS 语义)。
+> **「蓝图 Blueprint」基调**:亮面=暖白纸底(hue≈90 微暖,非纯白)+ 墨蓝前景;品牌主色=群青(hue≈268,高彩度,信任 / 基础设施 / HTTPS 语义);info 状态色=天青(hue≈222),与群青主色以 46° 色相差明确分野(DS12)。
 
 ### 1.1 亮色 `:root`
 
 ```css
 :root {
-  /* 基底与前景 */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.21 0.02 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.02 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.02 260);
+  /* 基底与前景(暖纸底 + 墨蓝字) */
+  --background: oklch(0.982 0.004 90);
+  --foreground: oklch(0.235 0.02 265);
+  --card: oklch(0.995 0.002 90);
+  --card-foreground: oklch(0.235 0.02 265);
+  --popover: oklch(0.995 0.002 90);
+  --popover-foreground: oklch(0.235 0.02 265);
 
-  /* 品牌主色(主操作 / 焦点环) */
-  --primary: oklch(0.55 0.17 258);
-  --primary-foreground: oklch(0.985 0.003 260);
+  /* 品牌主色·群青(主操作 / 焦点环) */
+  --primary: oklch(0.50 0.20 268);
+  --primary-foreground: oklch(0.97 0.005 265);
 
-  /* 次级 / 柔和 / 强调(hover 底) */
-  --secondary: oklch(0.968 0.006 260);
-  --secondary-foreground: oklch(0.30 0.02 260);
-  --muted: oklch(0.968 0.004 260);
-  --muted-foreground: oklch(0.552 0.02 260);
-  --accent: oklch(0.962 0.008 258);
-  --accent-foreground: oklch(0.30 0.02 260);
+  /* 次级 / 柔和 / 强调(hover 底,微染群青) */
+  --secondary: oklch(0.955 0.006 90);
+  --secondary-foreground: oklch(0.32 0.02 265);
+  --muted: oklch(0.96 0.005 90);
+  --muted-foreground: oklch(0.53 0.02 265);
+  --accent: oklch(0.94 0.01 268);
+  --accent-foreground: oklch(0.32 0.02 265);
 
   /* 破坏性(= 危险语义主色) */
-  --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.585 0.20 25);
+  --destructive-foreground: oklch(0.985 0.003 90);
 
-  /* 描边 / 输入框 / 焦点环 */
-  --border: oklch(0.922 0.006 260);
-  --input: oklch(0.922 0.006 260);
-  --ring: oklch(0.55 0.17 258);
+  /* 描边 / 输入框 / 焦点环(暖灰发丝线) */
+  --border: oklch(0.912 0.006 90);
+  --input: oklch(0.912 0.006 90);
+  --ring: oklch(0.50 0.20 268);
 
   /* —— 语义状态色(§3 立法用)—— */
-  --success: oklch(0.55 0.13 150);
+  --success: oklch(0.60 0.14 152);
   --success-foreground: oklch(0.99 0 0);
-  --success-muted: oklch(0.95 0.05 150);
-  --success-muted-foreground: oklch(0.42 0.11 150);
+  --success-muted: oklch(0.945 0.04 152);
+  --success-muted-foreground: oklch(0.44 0.10 152);
 
-  --warning: oklch(0.72 0.15 75);
-  --warning-foreground: oklch(0.26 0.05 75);
-  --warning-muted: oklch(0.95 0.06 85);
+  --warning: oklch(0.70 0.14 75);
+  --warning-foreground: oklch(0.27 0.05 75);
+  --warning-muted: oklch(0.955 0.05 80);
   --warning-muted-foreground: oklch(0.48 0.09 70);
 
-  --danger: oklch(0.58 0.22 27);
-  --danger-foreground: oklch(0.99 0 0);
-  --danger-muted: oklch(0.95 0.04 25);
-  --danger-muted-foreground: oklch(0.51 0.19 27);
+  --danger: oklch(0.585 0.20 25);
+  --danger-foreground: oklch(0.985 0.003 90);
+  --danger-muted: oklch(0.945 0.035 25);
+  --danger-muted-foreground: oklch(0.50 0.17 25);
 
-  --info: oklch(0.58 0.13 240);
+  --info: oklch(0.58 0.13 222);
   --info-foreground: oklch(0.99 0 0);
-  --info-muted: oklch(0.95 0.045 240);
-  --info-muted-foreground: oklch(0.45 0.13 245);
+  --info-muted: oklch(0.945 0.035 222);
+  --info-muted-foreground: oklch(0.44 0.11 222);
 
-  --neutral: oklch(0.55 0.02 260);
+  --neutral: oklch(0.54 0.02 265);
   --neutral-foreground: oklch(0.99 0 0);
-  --neutral-muted: oklch(0.96 0.004 260);
-  --neutral-muted-foreground: oklch(0.44 0.015 260);
+  --neutral-muted: oklch(0.955 0.005 265);
+  --neutral-muted-foreground: oklch(0.45 0.015 265);
 
   /* 红点 / 通知(= danger,§8 红点立法引用) */
-  --notification: oklch(0.58 0.22 27);
-  --notification-foreground: oklch(0.99 0 0);
+  --notification: oklch(0.585 0.20 25);
+  --notification-foreground: oklch(0.985 0.003 90);
 
   /* chart(shadcn 约定;MVP 预留,dashboard 无分布图表,见 §10-H12) */
-  --chart-1: oklch(0.55 0.17 258);
-  --chart-2: oklch(0.55 0.13 150);
-  --chart-3: oklch(0.72 0.15 75);
-  --chart-4: oklch(0.58 0.22 27);
-  --chart-5: oklch(0.55 0.02 260);
+  --chart-1: oklch(0.50 0.20 268);
+  --chart-2: oklch(0.60 0.14 152);
+  --chart-3: oklch(0.70 0.14 75);
+  --chart-4: oklch(0.585 0.20 25);
+  --chart-5: oklch(0.54 0.02 265);
 
   /* sidebar(App Shell 侧栏,§8) */
-  --sidebar: oklch(0.985 0.003 260);
-  --sidebar-foreground: oklch(0.21 0.02 260);
-  --sidebar-primary: oklch(0.55 0.17 258);
-  --sidebar-primary-foreground: oklch(0.985 0.003 260);
-  --sidebar-accent: oklch(0.955 0.006 260);
-  --sidebar-accent-foreground: oklch(0.21 0.02 260);
-  --sidebar-border: oklch(0.922 0.006 260);
-  --sidebar-ring: oklch(0.55 0.17 258);
+  --sidebar: oklch(0.965 0.005 90);
+  --sidebar-foreground: oklch(0.235 0.02 265);
+  --sidebar-primary: oklch(0.50 0.20 268);
+  --sidebar-primary-foreground: oklch(0.97 0.005 265);
+  --sidebar-accent: oklch(0.94 0.008 265);
+  --sidebar-accent-foreground: oklch(0.235 0.02 265);
+  --sidebar-border: oklch(0.912 0.006 90);
+  --sidebar-ring: oklch(0.50 0.20 268);
 
   /* 圆角基准(§6) */
-  --radius: 0.5rem;
+  --radius: 0.375rem;
 }
 ```
 
 ### 1.2 暗色 `.dark`
 
-> 暗色底不取纯黑,取冷调深 slate(oklch(0.185 …)),更适合 7×24 长时间盯看;卡片较底色微抬做层次;描边用半透明白(shadcn v4 暗色惯例)。状态色的 muted 反转为「低亮度高饱和底 + 高亮文字」。
+> 暗色底取深墨蓝(oklch(0.16 … hue≈265)),卡片较底色微抬做层次;描边用半透明白(shadcn v4 暗色惯例)。状态色的 muted 反转为「低亮度高饱和底 + 高亮文字」。**暗色下主色 / 状态色的前景色取深色墨**(高亮底 + 深字对比度优于白字,达 AA)。
 
 ```css
 .dark {
-  --background: oklch(0.185 0.015 260);
-  --foreground: oklch(0.97 0.005 260);
-  --card: oklch(0.21 0.017 260);
-  --card-foreground: oklch(0.97 0.005 260);
-  --popover: oklch(0.21 0.017 260);
-  --popover-foreground: oklch(0.97 0.005 260);
+  --background: oklch(0.16 0.012 265);
+  --foreground: oklch(0.945 0.008 265);
+  --card: oklch(0.19 0.014 265);
+  --card-foreground: oklch(0.945 0.008 265);
+  --popover: oklch(0.19 0.014 265);
+  --popover-foreground: oklch(0.945 0.008 265);
 
-  --primary: oklch(0.62 0.16 258);
-  --primary-foreground: oklch(0.99 0 0);
+  --primary: oklch(0.68 0.16 268);
+  --primary-foreground: oklch(0.17 0.02 268);
 
-  --secondary: oklch(0.27 0.015 260);
-  --secondary-foreground: oklch(0.97 0.005 260);
-  --muted: oklch(0.27 0.015 260);
-  --muted-foreground: oklch(0.70 0.02 260);
-  --accent: oklch(0.30 0.02 258);
-  --accent-foreground: oklch(0.97 0.005 260);
+  --secondary: oklch(0.24 0.014 265);
+  --secondary-foreground: oklch(0.945 0.008 265);
+  --muted: oklch(0.24 0.014 265);
+  --muted-foreground: oklch(0.68 0.02 265);
+  --accent: oklch(0.27 0.02 268);
+  --accent-foreground: oklch(0.945 0.008 265);
 
-  --destructive: oklch(0.65 0.20 27);
-  --destructive-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.66 0.19 25);
+  --destructive-foreground: oklch(0.17 0.03 25);
 
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.62 0.16 258);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.68 0.16 268);
 
-  --success: oklch(0.68 0.14 150);
-  --success-foreground: oklch(0.18 0.02 150);
-  --success-muted: oklch(0.30 0.06 152);
-  --success-muted-foreground: oklch(0.82 0.12 150);
+  --success: oklch(0.70 0.14 152);
+  --success-foreground: oklch(0.17 0.03 152);
+  --success-muted: oklch(0.27 0.05 152);
+  --success-muted-foreground: oklch(0.82 0.11 152);
 
-  --warning: oklch(0.78 0.15 78);
-  --warning-foreground: oklch(0.24 0.04 75);
-  --warning-muted: oklch(0.33 0.06 75);
-  --warning-muted-foreground: oklch(0.86 0.12 82);
+  --warning: oklch(0.78 0.14 78);
+  --warning-foreground: oklch(0.20 0.04 78);
+  --warning-muted: oklch(0.29 0.05 75);
+  --warning-muted-foreground: oklch(0.86 0.11 80);
 
-  --danger: oklch(0.65 0.20 27);
-  --danger-foreground: oklch(0.99 0 0);
-  --danger-muted: oklch(0.32 0.09 27);
-  --danger-muted-foreground: oklch(0.83 0.13 25);
+  --danger: oklch(0.66 0.19 25);
+  --danger-foreground: oklch(0.17 0.03 25);
+  --danger-muted: oklch(0.29 0.07 25);
+  --danger-muted-foreground: oklch(0.82 0.12 25);
 
-  --info: oklch(0.66 0.14 240);
-  --info-foreground: oklch(0.16 0.02 240);
-  --info-muted: oklch(0.30 0.07 245);
-  --info-muted-foreground: oklch(0.82 0.11 240);
+  --info: oklch(0.68 0.12 222);
+  --info-foreground: oklch(0.16 0.03 222);
+  --info-muted: oklch(0.27 0.05 222);
+  --info-muted-foreground: oklch(0.82 0.10 222);
 
-  --neutral: oklch(0.70 0.02 260);
-  --neutral-foreground: oklch(0.18 0.02 260);
-  --neutral-muted: oklch(0.27 0.015 260);
-  --neutral-muted-foreground: oklch(0.78 0.02 260);
+  --neutral: oklch(0.70 0.015 265);
+  --neutral-foreground: oklch(0.17 0.01 265);
+  --neutral-muted: oklch(0.24 0.012 265);
+  --neutral-muted-foreground: oklch(0.76 0.015 265);
 
-  --notification: oklch(0.65 0.20 27);
-  --notification-foreground: oklch(0.99 0 0);
+  --notification: oklch(0.66 0.19 25);
+  --notification-foreground: oklch(0.17 0.03 25);
 
-  --chart-1: oklch(0.62 0.16 258);
-  --chart-2: oklch(0.68 0.14 150);
-  --chart-3: oklch(0.78 0.15 78);
-  --chart-4: oklch(0.65 0.20 27);
-  --chart-5: oklch(0.70 0.02 260);
+  --chart-1: oklch(0.68 0.16 268);
+  --chart-2: oklch(0.70 0.14 152);
+  --chart-3: oklch(0.78 0.14 78);
+  --chart-4: oklch(0.66 0.19 25);
+  --chart-5: oklch(0.70 0.015 265);
 
-  --sidebar: oklch(0.21 0.017 260);
-  --sidebar-foreground: oklch(0.97 0.005 260);
-  --sidebar-primary: oklch(0.62 0.16 258);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.27 0.015 260);
-  --sidebar-accent-foreground: oklch(0.97 0.005 260);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.62 0.16 258);
+  --sidebar: oklch(0.185 0.013 265);
+  --sidebar-foreground: oklch(0.945 0.008 265);
+  --sidebar-primary: oklch(0.68 0.16 268);
+  --sidebar-primary-foreground: oklch(0.17 0.02 268);
+  --sidebar-accent: oklch(0.235 0.014 265);
+  --sidebar-accent-foreground: oklch(0.945 0.008 265);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.68 0.16 268);
 }
 ```
 
@@ -338,9 +338,9 @@
 | 根 CA | `expired` | 已过期 | danger | `ShieldAlert` | 静态 |
 
 **立法要点**:
-- **info 内两类图标区分**:排队 / 待开始(`pending_issue` / `queued` / `pending`)用**静态时钟** `Clock`;实际执行中(`issuing` / `renewing` / `revoking` / `running` / `validating` / `registering`)用**旋转 spinner** `Loader2 animate-spin`——同蓝色语义,图标区分「等待被处理」与「正在处理」。
+- **info 内两类图标区分**:排队 / 待开始(`pending_issue` / `queued` / `pending`)用**静态时钟** `Clock`;实际执行中(`issuing` / `renewing` / `revoking` / `running` / `validating` / `registering`)用**旋转 spinner** `Loader2 animate-spin`——同天青(info)语义,图标区分「等待被处理」与「正在处理」。
 - **`awaiting_manual` 归 warning 非 info**:它虽处 flow「进行中」,但语义是「等你去加 TXT」的**待处理**,用 amber + `Hourglass` 与 dashboard 待处理级别一致(flows/acme §3.1 / DA2)。
-- **`revoking`(info 蓝)vs `revoked`(neutral 灰)**:进行中态与主动终态分色。
+- **`revoking`(info 天青)vs `revoked`(neutral 灰)**:进行中态与主动终态分色。
 
 ### 3.3 域名列表「证书态投影」映射(domains/list F1)
 
@@ -446,7 +446,7 @@
 
 ## 6. 圆角 · 描边 · 阴影
 
-- **圆角**:`--radius: 0.5rem`(8px),偏紧凑显「精确 / 工具感」。阶梯 `sm/md/lg/xl`(§2)。Badge / Input / Button 用 `md`~`lg`;Card / Dialog 用 `lg`~`xl`;圆点 / 头像用 `rounded-full`。
+- **圆角**:`--radius: 0.375rem`(6px),锐利克制显「精密仪器感」。阶梯 `sm/md/lg/xl`(§2)。Badge / Input / Button 用 `md`~`lg`;Card / Dialog 用 `lg`~`xl`;圆点 / 头像用 `rounded-full`。
 - **描边**:结构主要靠 `border-border` 分区(暗色为半透明白),**边框优先于阴影**(P2 扁平精确)。表格、卡片、输入框统一 `1px` 边框。
 - **阴影**:克制。Card 静置可无阴影或 `shadow-xs`;浮层(Dropdown / Popover / Dialog / Toast)用 `shadow-md`~`shadow-lg` 建立层级;避免大面积重投影。
 
@@ -667,4 +667,6 @@
 - **DS8 · dashboard 强调色只在计数>0 出现**:三指标健康时中性,`失败数>0`/`即将到期数>0` 才染色。为什么:常态健康不应满屏报警;告警权重(danger>warning,已过期居首)只在真有待办时凸显(flows/dashboard §3.1)。
 - **DS9 · 挑战进度用步骤 / 时间线,禁假进度条**:无百分比语义。为什么:HTTP-01 自动 / DNS-01 手动都是「状态推进」而非「进度百分比」;步骤图 + 状态图标如实反映挑战状态机,假进度条误导。
 - **DS10 · 无既成端,反向提炼不适用,取基线立初版**:本端全新,依 TECH §1.4 锁定的 shadcn + Tailwind v4 + lucide + sonner 与 project 工具定位提出初版 token;送审后即为全端原型上游。为什么:符合「全新端依 approved 基线提初版并立法」的端级设计系统任务定义。
-```
+- **DS11 · 「蓝图 Blueprint」基调:暖纸亮面 + 群青主色(修订 DS1 色相选择)**:亮面底色改暖白(oklch hue≈90 微暖),前景与中性走墨蓝(hue≈265),主色改群青(hue≈268、彩度升至 0.20)。为什么:纯白 + 冷 slate + 标准蓝是「默认 shadcn 脸」,无记忆点;暖纸底让界面像「图纸」,群青即 blueprint 蓝,契合证书 / 基础设施的「可信蓝图」意象,且暖底缓解长时间盯看的冷白光疲劳。DS1 其余论证(蓝系传达信任、冷/墨中性衬托状态色)仍然成立,仅色相与彩度取值被本条修订。
+- **DS12 · info 状态色移至天青 hue≈222(修订 DS1 中 240 取值)**:旧值 info(240)与主色(258)仅 18° 色差,软底 Badge 与主色实心按钮在边缘情形(小尺寸、暗色、色弱)仍显含混;新值 222 与群青 268 拉开 46°,且天青比蓝更「过程感」。为什么:主色 = 你要按下的动作,info = 正在发生的过程,二者是界面里最容易同框的两种蓝,必须一眼可分;实心 vs 软底的形态差异保留为第二道区分。
+- **DS13 · 锐利化 + 微交互:radius 8→6px,按钮 active 压缩,selection 染色**:圆角基准降至 0.375rem,按钮加 `active:scale-[0.98]` 与 `shadow-xs`(default/destructive/outline),全局 `::selection` 取 20% 主色、滚动条细化。为什么:6px 圆角 + 发丝描边是「精密仪器」语义的形态落点;active 压缩给点击即时物理反馈,成本为零;selection 染色让群青渗透到文本操作细节,统一品牌触感。
