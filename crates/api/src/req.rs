@@ -166,6 +166,10 @@ pub struct ExportQuery {
     pub format: Option<String>,
     /// 含 private_key 时须为 true,否则 422 key_export_not_acknowledged。
     pub acknowledge_key_export: Option<bool>,
+    /// 部署目标:nginx|apache|iis|haproxy;给出时按目标打包 zip(全部含私钥)。
+    pub target: Option<String>,
+    /// target=iis 时必填:PFX 加密口令。
+    pub pfx_password: Option<String>,
 }
 
 #[derive(Deserialize, Default)]

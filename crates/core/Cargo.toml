@@ -49,3 +49,5 @@ instant-acme = { version = "0.8", default-features = false, features = [
 ] }
 # 吊销请求需 `CertificateDer`(instant-acme 未 re-export;版本随 rustls/instant-acme 全树对齐)。
 rustls-pki-types = "1"
+p12-keystore = "0.2.1"
+pem = "3.0.6"

@@ -58,13 +58,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { absoluteUtc, daysLabel, relativeTime } from "@/lib/time";
 import { toast } from "@/components/ui/sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queries";
 
-/** 导出内容预设(§2.8 parts 词表;非 §4.3 状态枚举,可用字面量)。 */
+/** 部署目标(§2.8 扩展):按目标服务打包 zip;通用 PEM 走 parts 自定义。 */
+const EXPORT_TARGETS = [
+  { value: "nginx", label: "Nginx(fullchain.pem + privkey.pem)" },
+  { value: "apache", label: "Apache(cert.pem + chain.pem + privkey.pem)" },
+  { value: "iis", label: "IIS / Tomcat(PFX 单文件 · 需口令)" },
+  { value: "haproxy", label: "HAProxy(合并 PEM 单文件)" },
+  { value: "generic", label: "通用 PEM(自定义内容)" },
+] as const;
+
+/** 通用 PEM 的内容预设(§2.8 parts 词表;非 §4.3 状态枚举,可用字面量)。 */
 const EXPORT_PRESETS: { value: string; label: string; hasKey: boolean }[] = [
   { value: "fullchain", label: "完整证书链(叶子 + 链)", hasKey: false },
   { value: "leaf", label: "仅叶子证书", hasKey: false },
@@ -128,7 +138,9 @@ export function CertificateDetailPage() {
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportTarget, setExportTarget] = useState<string>("nginx");
   const [exportParts, setExportParts] = useState("fullchain");
+  const [pfxPassword, setPfxPassword] = useState("");
   const [keyAck, setKeyAck] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -149,20 +161,30 @@ export function CertificateDetailPage() {
   };
 
   const openExport = () => {
+    setExportTarget("nginx");
     setExportParts("fullchain");
+    setPfxPassword("");
     setKeyAck(false);
     setExportOpen(true);
   };
 
-  const needsKeyAck = EXPORT_PRESETS.find((p) => p.value === exportParts)?.hasKey ?? false;
+  const isGeneric = exportTarget === "generic";
+  const needsKeyAck =
+    !isGeneric || (EXPORT_PRESETS.find((p) => p.value === exportParts)?.hasKey ?? false);
 
   const onDownload = async () => {
     const primary = data?.domains[0]?.hostname?.replace(/[^a-zA-Z0-9.-]/g, "_") ?? id;
-    const suffix = exportParts.replace(/,/g, "+");
-    const q = `parts=${exportParts}${needsKeyAck ? "&acknowledgeKeyExport=true" : ""}`;
+    const query = isGeneric
+      ? `parts=${exportParts}${needsKeyAck ? "&acknowledgeKeyExport=true" : ""}`
+      : `target=${exportTarget}&acknowledgeKeyExport=true${
+          exportTarget === "iis" ? `&pfxPassword=${encodeURIComponent(pfxPassword)}` : ""
+        }`;
+    const filename = isGeneric
+      ? `${primary}-${exportParts.replace(/,/g, "+")}.pem`
+      : `${primary}-${exportTarget}.zip`;
     setBusy(true);
     try {
-      const saved = await downloadFile(`/certificates/${id}/export?${q}`, `${primary}-${suffix}.pem`, {
+      const saved = await downloadFile(`/certificates/${id}/export?${query}`, filename, {
         desktop: isDesktop,
       });
       if (saved) {
@@ -442,37 +464,74 @@ export function CertificateDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 导出内容选择面板(H6:含私钥走风险确认) */}
+      {/* 导出面板:部署目标 zip / 通用 PEM(H6:含私钥走风险确认) */}
       <Dialog open={exportOpen} onOpenChange={(o) => !busy && setExportOpen(o)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>导出证书</DialogTitle>
             <DialogDescription>
-              选择导出内容;PEM 文件下载(服务器形态经浏览器下载,桌面形态保存到本地路径)。
+              选择部署目标,按目标服务的部署格式打包 zip 下载(服务器形态经浏览器下载,桌面形态保存到本地路径)。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="export-parts">导出内容</Label>
+              <Label htmlFor="export-target">部署目标</Label>
               <Select
-                value={exportParts}
+                value={exportTarget}
                 onValueChange={(v) => {
-                  setExportParts(v);
+                  setExportTarget(v);
                   setKeyAck(false);
                 }}
               >
-                <SelectTrigger id="export-parts" className="w-full">
+                <SelectTrigger id="export-target" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {EXPORT_PRESETS.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>
-                      {p.label}
+                  {EXPORT_TARGETS.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {isGeneric && (
+              <div className="space-y-1.5">
+                <Label htmlFor="export-parts">导出内容</Label>
+                <Select
+                  value={exportParts}
+                  onValueChange={(v) => {
+                    setExportParts(v);
+                    setKeyAck(false);
+                  }}
+                >
+                  <SelectTrigger id="export-parts" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPORT_PRESETS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {exportTarget === "iis" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="pfx-password">PFX 加密口令</Label>
+                <Input
+                  id="pfx-password"
+                  type="password"
+                  placeholder="导入 IIS 时需输入该口令"
+                  value={pfxPassword}
+                  onChange={(e) => setPfxPassword(e.target.value)}
+                />
+              </div>
+            )}
 
             {needsKeyAck && (
               <Alert variant="destructive">
@@ -480,7 +539,7 @@ export function CertificateDetailPage() {
                 <AlertTitle>私钥属敏感数据</AlertTitle>
                 <AlertDescription>
                   <p>
-                    导出的私钥可解密该证书的全部流量,请务必妥善保管、切勿外泄或经不安全渠道传输。
+                    导出包含私钥,可解密该证书的全部流量,请务必妥善保管、切勿外泄或经不安全渠道传输。
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     <Switch id="key-ack" checked={keyAck} onCheckedChange={setKeyAck} />
@@ -496,7 +555,14 @@ export function CertificateDetailPage() {
             <Button variant="secondary" disabled={busy} onClick={() => setExportOpen(false)}>
               取消
             </Button>
-            <Button disabled={busy || (needsKeyAck && !keyAck)} onClick={() => void onDownload()}>
+            <Button
+              disabled={
+                busy ||
+                (needsKeyAck && !keyAck) ||
+                (exportTarget === "iis" && pfxPassword.trim() === "")
+              }
+              onClick={() => void onDownload()}
+            >
               {busy && <Loader2 className="animate-spin" />}
               <Download />
               下载

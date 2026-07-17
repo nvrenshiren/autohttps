@@ -91,8 +91,11 @@ pub async fn revoke(
     Ok((StatusCode::ACCEPTED, Json(dto::cert_detail(data))))
 }
 
-/// 导出叶子/链/私钥(E1,§2.8)—— 二进制 PEM 下载(`application/x-pem-file`);跨状态只读动作。
-/// `parts` 非法值 → 400 validation_failed;含私钥未确认 → 422;无文件态 → 409(见服务层)。
+/// 导出(E1,§2.8)—— 两种模式:
+/// - 默认:parts 拼单 PEM 二进制下载(`application/x-pem-file`);
+/// - `target=nginx|apache|iis|haproxy`:按部署目标打包 **zip**(`application/zip`),全部含私钥
+///   (须 `acknowledgeKeyExport=true`),`iis` 另须 `pfxPassword`。
+/// `parts` 非法值 → 400;含私钥未确认 → 422;无文件态 → 409(见服务层)。
 pub async fn export(
     State(st): State<AppState>,
     Path(id): Path<String>,
@@ -104,6 +107,31 @@ pub async fn export(
             return Err(ApiError::new(ErrorCode::ValidationFailed, format!("不支持的导出格式: {f}")));
         }
     }
+
+    // 部署目标模式:zip 打包(全部目标含私钥,统一强制风险确认)
+    if let Some(t) = q.target.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        let target = certificates::ExportTarget::parse(t)
+            .ok_or_else(|| ApiError::new(ErrorCode::ValidationFailed, format!("非法的部署目标: {t}")))?;
+        if !q.acknowledge_key_export.unwrap_or(false) {
+            return Err(ApiError::new(
+                ErrorCode::KeyExportNotAcknowledged,
+                "部署目标导出包含私钥,需确认敏感数据风险(acknowledgeKeyExport=true)",
+            ));
+        }
+        let bundle =
+            certificates::export_target(&st.ctx, &id, target, q.pfx_password.as_deref()).await?;
+        let zip_bytes = zip_bundle(&bundle)?;
+        let disposition = format!("attachment; filename=\"{}\"", bundle.zip_name);
+        return Ok((
+            [
+                (header::CONTENT_TYPE, "application/zip".to_string()),
+                (header::CONTENT_DISPOSITION, disposition),
+            ],
+            zip_bytes,
+        )
+            .into_response());
+    }
+
     let parts = parse_export_parts(q.parts.as_deref())?;
     let input = certificates::ExportInput {
         parts,
@@ -119,6 +147,23 @@ pub async fn export(
         bundle.pem,
     )
         .into_response())
+}
+
+/// 目标文件组 → zip。
+fn zip_bundle(bundle: &certificates::TargetBundle) -> ApiResult<Vec<u8>> {
+    use std::io::Write as _;
+    let internal = |e: zip::result::ZipError| {
+        ApiError::new(ErrorCode::InternalError, format!("zip 打包失败: {e}"))
+    };
+    let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let opts =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    for f in &bundle.files {
+        zw.start_file(&f.name, opts).map_err(internal)?;
+        zw.write_all(&f.data).map_err(|e| internal(e.into()))?;
+    }
+    let bytes = zw.finish().map_err(internal)?.into_inner();
+    Ok(bytes)
 }
 
 /// 解析 `parts=<逗号分隔:leaf|chain|fullchain|private_key>`(默认 fullchain);非法值 → 400。
