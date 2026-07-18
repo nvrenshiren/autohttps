@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- autohttps 应用图标(主几何,1024 基准;小尺寸 16/24/32 使用加粗变体,见 icons 生成脚本)
+       设计:Blueprint 主题 —— 群青渐变 squircle 底 + 暖纸白闭合挂锁;
+       锁孔位置为"验证对勾"圆章,表达"证书已验证 / 自动续期"。 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3543d6"/>
+      <stop offset="1" stop-color="#1f29a0"/>
+    </linearGradient>
+    <clipPath id="squircle">
+      <rect x="0" y="0" width="1024" height="1024" rx="236" ry="236"/>
+    </clipPath>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" rx="236" ry="236" fill="url(#bg)"/>
+  <g clip-path="url(#squircle)">
+    <rect x="0" y="0" width="1024" height="420" fill="#ffffff" opacity="0.06"/>
+  </g>
+
+  <!-- 挂锁(描边) -->
+  <g fill="none" stroke="#f7f3ea" stroke-width="76" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 352 470 L 352 372 A 160 160 0 0 1 672 372 L 672 470"/>
+    <rect x="256" y="470" width="512" height="400" rx="84" ry="84"/>
+  </g>
+
+  <!-- 验证圆章(锁孔位) -->
+  <circle cx="512" cy="628" r="74" fill="#f7f3ea"/>
+  <path d="M 462 616 L 497 651 L 563 585" fill="none" stroke="#2230b8" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
