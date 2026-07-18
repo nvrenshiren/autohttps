@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import { Info, Loader2, TriangleAlert } from "lucide-react";
-import { useAppInfo, useSettings, useUpdateSettings } from "@/lib/queries";
+import { useAcmeAccounts, useAppInfo, useSettings, useUpdateSettings } from "@/lib/queries";
 import type { UpdateSettingsRequest } from "@/bindings";
 import { PageHeader } from "@/components/shared/page-header";
 import { ErrorState } from "@/components/shared/states";
@@ -17,12 +17,21 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Mono } from "@/components/shared/mono";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { ApiError } from "@/lib/api";
 
 interface FormState {
   renewalAdvanceDays: number;
   autoRenewEnabled: boolean;
+  /** 默认 ACME 账户 id;空串 = 不设置(清除指向) */
+  defaultAcmeAccountId: string;
   autostartEnabled: boolean;
   listenAddress: string;
   listenPort: number | "";
@@ -39,10 +48,13 @@ export function SettingsPage() {
   const appInfo = useAppInfo();
   const isDesktop = appInfo.data?.runMode === "desktop";
   const update = useUpdateSettings();
+  const accounts = useAcmeAccounts("registered");
+  const registeredAccounts = accounts.data?.items ?? [];
 
   const [form, setForm] = useState<FormState>({
     renewalAdvanceDays: 30,
     autoRenewEnabled: true,
+    defaultAcmeAccountId: "",
     autostartEnabled: false,
     listenAddress: "",
     listenPort: "",
@@ -53,6 +65,7 @@ export function SettingsPage() {
       setForm({
         renewalAdvanceDays: data.renewalAdvanceDays,
         autoRenewEnabled: data.autoRenewEnabled,
+        defaultAcmeAccountId: data.defaultAcmeAccountId ?? "",
         autostartEnabled: data.autostartEnabled ?? false,
         listenAddress: data.listenAddress ?? "",
         listenPort: data.listenPort ?? "",
@@ -64,6 +77,7 @@ export function SettingsPage() {
     const body: UpdateSettingsRequest = {
       renewalAdvanceDays: form.renewalAdvanceDays,
       autoRenewEnabled: form.autoRenewEnabled,
+      defaultAcmeAccountId: form.defaultAcmeAccountId === "" ? null : form.defaultAcmeAccountId,
     };
     if (isDesktop) {
       body.autostartEnabled = form.autostartEnabled;
@@ -148,21 +162,40 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* 默认 ACME 账户(只读展示;账户管理在 ACME 页) */}
+      {/* 默认 ACME 账户(可选已注册账户;账户的配置与注册在「ACME」页) */}
       <Card>
         <CardHeader>
           <CardTitle>默认 ACME 账户</CardTitle>
-          <CardDescription>签发时的默认账户;账户的配置与注册在「ACME」页。</CardDescription>
+          <CardDescription>
+            签发公共证书时未显式指定账户则用此默认;账户的配置与注册在「ACME」页。
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="text-sm">
-            当前默认账户:
-            {data.defaultAcmeAccountId ? (
-              <Mono className="ml-1">{data.defaultAcmeAccountId}</Mono>
-            ) : (
-              <span className="ml-1 text-muted-foreground">未设置</span>
-            )}
-          </div>
+        <CardContent className="space-y-1.5">
+          <Label htmlFor="defaultAcmeAccount">默认账户</Label>
+          <Select
+            value={form.defaultAcmeAccountId === "" ? "__none__" : form.defaultAcmeAccountId}
+            onValueChange={(v) =>
+              setForm((f) => ({ ...f, defaultAcmeAccountId: v === "__none__" ? "" : v }))
+            }
+          >
+            <SelectTrigger id="defaultAcmeAccount" className="w-full max-w-md">
+              <SelectValue placeholder="选择默认账户" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">不设置默认账户</SelectItem>
+              {registeredAccounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.caLabel ?? a.directoryUrl}
+                  {a.environment ? ` · ${a.environment}` : ""} · {a.contactEmail}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {registeredAccounts.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              暂无已注册的 ACME 账户,请先在「ACME」页配置注册。
+            </p>
+          )}
         </CardContent>
       </Card>
 
