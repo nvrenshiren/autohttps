@@ -5,7 +5,7 @@ use crate::domain::enums::RootCaStatus;
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
 use crate::persistence::entities::{certificates, root_cas};
 use crate::services::context::CoreContext;
-use crate::services::pagination::{Paged, PageParams};
+use crate::services::pagination::{PageParams, Paged};
 use crate::util::{new_id, now_rfc3339};
 use sea_orm::*;
 
@@ -28,7 +28,10 @@ async fn build_row(db: &DatabaseConnection, root_ca: root_cas::Model) -> CoreRes
         .filter(certificates::Column::RootCaId.eq(&root_ca.id))
         .count(db)
         .await?;
-    Ok(RootCaRow { root_ca, issued_certificate_count })
+    Ok(RootCaRow {
+        root_ca,
+        issued_certificate_count,
+    })
 }
 
 pub async fn list(ctx: &CoreContext, filter: RootCaListFilter) -> CoreResult<Paged<RootCaRow>> {
@@ -58,7 +61,12 @@ pub async fn list(ctx: &CoreContext, filter: RootCaListFilter) -> CoreResult<Pag
     for r in models {
         items.push(build_row(db, r).await?);
     }
-    Ok(Paged { items, page: page.page, page_size: page.page_size, total })
+    Ok(Paged {
+        items,
+        page: page.page,
+        page_size: page.page_size,
+        total,
+    })
 }
 
 pub async fn get(ctx: &CoreContext, id: &str) -> CoreResult<RootCaRow> {
@@ -93,7 +101,10 @@ pub async fn create(ctx: &CoreContext, input: CreateRootCaInput) -> CoreResult<R
         return Err(CoreError::validation("根 CA 名称不能为空"));
     }
     if input.validity_days <= 0 {
-        return Err(CoreError::new(ErrorCode::InvalidValidityPeriod, "有效期天数须为正整数"));
+        return Err(CoreError::new(
+            ErrorCode::InvalidValidityPeriod,
+            "有效期天数须为正整数",
+        ));
     }
 
     let generated = crate::ca::generate_root_ca(name, input.validity_days)?;
@@ -135,9 +146,14 @@ pub async fn import(ctx: &CoreContext, input: ImportRootCaInput) -> CoreResult<R
     let outcome = crate::ca::parse_and_validate_import(&input.cert_pem, &input.private_key_pem)?;
 
     let key_ref = new_id();
-    ctx.secrets.store(&key_ref, input.private_key_pem.as_bytes())?;
+    ctx.secrets
+        .store(&key_ref, input.private_key_pem.as_bytes())?;
 
-    let status = if outcome.is_expired { RootCaStatus::Expired } else { RootCaStatus::Active };
+    let status = if outcome.is_expired {
+        RootCaStatus::Expired
+    } else {
+        RootCaStatus::Active
+    };
     let now = now_rfc3339();
     let model = root_cas::ActiveModel {
         id: Set(new_id()),

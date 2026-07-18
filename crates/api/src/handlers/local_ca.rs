@@ -28,7 +28,10 @@ pub async fn list(
     Ok(Json(dto::page_of(paged, dto::root_ca_summary)))
 }
 
-pub async fn get(State(st): State<AppState>, Path(id): Path<String>) -> ApiResult<Json<RootCaDetail>> {
+pub async fn get(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<RootCaDetail>> {
     let row = local_ca::get(&st.ctx, &id).await?;
     Ok(Json(dto::root_ca_detail(row)))
 }
@@ -40,7 +43,10 @@ pub async fn create(
 ) -> ApiResult<(StatusCode, Json<RootCaDetail>)> {
     let row = local_ca::create(
         &st.ctx,
-        local_ca::CreateRootCaInput { name: body.name, validity_days: body.validity_days },
+        local_ca::CreateRootCaInput {
+            name: body.name,
+            validity_days: body.validity_days,
+        },
     )
     .await?;
     Ok((StatusCode::CREATED, Json(dto::root_ca_detail(row))))

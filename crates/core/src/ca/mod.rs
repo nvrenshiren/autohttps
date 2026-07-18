@@ -8,7 +8,7 @@
 
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
 use rcgen::{
-    CertificateParams, DnType, ExtendedKeyUsagePurpose, Issuer, IsCa, KeyPair, KeyUsagePurpose,
+    CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa, Issuer, KeyPair, KeyUsagePurpose,
     PublicKeyData, SanType, SerialNumber,
 };
 use sha2::{Digest, Sha256};
@@ -78,7 +78,8 @@ fn now() -> OffsetDateTime {
 }
 
 fn to_rfc3339(dt: OffsetDateTime) -> String {
-    dt.format(&Rfc3339).unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
+    dt.format(&Rfc3339)
+        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string())
 }
 
 /// 随机 16 字节正序列号(清最高位避免被解析为负数)。
@@ -95,7 +96,11 @@ fn random_serial() -> SerialNumber {
 
 /// 十六进制大写冒号分隔(证书标识展示惯例)。
 fn hex_colon(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(":")
+    bytes
+        .iter()
+        .map(|b| format!("{b:02X}"))
+        .collect::<Vec<_>>()
+        .join(":")
 }
 
 /// SHA-256 指纹(证书 DER),十六进制大写冒号分隔。
@@ -127,10 +132,15 @@ pub fn generate_root_ca(name: &str, validity_days: i64) -> CoreResult<GeneratedC
         dn
     };
     params.is_ca = IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
-    params.key_usages =
-        vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign, KeyUsagePurpose::DigitalSignature];
+    params.key_usages = vec![
+        KeyUsagePurpose::KeyCertSign,
+        KeyUsagePurpose::CrlSign,
+        KeyUsagePurpose::DigitalSignature,
+    ];
 
-    let cert = params.self_signed(&key).map_err(internal("自签根 CA 失败"))?;
+    let cert = params
+        .self_signed(&key)
+        .map_err(internal("自签根 CA 失败"))?;
     Ok(GeneratedCert {
         cert_pem: cert.pem(),
         key_pem: key.serialize_pem(),
@@ -174,19 +184,21 @@ pub fn sign_leaf(
         dn
     };
     params.is_ca = IsCa::NoCa;
-    params.key_usages =
-        vec![KeyUsagePurpose::DigitalSignature, KeyUsagePurpose::KeyEncipherment];
+    params.key_usages = vec![
+        KeyUsagePurpose::DigitalSignature,
+        KeyUsagePurpose::KeyEncipherment,
+    ];
     params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
     let mut sans = Vec::with_capacity(hostnames.len());
     for h in hostnames {
-        let name = SanType::DnsName(
-            h.as_str().try_into().map_err(internal("非法 SAN 域名"))?,
-        );
+        let name = SanType::DnsName(h.as_str().try_into().map_err(internal("非法 SAN 域名"))?);
         sans.push(name);
     }
     params.subject_alt_names = sans;
 
-    let cert = params.signed_by(&leaf_key, &issuer).map_err(internal("签发叶子证书失败"))?;
+    let cert = params
+        .signed_by(&leaf_key, &issuer)
+        .map_err(internal("签发叶子证书失败"))?;
     Ok(GeneratedCert {
         cert_pem: cert.pem(),
         key_pem: leaf_key.serialize_pem(),
@@ -205,12 +217,16 @@ pub fn sign_leaf(
 pub fn parse_and_validate_import(cert_pem: &str, key_pem: &str) -> CoreResult<ImportOutcome> {
     // 解析证书 PEM → DER
     let pem = x509_parser::pem::parse_x509_pem(cert_pem.as_bytes())
-        .map_err(|_| CoreError::new(ErrorCode::ImportInvalidCertificate, "无法解析根 CA 证书 PEM"))?
+        .map_err(|_| {
+            CoreError::new(
+                ErrorCode::ImportInvalidCertificate,
+                "无法解析根 CA 证书 PEM",
+            )
+        })?
         .1;
     let der = pem.contents.as_slice();
-    let (_rest, x509) = x509_parser::parse_x509_certificate(der).map_err(|_| {
-        CoreError::new(ErrorCode::ImportInvalidCertificate, "无法解析根 CA 证书")
-    })?;
+    let (_rest, x509) = x509_parser::parse_x509_certificate(der)
+        .map_err(|_| CoreError::new(ErrorCode::ImportInvalidCertificate, "无法解析根 CA 证书"))?;
 
     // 必须是 CA 证书
     if !x509.is_ca() {
@@ -232,12 +248,16 @@ pub fn parse_and_validate_import(cert_pem: &str, key_pem: &str) -> CoreResult<Im
     let key_spki = key.subject_public_key_info();
     let cert_spki = x509.public_key().raw;
     if key_spki.as_slice() != cert_spki {
-        return Err(CoreError::new(ErrorCode::ImportKeyMismatch, "证书与私钥不配对"));
+        return Err(CoreError::new(
+            ErrorCode::ImportKeyMismatch,
+            "证书与私钥不配对",
+        ));
     }
 
     // 确认可用作签发根(rcgen 能据其构造 Issuer)
-    Issuer::from_ca_cert_pem(cert_pem, key)
-        .map_err(|_| CoreError::new(ErrorCode::ImportInvalidCertificate, "证书不可用作签发根 CA"))?;
+    Issuer::from_ca_cert_pem(cert_pem, key).map_err(|_| {
+        CoreError::new(ErrorCode::ImportInvalidCertificate, "证书不可用作签发根 CA")
+    })?;
 
     let nb = x509.validity().not_before.to_datetime();
     let na = x509.validity().not_after.to_datetime();

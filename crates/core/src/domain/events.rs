@@ -13,15 +13,28 @@ use crate::domain::enums::{
 #[derive(Debug, Clone)]
 pub enum DomainEvent {
     /// 证书状态机任一流转(执行器结果 / 扫描 T6/T10 / 取消回退)。
-    CertificateStatusChanged { certificate_id: String, status: CertificateStatus },
+    CertificateStatusChanged {
+        certificate_id: String,
+        status: CertificateStatus,
+    },
     /// 任务状态机流转(入队 / 开始 / 终态 / 派生)。
-    TaskStatusChanged { task_id: String, certificate_id: String, status: TaskStatus },
+    TaskStatusChanged {
+        task_id: String,
+        certificate_id: String,
+        status: TaskStatus,
+    },
     /// 任务执行中新增一条日志(进度)。
     TaskLogAppended { task_id: String, seq: i32 },
     /// 根 CA 状态机流转(扫描 L3:active→expired)。
-    RootCaStatusChanged { root_ca_id: String, status: RootCaStatus },
+    RootCaStatusChanged {
+        root_ca_id: String,
+        status: RootCaStatus,
+    },
     /// ACME 账户状态机流转(注册完成/失败,AT2/AT3;acme api §6)。
-    AcmeAccountStatusChanged { account_id: String, status: AcmeAccountStatus },
+    AcmeAccountStatusChanged {
+        account_id: String,
+        status: AcmeAccountStatus,
+    },
     /// 验证挑战状态机流转(执行器 CT1–CT8;acme api §6)。
     ChallengeStatusChanged {
         challenge_id: String,

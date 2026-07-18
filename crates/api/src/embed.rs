@@ -15,9 +15,19 @@ struct Assets;
 fn serve(path: &str) -> Option<Response> {
     let asset = Assets::get(path)?;
     let mime = mime_guess::from_path(path).first_or_octet_stream();
+    // Vite 产物:`assets/` 下文件名带内容 hash → 长缓存不可变;其余(index.html 等)→ 不缓存,
+    // 保证发版后首屏始终取到新 HTML(hash 资源名随之变)。
+    let cache = if path.starts_with("assets/") {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-cache"
+    };
     Some(
         (
-            [(header::CONTENT_TYPE, mime.as_ref().to_string())],
+            [
+                (header::CONTENT_TYPE, mime.as_ref().to_string()),
+                (header::CACHE_CONTROL, cache.to_string()),
+            ],
             asset.data.into_owned(),
         )
             .into_response(),

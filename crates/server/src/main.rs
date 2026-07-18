@@ -44,7 +44,10 @@ async fn main() -> anyhow::Result<()> {
     // boot:崩溃恢复(running→failed 可重试)+ 启动即全量扫描(T6/T10 + L3)+ 依 settings 自动续签
     let recovered = autohttps_core::boot::run(&ctx).await?;
     if recovered > 0 {
-        tracing::warn!(recovered_tasks = recovered, "崩溃恢复:遗留 running 任务已置失败(可重试)");
+        tracing::warn!(
+            recovered_tasks = recovered,
+            "崩溃恢复:遗留 running 任务已置失败(可重试)"
+        );
     }
 
     // 任务执行器(tokio worker):消费持久队列,承接 self_signed 与 acme 的签发/续签/吊销

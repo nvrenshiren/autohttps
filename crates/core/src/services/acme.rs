@@ -10,7 +10,7 @@ use crate::persistence::entities::{
     acme_accounts, certificates, challenges, domains, http01_validation_configs, settings, tasks,
 };
 use crate::services::context::CoreContext;
-use crate::services::pagination::{Paged, PageParams};
+use crate::services::pagination::{PageParams, Paged};
 use crate::services::settings::SINGLETON_ID;
 use crate::util::{new_id, now_rfc3339};
 use sea_orm::*;
@@ -51,7 +51,10 @@ async fn default_account_id(db: &DatabaseConnection) -> CoreResult<Option<String
         .and_then(|s| s.default_acme_account_id))
 }
 
-async fn build_account_row(db: &DatabaseConnection, account: acme_accounts::Model) -> CoreResult<AccountRow> {
+async fn build_account_row(
+    db: &DatabaseConnection,
+    account: acme_accounts::Model,
+) -> CoreResult<AccountRow> {
     let default_id = default_account_id(db).await?;
     let certificate_count = certificates::Entity::find()
         .filter(certificates::Column::AcmeAccountId.eq(&account.id))
@@ -64,7 +67,10 @@ async fn build_account_row(db: &DatabaseConnection, account: acme_accounts::Mode
     })
 }
 
-pub async fn accounts_list(ctx: &CoreContext, filter: AccountListFilter) -> CoreResult<Paged<AccountRow>> {
+pub async fn accounts_list(
+    ctx: &CoreContext,
+    filter: AccountListFilter,
+) -> CoreResult<Paged<AccountRow>> {
     let db = &ctx.db;
     let page = PageParams::normalize(filter.page, filter.page_size);
     let mut query = acme_accounts::Entity::find();
@@ -80,7 +86,12 @@ pub async fn accounts_list(ctx: &CoreContext, filter: AccountListFilter) -> Core
     for a in models {
         items.push(build_account_row(db, a).await?);
     }
-    Ok(Paged { items, page: page.page, page_size: page.page_size, total })
+    Ok(Paged {
+        items,
+        page: page.page,
+        page_size: page.page_size,
+        total,
+    })
 }
 
 pub async fn account_get(ctx: &CoreContext, id: &str) -> CoreResult<AccountRow> {
@@ -92,7 +103,10 @@ pub async fn account_get(ctx: &CoreContext, id: &str) -> CoreResult<AccountRow> 
     build_account_row(db, account).await
 }
 
-async fn build_challenge_row(db: &DatabaseConnection, challenge: challenges::Model) -> CoreResult<ChallengeRow> {
+async fn build_challenge_row(
+    db: &DatabaseConnection,
+    challenge: challenges::Model,
+) -> CoreResult<ChallengeRow> {
     // certificate_id 经 task 关联反查(单一真相)
     let certificate_id = tasks::Entity::find_by_id(&challenge.task_id)
         .one(db)
@@ -103,10 +117,17 @@ async fn build_challenge_row(db: &DatabaseConnection, challenge: challenges::Mod
         .one(db)
         .await?
         .map(|d| d.hostname);
-    Ok(ChallengeRow { challenge, certificate_id, domain_hostname })
+    Ok(ChallengeRow {
+        challenge,
+        certificate_id,
+        domain_hostname,
+    })
 }
 
-pub async fn challenges_list(ctx: &CoreContext, filter: ChallengeListFilter) -> CoreResult<Paged<ChallengeRow>> {
+pub async fn challenges_list(
+    ctx: &CoreContext,
+    filter: ChallengeListFilter,
+) -> CoreResult<Paged<ChallengeRow>> {
     let db = &ctx.db;
     let page = PageParams::normalize(filter.page, filter.page_size);
     let mut query = challenges::Entity::find();
@@ -129,7 +150,12 @@ pub async fn challenges_list(ctx: &CoreContext, filter: ChallengeListFilter) -> 
             .map(|t| t.id)
             .collect();
         if task_ids.is_empty() {
-            return Ok(Paged { items: vec![], page: page.page, page_size: page.page_size, total: 0 });
+            return Ok(Paged {
+                items: vec![],
+                page: page.page,
+                page_size: page.page_size,
+                total: 0,
+            });
         }
         query = query.filter(challenges::Column::TaskId.is_in(task_ids));
     }
@@ -142,7 +168,12 @@ pub async fn challenges_list(ctx: &CoreContext, filter: ChallengeListFilter) -> 
     for c in models {
         items.push(build_challenge_row(db, c).await?);
     }
-    Ok(Paged { items, page: page.page, page_size: page.page_size, total })
+    Ok(Paged {
+        items,
+        page: page.page,
+        page_size: page.page_size,
+        total,
+    })
 }
 
 pub async fn challenge_get(ctx: &CoreContext, id: &str) -> CoreResult<ChallengeRow> {
@@ -154,7 +185,10 @@ pub async fn challenge_get(ctx: &CoreContext, id: &str) -> CoreResult<ChallengeR
     build_challenge_row(db, challenge).await
 }
 
-pub async fn http01_get(ctx: &CoreContext, domain_id: &str) -> CoreResult<http01_validation_configs::Model> {
+pub async fn http01_get(
+    ctx: &CoreContext,
+    domain_id: &str,
+) -> CoreResult<http01_validation_configs::Model> {
     http01_validation_configs::Entity::find_by_id(domain_id)
         .one(&ctx.db)
         .await?
@@ -172,11 +206,18 @@ pub async fn http01_put(
         return Err(CoreError::validation("webrootPath 不能为空"));
     }
     // 域名须存在(共享规则 domain_not_found)
-    if domains::Entity::find_by_id(domain_id).one(db).await?.is_none() {
+    if domains::Entity::find_by_id(domain_id)
+        .one(db)
+        .await?
+        .is_none()
+    {
         return Err(CoreError::new(ErrorCode::DomainNotFound, "域名不存在"));
     }
     let now = now_rfc3339();
-    match http01_validation_configs::Entity::find_by_id(domain_id).one(db).await? {
+    match http01_validation_configs::Entity::find_by_id(domain_id)
+        .one(db)
+        .await?
+    {
         Some(existing) => {
             let mut a: http01_validation_configs::ActiveModel = existing.into();
             a.webroot_path = Set(webroot_path);
@@ -211,8 +252,10 @@ pub struct RegisterAccountInput {
 /// 不设即用系统平台根(生产 Let's Encrypt 等)。
 pub fn account_builder() -> CoreResult<instant_acme::AccountBuilder> {
     match std::env::var("AUTOHTTPS_ACME_CA_CERT") {
-        Ok(path) if !path.trim().is_empty() => instant_acme::Account::builder_with_root(path.trim())
-            .map_err(|e| CoreError::internal(format!("加载 ACME 测试根证书失败: {e}"))),
+        Ok(path) if !path.trim().is_empty() => {
+            instant_acme::Account::builder_with_root(path.trim())
+                .map_err(|e| CoreError::internal(format!("加载 ACME 测试根证书失败: {e}")))
+        }
         _ => instant_acme::Account::builder()
             .map_err(|e| CoreError::internal(format!("初始化 ACME 客户端失败: {e}"))),
     }
@@ -235,19 +278,31 @@ pub async fn load_acme_account(
     let creds_bytes = ctx.secrets.load(key_ref)?;
     let credentials: instant_acme::AccountCredentials = serde_json::from_slice(&creds_bytes)
         .map_err(|e| CoreError::internal(format!("解析 ACME 账户凭据失败: {e}")))?;
-    account_builder()?.from_credentials(credentials).await.map_err(map_acme_err)
+    account_builder()?
+        .from_credentials(credentials)
+        .await
+        .map_err(map_acme_err)
 }
 
 /// 配置并注册账户(A1,AT1)。校验通过 → 插 `registering` 行 + 后台异步向 CA 注册 → 返回该行(202)。
 /// 终态(registered/registration_failed)由后台任务落库并经 SSE `acme_account_status_changed` 回推。
-pub async fn create_account(ctx: &CoreContext, input: RegisterAccountInput) -> CoreResult<AccountRow> {
+pub async fn create_account(
+    ctx: &CoreContext,
+    input: RegisterAccountInput,
+) -> CoreResult<AccountRow> {
     // 校验(acme api §2.1)
     if !input.tos_agreed {
-        return Err(CoreError::new(ErrorCode::TosNotAgreed, "注册前须同意服务条款"));
+        return Err(CoreError::new(
+            ErrorCode::TosNotAgreed,
+            "注册前须同意服务条款",
+        ));
     }
     let directory_url = input.directory_url.trim().to_string();
     if !(directory_url.starts_with("http://") || directory_url.starts_with("https://")) {
-        return Err(CoreError::new(ErrorCode::InvalidDirectoryUrl, "ACME 目录 URL 非法"));
+        return Err(CoreError::new(
+            ErrorCode::InvalidDirectoryUrl,
+            "ACME 目录 URL 非法",
+        ));
     }
     let email = input.contact_email.trim().to_string();
     if !is_valid_email(&email) {
@@ -353,7 +408,10 @@ async fn finalize_registration(
         ),
     };
     model.update(&ctx.db).await?;
-    ctx.emit(DomainEvent::AcmeAccountStatusChanged { account_id: account_id.to_string(), status });
+    ctx.emit(DomainEvent::AcmeAccountStatusChanged {
+        account_id: account_id.to_string(),
+        status,
+    });
     Ok(())
 }
 
@@ -372,7 +430,10 @@ pub async fn patch_account(
         .await?
         .ok_or_else(|| CoreError::new(ErrorCode::AcmeAccountNotFound, "ACME 账户不存在"))?;
     if account.status != AcmeAccountStatus::Registered {
-        return Err(CoreError::new(ErrorCode::AccountStateInvalid, "仅已注册账户可编辑邮箱"));
+        return Err(CoreError::new(
+            ErrorCode::AccountStateInvalid,
+            "仅已注册账户可编辑邮箱",
+        ));
     }
     let email = contact_email.trim().to_string();
     if !is_valid_email(&email) {
@@ -412,7 +473,10 @@ pub async fn retry_account(ctx: &CoreContext, id: &str) -> CoreResult<AccountRow
         .await?
         .ok_or_else(|| CoreError::new(ErrorCode::AcmeAccountNotFound, "ACME 账户不存在"))?;
     if account.status != AcmeAccountStatus::RegistrationFailed {
-        return Err(CoreError::new(ErrorCode::AccountStateInvalid, "仅注册失败的账户可重试"));
+        return Err(CoreError::new(
+            ErrorCode::AccountStateInvalid,
+            "仅注册失败的账户可重试",
+        ));
     }
     let mut a: acme_accounts::ActiveModel = account.into();
     a.status = Set(AcmeAccountStatus::Registering);
@@ -515,9 +579,16 @@ pub async fn dns_precheck(ctx: &CoreContext, id: &str) -> CoreResult<DnsPrecheck
         Some(name) if !name.is_empty() => query_txt_records(name).await,
         _ => Vec::new(),
     };
-    let expected = challenge.dns_txt_value.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let expected = challenge
+        .dns_txt_value
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     let propagated = expected.is_some_and(|e| observed.iter().any(|v| v.as_str() == e));
-    Ok(DnsPrecheckOutcome { propagated, observed_values: observed })
+    Ok(DnsPrecheckOutcome {
+        propagated,
+        observed_values: observed,
+    })
 }
 
 /// 用系统 DNS 解析器查 `name` 的全部 TXT 记录值。**任何失败(初始化 / NXDOMAIN / 超时 / 无记录)
@@ -531,13 +602,21 @@ async fn query_txt_records(name: &str) -> Vec<String> {
         }
     };
     // 补足末尾点 → 绝对域名,避免解析器追加本地 search 域造成误查。
-    let fqdn = if name.ends_with('.') { name.to_string() } else { format!("{name}.") };
+    let fqdn = if name.ends_with('.') {
+        name.to_string()
+    } else {
+        format!("{name}.")
+    };
     match resolver.txt_lookup(fqdn.clone()).await {
         // 单条 TXT 记录的多个字符串按 wire 顺序拼接为完整值(ACME 值单串,拼接对其无影响)。
         Ok(lookup) => lookup
             .iter()
             .map(|txt| {
-                let bytes: Vec<u8> = txt.txt_data().iter().flat_map(|s| s.iter().copied()).collect();
+                let bytes: Vec<u8> = txt
+                    .txt_data()
+                    .iter()
+                    .flat_map(|s| s.iter().copied())
+                    .collect();
                 String::from_utf8_lossy(&bytes).into_owned()
             })
             .collect(),
@@ -568,5 +647,9 @@ fn environment_label(directory_url: &str) -> Option<String> {
     let is_test = ["staging", "test", "pebble", "localhost", "127.0.0.1"]
         .iter()
         .any(|m| u.contains(m));
-    Some(if is_test { "测试".to_string() } else { "生产".to_string() })
+    Some(if is_test {
+        "测试".to_string()
+    } else {
+        "生产".to_string()
+    })
 }

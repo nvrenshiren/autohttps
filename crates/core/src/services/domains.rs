@@ -3,9 +3,11 @@
 use crate::domain::enums::{CertificateStatus, IssuanceMethod, ValidationMethod};
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
 use crate::domain::rules::worst_projection;
-use crate::persistence::entities::{certificate_domains, certificates, domains, http01_validation_configs};
+use crate::persistence::entities::{
+    certificate_domains, certificates, domains, http01_validation_configs,
+};
 use crate::services::context::CoreContext;
-use crate::services::pagination::{Paged, PageParams};
+use crate::services::pagination::{PageParams, Paged};
 use crate::util::{new_id, now_rfc3339};
 use sea_orm::*;
 
@@ -90,18 +92,17 @@ fn validate_hostname(hostname: &str) -> CoreResult<bool> {
     let is_wildcard = h.starts_with("*.");
     let labels_part = if is_wildcard { &h[2..] } else { h };
     if labels_part.is_empty() || labels_part.contains('*') {
-        return Err(CoreError::validation("hostname 通配符只能作为最左标签(如 *.example.com)"));
+        return Err(CoreError::validation(
+            "hostname 通配符只能作为最左标签(如 *.example.com)",
+        ));
     }
-    let ok = labels_part
-        .split('.')
-        .all(|label| {
-            !label.is_empty()
-                && label.len() <= 63
-                && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-        })
-        && labels_part.contains('.');
+    let ok = labels_part.split('.').all(|label| {
+        !label.is_empty()
+            && label.len() <= 63
+            && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+    }) && labels_part.contains('.');
     if !ok {
         return Err(CoreError::validation("hostname 格式非法"));
     }
@@ -186,8 +187,17 @@ pub async fn list(ctx: &CoreContext, filter: DomainListFilter) -> CoreResult<Pag
         }
         let total = rows.len() as u64;
         let skip = (page.zero_based() * page.page_size) as usize;
-        let items = rows.into_iter().skip(skip).take(page.page_size as usize).collect();
-        return Ok(Paged { items, page: page.page, page_size: page.page_size, total });
+        let items = rows
+            .into_iter()
+            .skip(skip)
+            .take(page.page_size as usize)
+            .collect();
+        return Ok(Paged {
+            items,
+            page: page.page,
+            page_size: page.page_size,
+            total,
+        });
     }
 
     let paginator = query.paginate(db, page.page_size);
@@ -198,7 +208,12 @@ pub async fn list(ctx: &CoreContext, filter: DomainListFilter) -> CoreResult<Pag
     for m in models {
         items.push(build_row(db, m).await?);
     }
-    Ok(Paged { items, page: page.page, page_size: page.page_size, total })
+    Ok(Paged {
+        items,
+        page: page.page,
+        page_size: page.page_size,
+        total,
+    })
 }
 
 pub async fn get(ctx: &CoreContext, id: &str) -> CoreResult<DomainDetailData> {
@@ -236,7 +251,10 @@ pub async fn create(ctx: &CoreContext, input: CreateDomainInput) -> CoreResult<D
         .one(db)
         .await?;
     if exists.is_some() {
-        return Err(CoreError::new(ErrorCode::DomainAlreadyExists, "该 hostname 已存在"));
+        return Err(CoreError::new(
+            ErrorCode::DomainAlreadyExists,
+            "该 hostname 已存在",
+        ));
     }
 
     let now = now_rfc3339();
@@ -252,7 +270,11 @@ pub async fn create(ctx: &CoreContext, input: CreateDomainInput) -> CoreResult<D
     };
     let domain = model.insert(db).await?;
     Ok(DomainDetailData {
-        row: DomainRow { domain, certificate_count: 0, worst_status: None },
+        row: DomainRow {
+            domain,
+            certificate_count: 0,
+            worst_status: None,
+        },
         certificates: vec![],
     })
 }
@@ -321,7 +343,9 @@ pub async fn delete(ctx: &CoreContext, id: &str) -> CoreResult<()> {
     }
 
     // 关联 HTTP-01 配置随域名删除(FK CASCADE 兜底,显式清理更稳)
-    http01_validation_configs::Entity::delete_by_id(&domain.id).exec(db).await?;
+    http01_validation_configs::Entity::delete_by_id(&domain.id)
+        .exec(db)
+        .await?;
     domains::Entity::delete_by_id(&domain.id).exec(db).await?;
     Ok(())
 }

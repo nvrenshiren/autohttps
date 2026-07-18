@@ -32,7 +32,14 @@ impl CoreContext {
     ) -> Self {
         let secrets = SecretStore::new(&data_dir);
         let (events, _) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
-        Self { db, secrets, data_dir, run_mode, app_version, events }
+        Self {
+            db,
+            secrets,
+            data_dir,
+            run_mode,
+            app_version,
+            events,
+        }
     }
 
     /// 发出一个领域事件(**尽力而为**:无 SSE 订阅者时静默丢弃,不阻塞业务)。

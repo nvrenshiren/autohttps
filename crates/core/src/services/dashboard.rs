@@ -105,7 +105,11 @@ pub async fn overview(ctx: &CoreContext) -> CoreResult<DashboardData> {
     }
 
     Ok(DashboardData {
-        metrics: DashboardMetrics { total_count, expiring_soon_count, failed_count },
+        metrics: DashboardMetrics {
+            total_count,
+            expiring_soon_count,
+            failed_count,
+        },
         pending_count: expiring_soon_count + failed_count,
         pending_items,
     })
@@ -130,7 +134,11 @@ pub async fn pending_count(ctx: &CoreContext) -> CoreResult<u64> {
 /// 计数失败仅告警、不阻断业务(事件是失效信号,前端仍会重取权威 `GET /dashboard`)。
 pub async fn emit_changed(ctx: &CoreContext) {
     match pending_count(ctx).await {
-        Ok(pc) => ctx.emit(DomainEvent::DashboardChanged { pending_count: pc as i64 }),
-        Err(e) => tracing::warn!(error = %e, "dashboard_changed:pendingCount 计算失败,跳过本次红点信号"),
+        Ok(pc) => ctx.emit(DomainEvent::DashboardChanged {
+            pending_count: pc as i64,
+        }),
+        Err(e) => {
+            tracing::warn!(error = %e, "dashboard_changed:pendingCount 计算失败,跳过本次红点信号")
+        }
     }
 }

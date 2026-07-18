@@ -58,17 +58,25 @@ pub fn to_server_event(ev: &DomainEvent) -> Option<ServerEvent> {
     let (event_type, payload) = match ev {
         // 内部信号:不上 wire(桌面壳专用,见 core `DomainEvent::SettingsChanged`)。
         DomainEvent::SettingsChanged => return None,
-        DomainEvent::CertificateStatusChanged { certificate_id, status } => (
+        DomainEvent::CertificateStatusChanged {
+            certificate_id,
+            status,
+        } => (
             EventType::CertificateStatusChanged,
             json!({ "certificateId": certificate_id, "status": status }),
         ),
-        DomainEvent::TaskStatusChanged { task_id, certificate_id, status } => (
+        DomainEvent::TaskStatusChanged {
+            task_id,
+            certificate_id,
+            status,
+        } => (
             EventType::TaskStatusChanged,
             json!({ "taskId": task_id, "certificateId": certificate_id, "status": status }),
         ),
-        DomainEvent::TaskLogAppended { task_id, seq } => {
-            (EventType::TaskLogAppended, json!({ "taskId": task_id, "seq": seq }))
-        }
+        DomainEvent::TaskLogAppended { task_id, seq } => (
+            EventType::TaskLogAppended,
+            json!({ "taskId": task_id, "seq": seq }),
+        ),
         DomainEvent::RootCaStatusChanged { root_ca_id, status } => (
             EventType::RootCaStatusChanged,
             json!({ "rootCaId": root_ca_id, "status": status }),
@@ -77,7 +85,12 @@ pub fn to_server_event(ev: &DomainEvent) -> Option<ServerEvent> {
             EventType::AcmeAccountStatusChanged,
             json!({ "accountId": account_id, "status": status }),
         ),
-        DomainEvent::ChallengeStatusChanged { challenge_id, task_id, domain_id, status } => (
+        DomainEvent::ChallengeStatusChanged {
+            challenge_id,
+            task_id,
+            domain_id,
+            status,
+        } => (
             EventType::ChallengeStatusChanged,
             json!({
                 "challengeId": challenge_id,
@@ -86,9 +99,14 @@ pub fn to_server_event(ev: &DomainEvent) -> Option<ServerEvent> {
                 "status": status,
             }),
         ),
-        DomainEvent::DashboardChanged { pending_count } => {
-            (EventType::DashboardChanged, json!({ "pendingCount": pending_count }))
-        }
+        DomainEvent::DashboardChanged { pending_count } => (
+            EventType::DashboardChanged,
+            json!({ "pendingCount": pending_count }),
+        ),
     };
-    Some(ServerEvent { event_type, at: now_rfc3339(), payload })
+    Some(ServerEvent {
+        event_type,
+        at: now_rfc3339(),
+        payload,
+    })
 }

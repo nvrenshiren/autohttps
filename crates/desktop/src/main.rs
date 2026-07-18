@@ -66,7 +66,10 @@ async fn boot() -> anyhow::Result<(Router, TcpListener, CoreContext)> {
     );
     let recovered = autohttps_core::boot::run(&ctx).await?;
     if recovered > 0 {
-        tracing::warn!(recovered_tasks = recovered, "崩溃恢复:遗留 running 任务已置失败(可重试)");
+        tracing::warn!(
+            recovered_tasks = recovered,
+            "崩溃恢复:遗留 running 任务已置失败(可重试)"
+        );
     }
 
     // 任务执行器(tokio worker):消费持久队列,承接签发/续签/吊销。
@@ -93,11 +96,20 @@ impl TrayIcons {
         let plain = base.rgba().to_vec();
         let mut dotted = plain.clone();
         draw_red_dot(&mut dotted, width, height);
-        Ok(Self { plain, dotted, width, height })
+        Ok(Self {
+            plain,
+            dotted,
+            width,
+            height,
+        })
     }
 
     fn image(&self, dotted: bool) -> Image<'static> {
-        let rgba = if dotted { self.dotted.clone() } else { self.plain.clone() };
+        let rgba = if dotted {
+            self.dotted.clone()
+        } else {
+            self.plain.clone()
+        };
         Image::new_owned(rgba, self.width, self.height)
     }
 }

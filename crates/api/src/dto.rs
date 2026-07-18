@@ -109,7 +109,11 @@ pub struct CertificateDetail {
 
 fn domain_refs(ds: Vec<certificates::DomainRefData>) -> Vec<DomainRef> {
     ds.into_iter()
-        .map(|d| DomainRef { id: d.id, hostname: d.hostname, is_wildcard: d.is_wildcard })
+        .map(|d| DomainRef {
+            id: d.id,
+            hostname: d.hostname,
+            is_wildcard: d.is_wildcard,
+        })
         .collect()
 }
 
@@ -152,7 +156,10 @@ pub fn cert_detail(data: certificates::CertDetailData) -> CertificateDetail {
             ca_label: a.ca_label,
             environment: a.environment,
         }),
-        root_ca: data.root_ca.map(|r| RootCaRef { id: r.id, name: r.name }),
+        root_ca: data.root_ca.map(|r| RootCaRef {
+            id: r.id,
+            name: r.name,
+        }),
         active_task_id: data.active_task_id,
     }
 }
@@ -269,7 +276,11 @@ pub fn settings_view(
         auto_renew_enabled: m.auto_renew_enabled,
         default_acme_account_id: m.default_acme_account_id,
         // 按当前形态取其一有值、另一组 null(database 形态差异)
-        autostart_enabled: if is_desktop { Some(m.autostart_enabled.unwrap_or(false)) } else { None },
+        autostart_enabled: if is_desktop {
+            Some(m.autostart_enabled.unwrap_or(false))
+        } else {
+            None
+        },
         listen_address: if is_desktop { None } else { m.listen_address },
         listen_port: if is_desktop { None } else { m.listen_port },
         data_storage_path: m.data_storage_path,
@@ -440,7 +451,9 @@ pub fn task_detail(data: tasks::TaskDetailData) -> TaskDetail {
     }
 }
 
-pub fn task_log_entry(m: autohttps_core::persistence::entities::task_log_entries::Model) -> TaskLogEntry {
+pub fn task_log_entry(
+    m: autohttps_core::persistence::entities::task_log_entries::Model,
+) -> TaskLogEntry {
     TaskLogEntry {
         id: m.id,
         task_id: m.task_id,
@@ -571,8 +584,14 @@ pub fn acme_account_detail(row: acme::AccountRow) -> AcmeAccountDetail {
     }
 }
 
-pub fn http01_config(m: autohttps_core::persistence::entities::http01_validation_configs::Model) -> Http01Config {
-    Http01Config { domain_id: m.domain_id, webroot_path: m.webroot_path, updated_at: m.updated_at }
+pub fn http01_config(
+    m: autohttps_core::persistence::entities::http01_validation_configs::Model,
+) -> Http01Config {
+    Http01Config {
+        domain_id: m.domain_id,
+        webroot_path: m.webroot_path,
+        updated_at: m.updated_at,
+    }
 }
 
 /// DNS-01 提交前本地预检结果(acme api §2.3)。
@@ -584,7 +603,10 @@ pub struct DnsPrecheckResult {
 }
 
 pub fn dns_precheck_result(o: acme::DnsPrecheckOutcome) -> DnsPrecheckResult {
-    DnsPrecheckResult { propagated: o.propagated, observed_values: o.observed_values }
+    DnsPrecheckResult {
+        propagated: o.propagated,
+        observed_values: o.observed_values,
+    }
 }
 
 pub fn challenge_summary(row: acme::ChallengeRow) -> ChallengeSummary {

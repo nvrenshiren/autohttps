@@ -63,12 +63,18 @@ pub async fn update(ctx: &CoreContext, input: UpdateSettingsInput) -> CoreResult
 
     // 形态适用校验(仅桌面 / 仅服务器项)
     if input.autostart_enabled.is_some() && !is_desktop {
-        return Err(CoreError::new(ErrorCode::SettingNotApplicable, "开机自启仅桌面形态适用")
-            .with_details(serde_json::json!({ "field": "autostartEnabled", "runMode": "server" })));
+        return Err(
+            CoreError::new(ErrorCode::SettingNotApplicable, "开机自启仅桌面形态适用").with_details(
+                serde_json::json!({ "field": "autostartEnabled", "runMode": "server" }),
+            ),
+        );
     }
     if (input.listen_address.is_some() || input.listen_port.is_some()) && is_desktop {
-        return Err(CoreError::new(ErrorCode::SettingNotApplicable, "监听地址/端口仅服务器形态适用")
-            .with_details(serde_json::json!({ "field": "listenAddress", "runMode": "desktop" })));
+        return Err(CoreError::new(
+            ErrorCode::SettingNotApplicable,
+            "监听地址/端口仅服务器形态适用",
+        )
+        .with_details(serde_json::json!({ "field": "listenAddress", "runMode": "desktop" })));
     }
 
     // 入参校验
@@ -85,10 +91,14 @@ pub async fn update(ctx: &CoreContext, input: UpdateSettingsInput) -> CoreResult
 
     // 默认账户校验(共享规则 acme_account_not_found)
     if let Some(Some(account_id)) = &input.default_acme_account_id {
-        let exists = acme_accounts::Entity::find_by_id(account_id).one(db).await?;
+        let exists = acme_accounts::Entity::find_by_id(account_id)
+            .one(db)
+            .await?;
         if exists.is_none() {
-            return Err(CoreError::new(ErrorCode::AcmeAccountNotFound, "默认 ACME 账户不存在")
-                .with_details(serde_json::json!({ "id": account_id })));
+            return Err(
+                CoreError::new(ErrorCode::AcmeAccountNotFound, "默认 ACME 账户不存在")
+                    .with_details(serde_json::json!({ "id": account_id })),
+            );
         }
     }
 

@@ -14,7 +14,9 @@ impl PageParams {
     /// 钳制:`page` 最小 1;`pageSize` 默认 20、上限 100(超限钳制,common §3.1)。
     pub fn normalize(page: Option<u64>, page_size: Option<u64>) -> Self {
         let page = page.unwrap_or(1).max(1);
-        let page_size = page_size.unwrap_or(DEFAULT_PAGE_SIZE).clamp(1, MAX_PAGE_SIZE);
+        let page_size = page_size
+            .unwrap_or(DEFAULT_PAGE_SIZE)
+            .clamp(1, MAX_PAGE_SIZE);
         Self { page, page_size }
     }
 

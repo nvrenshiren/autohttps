@@ -35,14 +35,21 @@ pub struct ScanReport {
 
 impl ScanReport {
     fn changed(&self) -> bool {
-        self.certs_expiring_soon + self.certs_expired + self.root_cas_expired + self.auto_renews_started > 0
+        self.certs_expiring_soon
+            + self.certs_expired
+            + self.root_cas_expired
+            + self.auto_renews_started
+            > 0
     }
 }
 
 /// 启动周期扫描循环(boot 之后由 bin 调用)。首扫已在 `boot::run` 完成,这里只跑周期。
 pub fn spawn(ctx: CoreContext) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        tracing::info!(interval_secs = SCAN_INTERVAL.as_secs(), "证书/根CA 扫描调度器已启动");
+        tracing::info!(
+            interval_secs = SCAN_INTERVAL.as_secs(),
+            "证书/根CA 扫描调度器已启动"
+        );
         loop {
             tokio::time::sleep(SCAN_INTERVAL).await;
             match scan_once(&ctx).await {
@@ -66,10 +73,10 @@ pub async fn scan_once(ctx: &CoreContext) -> CoreResult<ScanReport> {
 
     // 1) 证书到期判定(T6 / T10)。仅活跃到期相关态:valid / expiring_soon。
     let certs = certificates::Entity::find()
-        .filter(certificates::Column::Status.is_in([
-            CertificateStatus::Valid,
-            CertificateStatus::ExpiringSoon,
-        ]))
+        .filter(
+            certificates::Column::Status
+                .is_in([CertificateStatus::Valid, CertificateStatus::ExpiringSoon]),
+        )
         .all(db)
         .await?;
     for cert in certs {
@@ -151,11 +158,7 @@ pub async fn scan_once(ctx: &CoreContext) -> CoreResult<ScanReport> {
 }
 
 /// 更新证书状态 + updated_at,并发 `certificate_status_changed` 事件。
-async fn set_cert_status(
-    ctx: &CoreContext,
-    id: &str,
-    status: CertificateStatus,
-) -> CoreResult<()> {
+async fn set_cert_status(ctx: &CoreContext, id: &str, status: CertificateStatus) -> CoreResult<()> {
     certificates::ActiveModel {
         id: Set(id.to_string()),
         status: Set(status),
@@ -164,7 +167,10 @@ async fn set_cert_status(
     }
     .update(&ctx.db)
     .await?;
-    ctx.emit(DomainEvent::CertificateStatusChanged { certificate_id: id.to_string(), status });
+    ctx.emit(DomainEvent::CertificateStatusChanged {
+        certificate_id: id.to_string(),
+        status,
+    });
     Ok(())
 }
 

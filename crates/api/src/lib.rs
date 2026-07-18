@@ -18,6 +18,7 @@ pub mod serde_helpers;
 pub mod state;
 
 use autohttps_core::CoreContext;
+use axum::http::{HeaderValue, Request, Response};
 use axum::routing::{get, post};
 use axum::Router;
 use handlers::{
@@ -55,7 +56,9 @@ pub fn app(ctx: CoreContext) -> Router {
         .route("/domains", get(domains::list).post(domains::create))
         .route(
             "/domains/{id}",
-            get(domains::get).patch(domains::update).delete(domains::delete),
+            get(domains::get)
+                .patch(domains::update)
+                .delete(domains::delete),
         )
         // --- settings ---
         .route("/settings", get(settings::get).patch(settings::patch))
@@ -72,7 +75,9 @@ pub fn app(ctx: CoreContext) -> Router {
         )
         .route(
             "/acme/accounts/{id}",
-            get(acme::account_get).patch(acme::account_patch).delete(acme::account_delete),
+            get(acme::account_get)
+                .patch(acme::account_patch)
+                .delete(acme::account_delete),
         )
         .route("/acme/accounts/{id}/retry", post(acme::account_retry))
         // --- acme http01 configs ---
@@ -83,8 +88,14 @@ pub fn app(ctx: CoreContext) -> Router {
         // --- acme challenges ---
         .route("/acme/challenges", get(acme::challenges_list))
         .route("/acme/challenges/{id}", get(acme::challenge_get))
-        .route("/acme/challenges/{id}/dns-precheck", get(acme::dns_precheck))
-        .route("/acme/challenges/{id}/confirm", post(acme::challenge_confirm))
+        .route(
+            "/acme/challenges/{id}/dns-precheck",
+            get(acme::dns_precheck),
+        )
+        .route(
+            "/acme/challenges/{id}/confirm",
+            post(acme::challenge_confirm),
+        )
         .route("/acme/challenges/{id}/retry", post(acme::challenge_retry))
         // --- root CAs ---
         .route("/root-cas", get(local_ca::list).post(local_ca::create))
@@ -97,9 +108,42 @@ pub fn app(ctx: CoreContext) -> Router {
         .nest("/api", api)
         // SPA:内嵌前端产物 + client-side 路由 fallback(common §6.1 同源,生产无需 CORS)
         .fallback(embed::spa_handler)
+        // 安全响应头:API 与 SPA 同源自托管,收紧 CSP 到 self(SSE 走 connect-src 'self');
+        // frame-ancestors 替代 X-Frame-Options 的 DENY(二者并存无害)。
+        .layer(axum::middleware::from_fn(security_headers))
         // 开发期放行 Vite dev server 源(ARCHITECTURE §4.3);生产同源不依赖 CORS
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
+}
+
+/// 为所有响应(API + SPA)附加安全响应头。
+async fn security_headers(
+    req: Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> Response<axum::body::Body> {
+    let mut resp = next.run(req).await;
+    let h = resp.headers_mut();
+    h.insert(
+        axum::http::header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
+             img-src 'self' data:; font-src 'self' data:; connect-src 'self'; \
+             frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        ),
+    );
+    h.insert(
+        axum::http::header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    h.insert(
+        axum::http::header::X_FRAME_OPTIONS,
+        HeaderValue::from_static("DENY"),
+    );
+    h.insert(
+        axum::http::header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
+    resp
 }
 
 /// SSE wire 契约(单一定义,导出 TS):事件类型枚举 + 包络 + core `DomainEvent` → 包络的映射。

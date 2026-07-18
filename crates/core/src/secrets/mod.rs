@@ -25,13 +25,18 @@ pub struct SecretStore {
 impl std::fmt::Debug for SecretStore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // 绝不打印身份材料(AR4/L6)。
-        f.debug_struct("SecretStore").field("root", &self.root).finish_non_exhaustive()
+        f.debug_struct("SecretStore")
+            .field("root", &self.root)
+            .finish_non_exhaustive()
     }
 }
 
 impl SecretStore {
     pub fn new(data_dir: &Path) -> Self {
-        Self { root: data_dir.join("secrets"), identity: Arc::new(OnceLock::new()) }
+        Self {
+            root: data_dir.join("secrets"),
+            identity: Arc::new(OnceLock::new()),
+        }
     }
 
     fn master_key_path(&self) -> PathBuf {

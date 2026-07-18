@@ -2,8 +2,8 @@
 //! 挑战动作(dns-precheck 本地预检 / confirm / retry)均为真实实现。
 
 use crate::dto::{
-    self, AcmeAccountDetail, AcmeAccountSummary, ChallengeDetail, ChallengeSummary, DnsPrecheckResult,
-    Http01Config, Page,
+    self, AcmeAccountDetail, AcmeAccountSummary, ChallengeDetail, ChallengeSummary,
+    DnsPrecheckResult, Http01Config, Page,
 };
 use crate::error::ApiResult;
 use crate::extract::JsonBody;

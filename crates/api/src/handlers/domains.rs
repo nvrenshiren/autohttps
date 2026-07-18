@@ -21,7 +21,8 @@ fn parse_cert_state(raw: &Option<String>) -> ApiResult<domains::CertStateFilter>
             if tok == "none" {
                 f.include_none = true;
             } else {
-                f.statuses.push(parse_enum::<CertificateStatus>("certificateState", tok)?);
+                f.statuses
+                    .push(parse_enum::<CertificateStatus>("certificateState", tok)?);
             }
         }
     }
@@ -82,10 +83,7 @@ pub async fn update(
     Ok(Json(dto::domain_detail(data)))
 }
 
-pub async fn delete(
-    State(st): State<AppState>,
-    Path(id): Path<String>,
-) -> ApiResult<StatusCode> {
+pub async fn delete(State(st): State<AppState>, Path(id): Path<String>) -> ApiResult<StatusCode> {
     domains::delete(&st.ctx, &id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

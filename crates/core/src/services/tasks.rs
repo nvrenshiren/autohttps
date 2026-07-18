@@ -4,11 +4,13 @@
 use crate::domain::enums::{TaskStatus, TaskTrigger, TaskType};
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};
 use crate::domain::events::DomainEvent;
-use crate::persistence::entities::{certificate_domains, certificates, domains, task_log_entries, tasks};
+use crate::persistence::entities::{
+    certificate_domains, certificates, domains, task_log_entries, tasks,
+};
 use crate::services::certificates as cert_svc;
 use crate::services::context::CoreContext;
 use crate::services::dashboard;
-use crate::services::pagination::{Paged, PageParams};
+use crate::services::pagination::{PageParams, Paged};
 use crate::util::now_rfc3339;
 use sea_orm::*;
 
@@ -67,12 +69,18 @@ async fn cert_hostnames(db: &DatabaseConnection, cert_id: &str) -> CoreResult<Ve
 }
 
 async fn build_row(db: &DatabaseConnection, task: tasks::Model) -> CoreResult<TaskRow> {
-    let cert = certificates::Entity::find_by_id(&task.certificate_id).one(db).await?;
+    let cert = certificates::Entity::find_by_id(&task.certificate_id)
+        .one(db)
+        .await?;
     let (certificate_deleted, certificate_domains) = match cert {
         Some(_) => (false, Some(cert_hostnames(db, &task.certificate_id).await?)),
         None => (true, None),
     };
-    Ok(TaskRow { task, certificate_deleted, certificate_domains })
+    Ok(TaskRow {
+        task,
+        certificate_deleted,
+        certificate_domains,
+    })
 }
 
 pub async fn list(ctx: &CoreContext, filter: TaskListFilter) -> CoreResult<Paged<TaskRow>> {
@@ -119,7 +127,12 @@ pub async fn list(ctx: &CoreContext, filter: TaskListFilter) -> CoreResult<Paged
     for t in models {
         items.push(build_row(db, t).await?);
     }
-    Ok(Paged { items, page: page.page, page_size: page.page_size, total })
+    Ok(Paged {
+        items,
+        page: page.page,
+        page_size: page.page_size,
+        total,
+    })
 }
 
 pub async fn get(ctx: &CoreContext, id: &str) -> CoreResult<TaskDetailData> {
@@ -138,7 +151,9 @@ pub async fn get(ctx: &CoreContext, id: &str) -> CoreResult<TaskDetailData> {
         .map(|t| t.id)
         .collect();
 
-    let cert_model = certificates::Entity::find_by_id(&task.certificate_id).one(db).await?;
+    let cert_model = certificates::Entity::find_by_id(&task.certificate_id)
+        .one(db)
+        .await?;
     let certificate = match cert_model {
         Some(c) => Some(TaskCertRefData {
             id: c.id.clone(),
@@ -149,7 +164,12 @@ pub async fn get(ctx: &CoreContext, id: &str) -> CoreResult<TaskDetailData> {
     };
 
     let row = build_row(db, task).await?;
-    Ok(TaskDetailData { row, parent_task_id, child_task_ids, certificate })
+    Ok(TaskDetailData {
+        row,
+        parent_task_id,
+        child_task_ids,
+        certificate,
+    })
 }
 
 pub async fn logs(
@@ -165,8 +185,8 @@ pub async fn logs(
         return Err(CoreError::new(ErrorCode::TaskNotFound, "任务不存在"));
     }
     let params = PageParams::normalize(page, page_size);
-    let mut query = task_log_entries::Entity::find()
-        .filter(task_log_entries::Column::TaskId.eq(id));
+    let mut query =
+        task_log_entries::Entity::find().filter(task_log_entries::Column::TaskId.eq(id));
     if let Some(seq) = after_seq {
         query = query.filter(task_log_entries::Column::Seq.gt(seq));
     }
@@ -175,7 +195,12 @@ pub async fn logs(
     let paginator = query.paginate(db, params.page_size);
     let total = paginator.num_items().await?;
     let items = paginator.fetch_page(params.zero_based()).await?;
-    Ok(Paged { items, page: params.page, page_size: params.page_size, total })
+    Ok(Paged {
+        items,
+        page: params.page,
+        page_size: params.page_size,
+        total,
+    })
 }
 
 /// 取消结果:`was_running` 供 handler 决定 202(running,尽力而为)/ 200(queued)。
@@ -194,9 +219,10 @@ pub async fn cancel_task(ctx: &CoreContext, id: &str) -> CoreResult<CancelOutcom
         .ok_or_else(|| CoreError::new(ErrorCode::TaskNotFound, "任务不存在"))?;
 
     if !matches!(task.status, TaskStatus::Queued | TaskStatus::Running) {
-        return Err(CoreError::new(ErrorCode::TaskNotCancellable, "终态任务不可取消").with_details(
-            serde_json::json!({ "currentStatus": task.status }),
-        ));
+        return Err(
+            CoreError::new(ErrorCode::TaskNotCancellable, "终态任务不可取消")
+                .with_details(serde_json::json!({ "currentStatus": task.status })),
+        );
     }
     let was_running = matches!(task.status, TaskStatus::Running);
 
@@ -218,7 +244,10 @@ pub async fn cancel_task(ctx: &CoreContext, id: &str) -> CoreResult<CancelOutcom
     dashboard::emit_changed(ctx).await;
 
     let detail = get(ctx, id).await?;
-    Ok(CancelOutcome { was_running, detail })
+    Ok(CancelOutcome {
+        was_running,
+        detail,
+    })
 }
 
 /// 手动重试(B1,TT7)。仅 `failed` 可重试 → 派生同类型、同证书新任务(trigger=manual、attempt+1、
@@ -232,9 +261,10 @@ pub async fn retry_task(ctx: &CoreContext, id: &str) -> CoreResult<TaskDetailDat
         .ok_or_else(|| CoreError::new(ErrorCode::TaskNotFound, "任务不存在"))?;
 
     if task.status != TaskStatus::Failed {
-        return Err(CoreError::new(ErrorCode::TaskNotRetryable, "仅失败任务可重试").with_details(
-            serde_json::json!({ "currentStatus": task.status }),
-        ));
+        return Err(
+            CoreError::new(ErrorCode::TaskNotRetryable, "仅失败任务可重试")
+                .with_details(serde_json::json!({ "currentStatus": task.status })),
+        );
     }
     // 重试前校验证书仍存在(DB §2.3,避免对已删证书误触发)
     let cert = certificates::Entity::find_by_id(&task.certificate_id)

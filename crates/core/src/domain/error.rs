@@ -78,14 +78,8 @@ impl ErrorCode {
         use ErrorCode::*;
         match self {
             ValidationFailed => 400,
-            NotFound
-            | CertNotFound
-            | DomainNotFound
-            | AcmeAccountNotFound
-            | ChallengeNotFound
-            | Http01ConfigNotFound
-            | RootCaNotFound
-            | TaskNotFound => 404,
+            NotFound | CertNotFound | DomainNotFound | AcmeAccountNotFound | ChallengeNotFound
+            | Http01ConfigNotFound | RootCaNotFound | TaskNotFound => 404,
 
             // 409 —— 状态冲突 / 引用冲突
             CertInProgressCannotDelete
@@ -141,7 +135,11 @@ pub struct CoreError {
 
 impl CoreError {
     pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
-        Self { code, message: message.into(), details: None }
+        Self {
+            code,
+            message: message.into(),
+            details: None,
+        }
     }
 
     pub fn with_details(mut self, details: serde_json::Value) -> Self {

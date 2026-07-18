@@ -31,7 +31,10 @@ pub async fn list(
     Ok(Json(dto::page_of(paged, dto::task_summary)))
 }
 
-pub async fn get(State(st): State<AppState>, Path(id): Path<String>) -> ApiResult<Json<TaskDetail>> {
+pub async fn get(
+    State(st): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<TaskDetail>> {
     let data = tasks::get(&st.ctx, &id).await?;
     Ok(Json(dto::task_detail(data)))
 }
@@ -60,6 +63,10 @@ pub async fn cancel(
     Path(id): Path<String>,
 ) -> ApiResult<(StatusCode, Json<TaskDetail>)> {
     let outcome = tasks::cancel_task(&st.ctx, &id).await?;
-    let code = if outcome.was_running { StatusCode::ACCEPTED } else { StatusCode::OK };
+    let code = if outcome.was_running {
+        StatusCode::ACCEPTED
+    } else {
+        StatusCode::OK
+    };
     Ok((code, Json(dto::task_detail(outcome.detail))))
 }

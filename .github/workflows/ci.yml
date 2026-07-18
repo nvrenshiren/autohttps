@@ -47,10 +47,8 @@ jobs:
       # locally via `tauri build`.
       - name: Format check
         run: cargo fmt --all --check
-        continue-on-error: true
-      - name: Clippy
-        run: cargo clippy -p autohttps-core -p autohttps-api -p server
-        continue-on-error: true
+      - name: Clippy (warnings as errors)
+        run: cargo clippy -p autohttps-core -p autohttps-api -p server --all-targets -- -D warnings
       - name: Check
         run: cargo check -p autohttps-core -p autohttps-api -p server
       - name: Test

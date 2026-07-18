@@ -19,9 +19,10 @@ where
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
         match Json::<T>::from_request(req, state).await {
             Ok(Json(value)) => Ok(JsonBody(value)),
-            Err(rejection) => {
-                Err(ApiError::new(ErrorCode::ValidationFailed, rejection.body_text()))
-            }
+            Err(rejection) => Err(ApiError::new(
+                ErrorCode::ValidationFailed,
+                rejection.body_text(),
+            )),
         }
     }
 }

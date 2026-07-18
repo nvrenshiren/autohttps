@@ -183,3 +183,83 @@ pub enum RunMode {
     Desktop,
     Server,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// wire 值必须严格等于 TECH §4.3 标识(snake_case);前端 TS 是此处的投影,值漂移即契约破坏。
+    #[test]
+    fn certificate_status_wire_values() {
+        let cases = [
+            (CertificateStatus::PendingIssue, "pending_issue"),
+            (CertificateStatus::Issuing, "issuing"),
+            (CertificateStatus::IssueFailed, "issue_failed"),
+            (CertificateStatus::Valid, "valid"),
+            (CertificateStatus::ExpiringSoon, "expiring_soon"),
+            (CertificateStatus::Renewing, "renewing"),
+            (CertificateStatus::RenewalFailed, "renewal_failed"),
+            (CertificateStatus::Expired, "expired"),
+            (CertificateStatus::Revoking, "revoking"),
+            (CertificateStatus::Revoked, "revoked"),
+        ];
+        assert_eq!(cases.len(), 10, "证书状态机为 10 态");
+        for (variant, wire) in cases {
+            assert_eq!(
+                serde_json::to_value(variant).unwrap(),
+                serde_json::json!(wire)
+            );
+            assert_eq!(variant.to_value(), wire, "DB 值应等于 wire 值");
+        }
+    }
+
+    #[test]
+    fn task_and_challenge_wire_values() {
+        assert_eq!(serde_json::to_value(TaskStatus::Queued).unwrap(), "queued");
+        assert_eq!(
+            serde_json::to_value(TaskStatus::Cancelled).unwrap(),
+            "cancelled"
+        );
+        assert_eq!(serde_json::to_value(TaskType::Renew).unwrap(), "renew");
+        assert_eq!(
+            serde_json::to_value(TaskTrigger::Cleanup).unwrap(),
+            "cleanup"
+        );
+        assert_eq!(
+            serde_json::to_value(ChallengeStatus::AwaitingManual).unwrap(),
+            "awaiting_manual"
+        );
+        assert_eq!(
+            serde_json::to_value(AcmeAccountStatus::RegistrationFailed).unwrap(),
+            "registration_failed"
+        );
+        assert_eq!(
+            serde_json::to_value(RootCaStatus::Active).unwrap(),
+            "active"
+        );
+        assert_eq!(serde_json::to_value(RunMode::Desktop).unwrap(), "desktop");
+    }
+
+    #[test]
+    fn validation_method_uses_explicit_rename() {
+        // serde snake_case 对 Http01 会产出 http01(数字不加下划线);契约要求 http_01/dns_01。
+        assert_eq!(
+            serde_json::to_value(ValidationMethod::Http01).unwrap(),
+            "http_01"
+        );
+        assert_eq!(
+            serde_json::to_value(ValidationMethod::Dns01).unwrap(),
+            "dns_01"
+        );
+        assert_eq!(ValidationMethod::Http01.to_value(), "http_01");
+        assert_eq!(ValidationMethod::Dns01.to_value(), "dns_01");
+    }
+
+    #[test]
+    fn wire_values_roundtrip() {
+        let v: CertificateStatus =
+            serde_json::from_str("\"expiring_soon\"").expect("wire 值应可反序列化");
+        assert_eq!(v, CertificateStatus::ExpiringSoon);
+        assert!(serde_json::from_str::<CertificateStatus>("\"ExpiringSoon\"").is_err());
+    }
+}
