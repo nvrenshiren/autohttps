@@ -143,7 +143,7 @@ export function TasksListPage() {
         description="签发 / 续签 / 吊销任务的队列与历史统一视图;失败可重试、进行中可取消。"
       />
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
         {/* 工具栏(组合筛选:类型 / 状态 / 时间;关联证书经详情页跳入) */}
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
           <Select

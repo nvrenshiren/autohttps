@@ -74,7 +74,7 @@ export function RootCaListPage() {
         }
       />
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
         {isError ? (
           <div className="p-4">
             <ErrorState error={error} onRetry={() => void refetch()} />

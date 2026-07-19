@@ -27,7 +27,7 @@ export function PageHeader({
               <span key={i} className="inline-flex items-center gap-1">
                 {i > 0 && <ChevronRight className="size-3" />}
                 {c.to ? (
-                  <Link to={c.to} className="hover:text-foreground">
+                  <Link to={c.to} className="transition-colors hover:text-primary">
                     {c.label}
                   </Link>
                 ) : (
@@ -37,8 +37,10 @@ export function PageHeader({
             ))}
           </nav>
         )}
-        <h1 className="truncate text-xl font-semibold">{title}</h1>
-        {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
+        <h1 className="truncate font-display text-xl font-semibold tracking-tight">{title}</h1>
+        {description && (
+          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+        )}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>

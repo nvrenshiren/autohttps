@@ -17,6 +17,7 @@
 
 ### Changed
 
+- **设计系统 v2「极光守护」**:重塑整体视觉。深空靛 × 极光青品牌渐变,浅色「曜石白」/暗色「深空墨」双主题统一语义 token;卡片改为带内切边的薄玻璃浮层,弹窗/下拉/气泡用半透明玻璃 + 背滤;引入 Space Grotesk / Outfit / JetBrains Mono 字体,标题与一级指标用品牌渐变字;侧栏激活项为玻璃胶囊 + 品牌描边微光,列表/详情/设置全面升级;加入路由切换与指标的克制动效(遵循 prefers-reduced-motion)。
 - 证书创建(证书 + SAN 关联)与删除(任务取消 + 关联清理 + 行删除)的库内多步写纳入事务,失败整体回滚;事件广播与文件清理移至提交之后。
 - CI 收紧:`cargo fmt --check` 与 `cargo clippy` 不再 `continue-on-error`,clippy 以 `--all-targets -D warnings` 作为硬门禁。
 

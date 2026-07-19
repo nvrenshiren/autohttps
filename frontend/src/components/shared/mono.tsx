@@ -23,14 +23,14 @@ export function CopyableValue({ value, className }: { value: string; className?:
   };
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-muted/50 px-2 py-1 font-mono text-[13px]">
+      <code className="min-w-0 flex-1 truncate rounded-lg border border-border bg-muted/50 px-2 py-1 font-mono text-[13px]">
         {value}
       </code>
       <button
         type="button"
         onClick={copy}
         aria-label="复制"
-        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
       </button>

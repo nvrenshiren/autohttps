@@ -23,10 +23,16 @@ export function EmptyState({
   iconClassName?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-      <Icon className={cn("size-7 text-muted-foreground", iconClassName)} />
+    <div className="flex flex-col items-center justify-center gap-2.5 px-6 py-16 text-center">
+      <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-border bg-muted/50 shadow-xs">
+        <Icon className={cn("size-6 text-muted-foreground", iconClassName)} />
+      </span>
       <div className="text-sm font-medium text-foreground">{title}</div>
-      {description && <div className="max-w-sm text-xs text-muted-foreground">{description}</div>}
+      {description && (
+        <div className="max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+          {description}
+        </div>
+      )}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );

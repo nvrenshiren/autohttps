@@ -1,7 +1,7 @@
 /**
- * App Shell(设计 §8)—— 800×600 响应式:**56px 图标轨为默认**,`≥1024`(lg)展开 240px 标签侧栏;
- * 竖向紧凑(薄 h-14 顶栏、内容区滚动)。红点仅挂总览(dashboard 唯一落点)。运行形态只读 chip +
- * 主题切换(主题切换放顶栏右,与侧栏底部二选一,勿重复)。
+ * App Shell(设计系统 v2「极光守护」)—— 800×600 响应式:**56px 图标轨为默认**,
+ * `≥1024`(lg)展开 240px 标签侧栏。品牌标为极光渐变锁;激活项为玻璃胶囊 + 品牌描边 + 微光。
+ * 红点仅挂总览(dashboard 唯一落点)。运行形态只读 chip + 主题切换。环境光由 .ambient 承载。
  */
 import { NavLink, useLocation } from "react-router";
 import {
@@ -43,10 +43,24 @@ function sectionTitle(pathname: string): string {
   return NAV.find((n) => n.to === seg)?.label ?? "autohttps";
 }
 
+function BrandMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "brand-gradient inline-flex shrink-0 items-center justify-center rounded-xl text-primary-foreground",
+        "shadow-[0_0_0_1px_oklch(1_0_0/18%)_inset,0_4px_14px_-2px_oklch(0.52_0.21_267/50%)]",
+        className,
+      )}
+    >
+      <ShieldCheck className="size-[62%]" strokeWidth={2.2} />
+    </span>
+  );
+}
+
 function NotificationDot({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-notification px-1 text-[10px] leading-none text-notification-foreground">
+    <span className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-notification px-1 text-[10px] font-semibold leading-none text-notification-foreground shadow-[0_0_0_2px_var(--color-sidebar)]">
       {count > 99 ? "99+" : count}
     </span>
   );
@@ -59,15 +73,15 @@ function Sidebar({ pendingCount }: { pendingCount: number }) {
   return (
     <aside className="flex w-14 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:w-60">
       {/* 品牌 */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-3 lg:px-4">
-        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs ring-1 ring-primary/20">
-          <ShieldCheck className="size-[18px]" />
+      <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-3 lg:px-4">
+        <BrandMark className="size-7" />
+        <span className="hidden font-display text-[15px] font-semibold tracking-tight lg:inline">
+          auto<span className="text-aurora">https</span>
         </span>
-        <span className="hidden text-sm font-semibold tracking-tight lg:inline">autohttps</span>
       </div>
 
       {/* 导航 */}
-      <nav className="flex-1 space-y-0.5 overflow-auto p-2">
+      <nav className="flex-1 space-y-1 overflow-auto p-2">
         {NAV.map(({ to, label, Icon, end }) => (
           <NavLink
             key={to}
@@ -75,21 +89,26 @@ function Sidebar({ pendingCount }: { pendingCount: number }) {
             end={end}
             className={({ isActive }) =>
               cn(
-                "relative flex h-9 items-center gap-2.5 rounded-md px-2.5 transition-colors",
+                "relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 transition-all duration-150",
                 "justify-center lg:justify-start",
                 isActive
-                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-[inset_0_0_0_1px_var(--color-border-strong)]"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
               )
             }
           >
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-sidebar-primary" />
+                  <span className="brand-gradient absolute left-0 top-2 bottom-2 w-[3px] rounded-full shadow-[0_0_8px_oklch(0.52_0.21_267/60%)]" />
                 )}
                 <span className="relative inline-flex items-center justify-center">
-                  <Icon className={cn("size-5", isActive && "text-sidebar-primary")} />
+                  <Icon
+                    className={cn(
+                      "size-5 transition-colors",
+                      isActive && "text-sidebar-primary",
+                    )}
+                  />
                   {to === "/" && <NotificationDot count={pendingCount} />}
                 </span>
                 <span className="hidden lg:inline">{label}</span>
@@ -104,7 +123,10 @@ function Sidebar({ pendingCount }: { pendingCount: number }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground lg:justify-start">
-              <span className="inline-flex size-1.5 shrink-0 rounded-full bg-success" />
+              <span className="relative inline-flex size-1.5 shrink-0">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-success" />
+              </span>
               <span className="hidden lg:inline">运行形态:{runModeLabel}</span>
             </div>
           </TooltipTrigger>
@@ -122,15 +144,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <div className="ambient" aria-hidden />
       <Sidebar pendingCount={pendingCount} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4 sm:px-6">
-          <span className="text-base font-semibold tracking-tight">{sectionTitle(location.pathname)}</span>
+          <span className="font-display text-base font-semibold tracking-tight">
+            {sectionTitle(location.pathname)}
+          </span>
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
           </div>
         </header>
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto">
+          <div key={location.pathname} className="page-in h-full">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );
