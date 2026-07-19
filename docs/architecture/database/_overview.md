@@ -16,12 +16,12 @@
 | 时间 | `TEXT·RFC3339 UTC`(`time::OffsetDateTime` / SeaORM `TimeDateTimeWithTimeZone`) | TECH §3.5 |
 | 审计列 | `created_at` / `updated_at`(全业务表);architect 统一约定 | 本总览 |
 | 软删除 | **无**——证书/域名硬删除(退出状态机);任务只增留痕(证书删后只读保留);根 CA/账户 MVP 不删或显式移除 | flows 各模块 |
-| 敏感数据 | 私钥/账户密钥/根 CA 私钥**只存 `*_ref` 引用**,密文落数据目录(age),绝不明文入库/入日志 | AR4 / project §7 / L6 |
+| 敏感数据 | 私钥/账户密钥/根 CA 私钥/WebDAV 口令**只存 `*_ref` 引用**,密文落数据目录(age),绝不明文入库/入日志 | AR4 / project §7 / L6 |
 | 布尔 | `BOOLEAN` = SQLite INTEGER 0/1 | SQLite |
 
 ---
 
-## 2. 表总览(11 表 + dashboard 无表)
+## 2. 表总览(12 表 + dashboard 无表)
 
 | # | 表 | 归属模块 | 主键 | 关键外键 / 引用 |
 | --- | --- | --- | --- | --- |
@@ -36,6 +36,7 @@
 | 9 | `tasks` | tasks | `id` UUIDv7 | `certificate_id` **软引用** certificates · `parent_task_id`→tasks(自引用,SET NULL) |
 | 10 | `task_log_entries` | tasks | `id` UUIDv7 | `task_id`→tasks(CASCADE) |
 | 11 | `settings` | settings | `id`='global' 单例 | `default_acme_account_id`→acme_accounts(SET NULL,可空) |
+| 12 | `sync_configs` | sync | `id`='webdav' 单例 | `password_ref` **软引用** SecretStore 密文(库外) |
 | — | (dashboard) | dashboard | 无表 | 纯聚合只读 certificates + tasks(+ 经 certificates 携带 domains) |
 
 ---
@@ -139,6 +140,14 @@ erDiagram
         text default_acme_account_id FK "可空"
         text data_storage_path "只读"
     }
+    SYNC_CONFIGS {
+        text id PK "单例 webdav"
+        text base_url "远端目录完整 URL"
+        text username
+        text password_ref "敏感 AR4,软引用库外密文"
+        text last_backup_at "RFC3339,可空"
+        text last_backup_result "success/failed,可空"
+    }
 ```
 
 > Mermaid 记号:`--` 识别关系(硬 FK,子依赖父)· `..` 非识别关系(可空 FK 或**软引用**)。
@@ -191,7 +200,7 @@ erDiagram
 | `internal_cert_revocations.certificate_id` | certificates | **软引用(无 DB FK)** | 作废清单独立于证书实体长存(内网证书删除后作废序列号仍在) |
 | `settings.default_acme_account_id` | acme_accounts | **SET NULL** | 默认账户被删 → 指向置空,签发处引导重选 |
 
-> **软引用**统一定义:逻辑外键、DB 不设级联约束,父行删除后子行保留原 id;"已删除"由父表该 id 是否存在判定(UUIDv7 不复用 ⇒ 不会误配)。用于三处需**跨父实体生命周期长存**的历史/账本:任务历史、历史挑战、作废清单。
+> **软引用**统一定义:逻辑外键、DB 不设级联约束,父行删除后子行保留原 id;"已删除"由父表该 id 是否存在判定(UUIDv7 不复用 ⇒ 不会误配)。用于三处需**跨父实体生命周期长存**的历史/账本:任务历史、历史挑战、作废清单。另有一类**库外软引用**:`*_ref` 敏感数据引用键(§7),指向 SecretStore 密文而非库内行,生命周期归应用层(boot 孤儿清扫须把全部 `*_ref` 列计入存活集)。
 
 ---
 
@@ -228,8 +237,10 @@ erDiagram
 | 证书私钥 | `certificates.private_key_ref`(引用键) | 数据目录内密文(age),`crates/core/src/secrets/` |
 | ACME 账户密钥 | `acme_accounts.account_key_ref`(引用键) | 同上 |
 | 根 CA 私钥 | `root_cas.private_key_ref`(引用键) | 同上(敏感级最高) |
+| WebDAV 登录口令 | `sync_configs.password_ref`(引用键) | 同上;备份口令(`passphrase`)**零持久**,连引用都不存(sync DEC4) |
 
 - **库内绝无明文密钥列**;`task_log_entries.message` 等日志**脱敏**不含密钥(L6)。
+- **boot 孤儿密钥清扫**(`secrets/` 下无实体引用的 `.age` 删除)必须把以上**全部** `*_ref` 列计入存活引用集 —— 漏算即误删(2026-07-19:`sync_configs.password_ref` 曾被漏算,每次启动误删 WebDAV 口令密文,已修并加回归测试)。
 - 公开材料可入库/内联:证书文件以 `cert_pem_ref` 落数据目录文件;根 CA 证书 `cert_pem` 因公开且频繁取用(签发组链/导出)内联存储。
 - 挑战的 TXT 值 / HTTP 文件内容 / key authorization **非**上述敏感三类,可入库并展示(DNS-01 需展示 TXT 供复制)。
 
@@ -243,5 +254,6 @@ erDiagram
 - [x] 域名验证方式:**类别**(`domains.validation_method`)与 **webroot 执行配置**(`http01_validation_configs`)分属 domains / acme(DEA5),不重叠。
 - [x] 根 CA 签发内网证书由 `certificates.root_ca_id` 反查,不建冗余关联表;作废清单独立长存。
 - [x] 全部状态列取 §4.3 wire 值;局部属性已标注非 §4.3 + 治理路径。
-- [x] 敏感三类只存 `*_ref`;dashboard 无表(纯聚合)。
+- [x] 敏感四类只存 `*_ref`(证书私钥 / 账户密钥 / 根 CA 私钥 / WebDAV 口令);备份口令零持久;dashboard 无表(纯聚合)。
+- [x] 单例表两例同口径:`settings`(哨兵 `'global'`)/ `sync_configs`(哨兵 `'webdav'`),应用层 upsert 保一行。
 - [x] 每实例一 SQLite 库(WAL),数据落 settings 数据存储路径下(settings `data_storage_path`)。

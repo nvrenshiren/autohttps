@@ -25,6 +25,7 @@
 
 - 修复全部 clippy `doc_lazy_continuation` 文档警告(clippy 现零警告)。
 - 修复 WebDAV 恢复后重开应用「已存口令丢失需重输」:boot 孤儿密钥清扫漏算 `sync_configs.password_ref` 引用,每次启动把 WebDAV 口令密文当孤儿删掉;现纳入引用全集(回归测试锁定)。
+- 修复 ACME 签发偶发「域名 X 无 HTTP-01 挑战」失败:CA 复用仍在有效期内的授权(Let's Encrypt ~30 天)时不下发任何挑战,执行器误当异常;现识别授权已为 `valid` 即直接视为该域名已验证(记一条 passed 挑战行供审计),不再取挑战。
 
 ## [0.1.0-dev] - 2026-07-18
 
