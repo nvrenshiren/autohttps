@@ -12,6 +12,8 @@ use sea_orm_migration::MigratorTrait;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 
 /// 文件库(非内存):pack 的 `VACUUM INTO` 在内存库上目标文件行为不可靠,文件库更贴近真实。
+/// **多连接池(=4,贴近生产 8)**:在线恢复的 ATTACH 单连接修复点只有在多连接池下才会暴露
+/// (单连接池会掩盖 ATTACH/查询落到不同连接的问题)。
 async fn file_db(dir: &std::path::Path) -> sea_orm::DatabaseConnection {
     let opts = SqliteConnectOptions::new()
         .filename(dir.join("autohttps.db"))
@@ -19,7 +21,7 @@ async fn file_db(dir: &std::path::Path) -> sea_orm::DatabaseConnection {
         .journal_mode(SqliteJournalMode::Wal)
         .foreign_keys(true);
     let pool = SqlitePoolOptions::new()
-        .max_connections(1)
+        .max_connections(4)
         .connect_with(opts)
         .await
         .expect("建库失败");

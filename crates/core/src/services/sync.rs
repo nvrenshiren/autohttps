@@ -416,94 +416,79 @@ async fn vacuum_into(ctx: &CoreContext, dest: &std::path::Path) -> CoreResult<()
 
 /// 在线把 `src` 库文件的内容导入活跃库(ATTACH + 逐表替换,事务内)。
 ///
-/// 备份来自同应用,schema 一致;迁移表一并替换以保持版本记录一致。
+/// **单连接串行**:ATTACH/BEGIN/逐表替换/COMMIT/DETACH 全部走**同一条**池化连接 ——
+/// ATTACH 只对单条连接有效,若各语句走连接池分别 acquire(池 `max_connections=8`),
+/// 会落到不同连接,后续 `src.sqlite_master` 查询即报 `no such table: src.sqlite_master`。
 /// 对外仅经 `restore` 调用;`pub` 仅供集成测试直接驱动该核心路径(Windows 文件锁修复点)。
 #[doc(hidden)]
 pub async fn restore_db_from(ctx: &CoreContext, src: &std::path::Path) -> CoreResult<()> {
-    use sea_orm::ConnectionTrait;
-    let db = &ctx.db;
+    let pool = ctx.db.get_sqlite_connection_pool();
+    let mut conn = pool
+        .acquire()
+        .await
+        .map_err(|e| CoreError::internal(format!("获取恢复专用连接失败: {e}")))?;
+
     let src_str = src.to_string_lossy().replace('\\', "/");
     let esc = src_str.replace('\'', "''");
 
-    // 逐表复制需在事务外 ATTACH(ATTACH 可在事务内,但为清晰起见先 ATTACH 再开事务)
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        format!("ATTACH DATABASE '{esc}' AS src;"),
-    ))
-    .await?;
+    sqlx::query(&format!("ATTACH DATABASE '{esc}' AS src;"))
+        .execute(&mut *conn)
+        .await
+        .map_err(|e| CoreError::internal(format!("挂载备份库失败: {e}")))?;
 
-    let result = restore_tables_via_attach(db).await;
+    let result = restore_tables_on(&mut conn).await;
 
     // 无论成败都 DETACH(尽力而为)
-    let _ = db
-        .execute(sea_orm::Statement::from_string(
-            sea_orm::DatabaseBackend::Sqlite,
-            "DETACH DATABASE src;".to_string(),
-        ))
+    let _ = sqlx::query("DETACH DATABASE src;")
+        .execute(&mut *conn)
         .await;
     result
 }
 
-/// ATTACH 后的事务内逐表替换(独立成函数便于确保 DETACH 总能执行)。
+/// 单连接上的事务内逐表替换(独立成函数便于确保 DETACH 总能执行)。
 ///
 /// 按**列名交集**对齐(非 `SELECT *`):备份与活跃库 schema 可能因版本差异列不一致
 /// (如恢复旧代码打的备份),`SELECT *` 会因列数不符直接报错。交集对齐容忍加列/删列;
 /// 只删活跃库中备份也有的表,备份没有的表(如新版新增表)保留现值不动。
-async fn restore_tables_via_attach(db: &sea_orm::DatabaseConnection) -> CoreResult<()> {
-    use sea_orm::ConnectionTrait;
+async fn restore_tables_on(conn: &mut sqlx::pool::PoolConnection<sqlx::Sqlite>) -> CoreResult<()> {
+    use sqlx::Row;
     // 目标表集合 = src 中的用户表(排除 sqlite_ 系统表)
-    let rows = db
-        .query_all(sea_orm::Statement::from_string(
-            sea_orm::DatabaseBackend::Sqlite,
-            "SELECT name FROM src.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
-                .to_string(),
-        ))
-        .await
-        .map_err(db_err("读取备份库表清单"))?;
-    let mut tables: Vec<String> = Vec::new();
-    for r in &rows {
-        let name: String = r
-            .try_get_by_index(0)
-            .map_err(|e| CoreError::internal(format!("读取备份库表名失败: {e}")))?;
-        tables.push(name);
-    }
-
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "BEGIN IMMEDIATE;".to_string(),
-    ))
+    let rows = sqlx::query(
+        "SELECT name FROM src.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';",
+    )
+    .fetch_all(&mut **conn)
     .await
-    .map_err(db_err("开启恢复事务"))?;
+    .map_err(|e| CoreError::internal(format!("读取备份库表清单失败: {e}")))?;
+    let tables: Vec<String> = rows.iter().map(|r| r.get::<String, _>(0)).collect();
+
+    sqlx::query("BEGIN IMMEDIATE;")
+        .execute(&mut **conn)
+        .await
+        .map_err(|e| CoreError::internal(format!("开启恢复事务失败: {e}")))?;
     for t in &tables {
-        let result = restore_one_table(db, t).await;
-        if let Err(e) = result {
-            let _ = db
-                .execute(sea_orm::Statement::from_string(
-                    sea_orm::DatabaseBackend::Sqlite,
-                    "ROLLBACK;".to_string(),
-                ))
-                .await;
+        if let Err(e) = restore_one_table_on(conn, t).await {
+            let _ = sqlx::query("ROLLBACK;").execute(&mut **conn).await;
             return Err(e);
         }
     }
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "COMMIT;".to_string(),
-    ))
-    .await
-    .map_err(db_err("提交恢复事务"))?;
+    sqlx::query("COMMIT;")
+        .execute(&mut **conn)
+        .await
+        .map_err(|e| CoreError::internal(format!("提交恢复事务失败: {e}")))?;
     Ok(())
 }
 
 /// 单表替换:取活跃库与备份库的列名交集,按交集列 DELETE + INSERT(标识符加引号)。
-async fn restore_one_table(db: &sea_orm::DatabaseConnection, t: &str) -> CoreResult<()> {
-    use sea_orm::ConnectionTrait;
-    let main_cols = table_columns(db, "main", t).await?;
+async fn restore_one_table_on(
+    conn: &mut sqlx::pool::PoolConnection<sqlx::Sqlite>,
+    t: &str,
+) -> CoreResult<()> {
+    let main_cols = table_columns_on(conn, "main", t).await?;
     if main_cols.is_empty() {
         // 活跃库没有这张表(备份来自更高版本)—— 跳过,不建表(避免引入未迁移 schema)
         return Ok(());
     }
-    let src_cols = table_columns(db, "src", t).await?;
+    let src_cols = table_columns_on(conn, "src", t).await?;
     let common: Vec<&String> = main_cols.iter().filter(|c| src_cols.contains(c)).collect();
     if common.is_empty() {
         return Ok(());
@@ -516,40 +501,23 @@ async fn restore_one_table(db: &sea_orm::DatabaseConnection, t: &str) -> CoreRes
     let q = format!(
         "DELETE FROM \"{t}\"; INSERT INTO \"{t}\" ({cols}) SELECT {cols} FROM src.\"{t}\";",
     );
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        q,
-    ))
-    .await
-    .map_err(db_err(&format!("恢复表 {t}")))?;
+    sqlx::query(&q)
+        .execute(&mut **conn)
+        .await
+        .map_err(|e| CoreError::internal(format!("恢复表 {t} 失败: {e}")))?;
     Ok(())
 }
 
 /// 读某 schema 下某表的列名(PRAGMA table_info)。
-async fn table_columns(
-    db: &sea_orm::DatabaseConnection,
+async fn table_columns_on(
+    conn: &mut sqlx::pool::PoolConnection<sqlx::Sqlite>,
     schema: &str,
     table: &str,
 ) -> CoreResult<Vec<String>> {
-    use sea_orm::ConnectionTrait;
-    let rows = db
-        .query_all(sea_orm::Statement::from_string(
-            sea_orm::DatabaseBackend::Sqlite,
-            format!("PRAGMA {schema}.table_info(\"{table}\");"),
-        ))
+    use sqlx::Row;
+    let rows = sqlx::query(&format!("PRAGMA {schema}.table_info(\"{table}\");"))
+        .fetch_all(&mut **conn)
         .await
-        .map_err(db_err(&format!("读取表 {table} 结构")))?;
-    let mut cols = Vec::new();
-    for r in &rows {
-        let name: String = r
-            .try_get_by_index(1)
-            .map_err(|e| CoreError::internal(format!("解析表 {table} 列名失败: {e}")))?;
-        cols.push(name);
-    }
-    Ok(cols)
-}
-
-/// 把底层 DbErr 透传进恢复错误的 message(恢复是运维诊断场景,需要真因;不套统一抹平)。
-fn db_err(what: &str) -> impl Fn(sea_orm::DbErr) -> CoreError + '_ {
-    move |e| CoreError::internal(format!("{what}失败: {e}"))
+        .map_err(|e| CoreError::internal(format!("读取表 {table} 结构失败: {e}")))?;
+    Ok(rows.iter().map(|r| r.get::<String, _>(1)).collect())
 }
