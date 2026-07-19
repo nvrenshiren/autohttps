@@ -13,6 +13,7 @@ pub mod executor;
 pub mod local_ca;
 pub mod pagination;
 pub mod settings;
+pub mod sync;
 pub mod tasks;
 
 pub use context::CoreContext;

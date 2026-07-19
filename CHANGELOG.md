@@ -6,6 +6,8 @@
 
 ### Added
 
+- **WebDAV 备份同步(手动快照)**:设置页配置 WebDAV(口令经 SecretStore 存引用、库内不存本体),一键把「一致性库快照(VACUUM INTO)+ 全部密钥材料」打包 zip、用用户口令(age passphrase,≥10 位)整包加密后上传;支持测试连接、远端备份列表(PROPFIND)、覆盖式恢复(恢复前先归档现场可回滚,完成后提示重启生效)。
+- 新增 `sync_configs` 单例表(迁移 m20260719_000002)与 `/api/sync/*` REST 面(webdav-config 读写删 / test / backup / backups / restore)。
 - 服务层集成测试(内存 SQLite + 临时数据目录):boot 崩溃恢复、证书创建/续签/吊销/重试/删除门控、任务取消回退。
 - 领域规则单元测试:证书 10 态状态机判定(`can_renew`/`can_revoke`/`can_retry`/待处理集等)与枚举 wire 值(snake_case)锁定。
 - 工具函数单元测试:UUIDv7 生成、RFC3339 解析/回读、`days_until` 边界(未来/过去/取整)。

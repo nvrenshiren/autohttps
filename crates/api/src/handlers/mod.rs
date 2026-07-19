@@ -8,4 +8,5 @@ pub mod domains;
 pub mod events;
 pub mod local_ca;
 pub mod settings;
+pub mod sync;
 pub mod tasks;

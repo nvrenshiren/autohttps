@@ -70,6 +70,20 @@ pub enum ErrorCode {
     TaskNotRetryable,
     TaskNotCancellable,
     CertificateDeleted,
+
+    // --- sync(WebDAV 备份)---
+    /// 连接超时/网络不可达(502 下游)。
+    SyncUnreachable,
+    /// 凭据无效或无权限(401 上游语义 → 502)。
+    SyncAuthFailed,
+    /// 远端路径/备份文件不存在(404 下游)。
+    SyncRemoteNotFound,
+    /// 远端其他错误(502)。
+    SyncRemoteError,
+    /// 备份口令错误/包损坏(422)。
+    SyncPassphraseWrong,
+    /// 未配置 WebDAV(409:前置缺失)。
+    SyncNotConfigured,
 }
 
 impl ErrorCode {
@@ -121,6 +135,11 @@ impl ErrorCode {
 
             NotImplemented => 501,
             InternalError => 500,
+
+            // sync:口令/格式 → 422;未配置 → 409;远端问题 → 502 下游错误
+            SyncPassphraseWrong => 422,
+            SyncNotConfigured | SyncRemoteNotFound => 409,
+            SyncUnreachable | SyncAuthFailed | SyncRemoteError => 502,
         }
     }
 }

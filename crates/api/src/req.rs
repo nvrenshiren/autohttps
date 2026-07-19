@@ -200,3 +200,32 @@ pub struct RootCaListQuery {
     pub sort: Option<String>,
     pub order: Option<String>,
 }
+
+// ============ sync(WebDAV 备份)============
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PutSyncConfigRequest {
+    /// 远端目录完整 URL(含远程路径)。
+    pub base_url: String,
+    pub username: String,
+    /// 口令:缺省 = 保留已存;空串 = 清除;非空 = 重写。读取永不回传。
+    #[serde(default)]
+    pub password: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupNowRequest {
+    /// 备份加密口令(最少 10 位;口令即私钥最后防线)。
+    pub passphrase: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreRequest {
+    /// 远端备份文件名(来自 GET /sync/backups 列表)。
+    pub remote_name: String,
+    /// 备份时的加密口令。
+    pub passphrase: String,
+}

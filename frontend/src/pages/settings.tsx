@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { ApiError } from "@/lib/api";
+import { WebdavSyncCard } from "@/pages/settings-webdav";
 
 interface FormState {
   renewalAdvanceDays: number;
@@ -264,6 +265,9 @@ export function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* WebDAV 备份同步(手动快照备份/恢复) */}
+      <WebdavSyncCard />
 
       {/* 数据存储(只读) */}
       <Card>

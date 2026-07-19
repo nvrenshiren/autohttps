@@ -60,5 +60,18 @@ hickory-resolver = { version = "0.25", default-features = false, features = [
 p12-keystore = "0.2.1"
 pem = "3.0.6"
 
+# --- WebDAV 备份同步(sync 模块)---
+# HTTP 栈复用 instant-acme 已引入的 hyper + hyper-rustls(platform-verifier 原生根证书),
+# 不引入 reqwest(保持依赖面与构建成本)。zip 用于备份包打包(api 证书导出同款)。
+hyper = { version = "1", default-features = false }
+hyper-util = { version = "0.1", features = ["client", "client-legacy", "tokio"] }
+hyper-rustls = { version = "0.27", default-features = false, features = [
+    "http1",
+    "rustls-platform-verifier",
+] }
+http-body-util = "0.1"
+base64 = "0.22"
+zip = { version = "5.0.1", default-features = false, features = ["deflate"] }
+
 [dev-dependencies]
 tempfile = "3"

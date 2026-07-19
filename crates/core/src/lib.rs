@@ -12,6 +12,7 @@ pub mod persistence;
 pub mod scan;
 pub mod secrets;
 pub mod services;
+pub mod sync;
 pub mod util;
 
 pub use domain::enums;

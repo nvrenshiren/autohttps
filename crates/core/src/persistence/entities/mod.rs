@@ -12,5 +12,6 @@ pub mod http01_validation_configs;
 pub mod internal_cert_revocations;
 pub mod root_cas;
 pub mod settings;
+pub mod sync_configs;
 pub mod task_log_entries;
 pub mod tasks;

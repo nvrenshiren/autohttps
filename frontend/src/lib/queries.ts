@@ -64,6 +64,8 @@ export const qk = {
   challenges: ["challenges"] as const,
   challengesByCert: (certificateId: string) => ["challenges", certificateId] as const,
   challenge: (id: string) => ["challenge", id] as const,
+  syncConfig: ["sync-config"] as const,
+  syncBackups: ["sync-backups"] as const,
 };
 
 // ---------- app-info / dashboard ----------
@@ -228,6 +230,88 @@ export function useUpdateSettings() {
   return useMutation({
     mutationFn: (body: UpdateSettingsRequest) => api.patch<SettingsView>("/settings", body),
     onSuccess: (data) => qc.setQueryData(qk.settings, data),
+  });
+}
+
+// ---------- sync(WebDAV 备份)----------
+
+export interface SyncConfigView {
+  configured: boolean;
+  baseUrl: string | null;
+  username: string | null;
+  passwordSet: boolean;
+  lastBackupAt: string | null;
+  lastBackupResult: string | null;
+  lastBackupError: string | null;
+}
+
+export interface RemoteBackupItem {
+  name: string;
+  size: number | null;
+  modified: string | null;
+}
+
+export interface RestoreOutcome {
+  restoredFrom: string;
+  backupCreatedAt: string;
+  secretsRestored: number;
+  requiresRestart: boolean;
+}
+
+export function useSyncConfig() {
+  return useQuery({
+    queryKey: qk.syncConfig,
+    queryFn: () => api.get<SyncConfigView>("/sync/webdav-config"),
+  });
+}
+
+export function useSaveSyncConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      baseUrl: string;
+      username: string;
+      password?: string;
+    }) => api.put<SyncConfigView>("/sync/webdav-config", body),
+    onSuccess: (data) => qc.setQueryData(qk.syncConfig, data),
+  });
+}
+
+export function useDeleteSyncConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.del("/sync/webdav-config"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.syncConfig }),
+  });
+}
+
+export function useTestSyncConnection() {
+  return useMutation({
+    mutationFn: () => api.post<{ ok: boolean }>("/sync/test"),
+  });
+}
+
+export function useBackupNow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (passphrase: string) =>
+      api.post<RemoteBackupItem>("/sync/backup", { passphrase }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.syncConfig }),
+  });
+}
+
+export function useRemoteBackups(enabled: boolean) {
+  return useQuery({
+    queryKey: qk.syncBackups,
+    queryFn: () => api.get<RemoteBackupItem[]>("/sync/backups"),
+    enabled,
+  });
+}
+
+export function useRestoreBackup() {
+  return useMutation({
+    mutationFn: (body: { remoteName: string; passphrase: string }) =>
+      api.post<RestoreOutcome>("/sync/restore", body),
   });
 }
 

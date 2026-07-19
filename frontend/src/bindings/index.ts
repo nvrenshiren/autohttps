@@ -101,6 +101,12 @@ export type ErrorCode =
   | "task_not_retryable"
   | "task_not_cancellable"
   | "certificate_deleted"
+  | "sync_unreachable"
+  | "sync_auth_failed"
+  | "sync_remote_not_found"
+  | "sync_remote_error"
+  | "sync_passphrase_wrong"
+  | "sync_not_configured"
   | (string & {}); // 兜底:未来新增码不至于类型错
 
 // ============ 通用 ============

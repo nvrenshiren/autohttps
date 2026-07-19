@@ -22,7 +22,8 @@ use axum::http::{HeaderValue, Request, Response};
 use axum::routing::{get, post};
 use axum::Router;
 use handlers::{
-    acme, app_info, certificates, dashboard, domains, events as sse, local_ca, settings, tasks,
+    acme, app_info, certificates, dashboard, domains, events as sse, local_ca, settings, sync,
+    tasks,
 };
 use state::AppState;
 use tower_http::cors::CorsLayer;
@@ -62,6 +63,17 @@ pub fn app(ctx: CoreContext) -> Router {
         )
         // --- settings ---
         .route("/settings", get(settings::get).patch(settings::patch))
+        // --- sync(WebDAV 备份)---
+        .route(
+            "/sync/webdav-config",
+            get(sync::get_config)
+                .put(sync::put_config)
+                .delete(sync::delete_config),
+        )
+        .route("/sync/test", post(sync::test))
+        .route("/sync/backup", post(sync::backup))
+        .route("/sync/backups", get(sync::list_backups))
+        .route("/sync/restore", post(sync::restore))
         // --- tasks ---
         .route("/tasks", get(tasks::list))
         .route("/tasks/{id}", get(tasks::get))

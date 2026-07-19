@@ -415,7 +415,12 @@ version = "0.1.0"
 dependencies = [
  "age",
  "anyhow",
+ "base64 0.22.1",
  "hickory-resolver",
+ "http-body-util",
+ "hyper",
+ "hyper-rustls",
+ "hyper-util",
  "instant-acme",
  "p12-keystore",
  "pem",
@@ -436,6 +441,7 @@ dependencies = [
  "ts-rs",
  "uuid",
  "x509-parser",
+ "zip",
 ]
 
 [[package]]
