@@ -6,7 +6,7 @@
 
 use crate::domain::enums::TaskStatus;
 use crate::domain::error::CoreResult;
-use crate::persistence::entities::{acme_accounts, certificates, root_cas, tasks};
+use crate::persistence::entities::{acme_accounts, certificates, root_cas, sync_configs, tasks};
 use crate::services::context::CoreContext;
 use crate::util::now_rfc3339;
 use sea_orm::*;
@@ -40,7 +40,8 @@ pub async fn recover_tasks(ctx: &CoreContext) -> CoreResult<u64> {
 ///
 /// 多步写(先落密文、后写库行)中途崩溃会留下无引用的孤儿文件;boot 时对照
 /// `certificates.cert_pem_ref/private_key_ref`、`acme_accounts.account_key_ref`、
-/// `root_cas.private_key_ref` 的全集清扫。`master.key` 与非 `.age` 文件不动。返回清扫数。
+/// `root_cas.private_key_ref`、`sync_configs.password_ref` 的全集清扫。
+/// `master.key` 与非 `.age` 文件不动。返回清扫数。
 pub async fn sweep_orphan_secrets(ctx: &CoreContext) -> CoreResult<u64> {
     let db = &ctx.db;
     let mut live: HashSet<String> = HashSet::new();
@@ -61,6 +62,13 @@ pub async fn sweep_orphan_secrets(ctx: &CoreContext) -> CoreResult<u64> {
             .await?
             .into_iter()
             .map(|ca| ca.private_key_ref),
+    );
+    live.extend(
+        sync_configs::Entity::find()
+            .all(db)
+            .await?
+            .into_iter()
+            .filter_map(|s| s.password_ref),
     );
 
     let dir = ctx.data_dir.join("secrets");

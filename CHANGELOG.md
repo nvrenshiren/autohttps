@@ -23,6 +23,7 @@
 ### Fixed
 
 - 修复全部 clippy `doc_lazy_continuation` 文档警告(clippy 现零警告)。
+- 修复 WebDAV 恢复后重开应用「已存口令丢失需重输」:boot 孤儿密钥清扫漏算 `sync_configs.password_ref` 引用,每次启动把 WebDAV 口令密文当孤儿删掉;现纳入引用全集(回归测试锁定)。
 
 ## [0.1.0-dev] - 2026-07-18
 

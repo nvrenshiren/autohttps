@@ -4,7 +4,7 @@
 //! create 全链路(证书 + SAN 关联 + 入队任务)、delete 清理(任务取消 + 密钥文件移除)。
 
 use autohttps_core::enums::{CertificateStatus, IssuanceMethod, TaskStatus, TaskTrigger, TaskType};
-use autohttps_core::persistence::entities::{certificates, domains, tasks};
+use autohttps_core::persistence::entities::{certificates, domains, sync_configs, tasks};
 use autohttps_core::services::certificates::{self as cert_svc, IssueCertInput};
 use autohttps_core::services::{boot, tasks as task_svc};
 use autohttps_core::CoreContext;
@@ -427,4 +427,35 @@ async fn boot_sweeps_orphan_secret_files() {
     assert!(!secrets_dir.join("orphan-a.age").exists());
     assert!(!secrets_dir.join("orphan-b.age").exists());
     assert!(secrets_dir.join("master.key").exists(), "master.key 不动");
+}
+
+/// 回归:boot 清扫不得删掉 `sync_configs.password_ref` 引用的 WebDAV 口令密文。
+/// 漏算该引用会让每次启动都把已存口令当孤儿删掉 —— 表现为「重开应用后 WebDAV 密码丢失」。
+#[tokio::test]
+async fn boot_sweep_keeps_sync_password_secret() {
+    let (ctx, dir) = test_ctx().await;
+    let secrets_dir = dir.path().join("secrets");
+
+    ctx.secrets.store("webdav-pass", b"P4SS").unwrap();
+    let now = autohttps_core::util::now_rfc3339();
+    sync_configs::ActiveModel {
+        id: Set(sync_configs::SINGLETON_ID.to_string()),
+        base_url: Set("https://dav.example.com/autohttps/".to_string()),
+        username: Set("alice".to_string()),
+        password_ref: Set(Some("webdav-pass".to_string())),
+        last_backup_at: Set(None),
+        last_backup_result: Set(None),
+        last_backup_error: Set(None),
+        updated_at: Set(now),
+    }
+    .insert(&ctx.db)
+    .await
+    .expect("插同步配置失败");
+
+    let swept = boot::sweep_orphan_secrets(&ctx).await.expect("清扫失败");
+    assert_eq!(swept, 0, "被同步配置引用的口令不是孤儿");
+    assert!(
+        secrets_dir.join("webdav-pass.age").exists(),
+        "口令密文必须保留"
+    );
 }
