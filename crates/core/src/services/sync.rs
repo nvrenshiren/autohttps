@@ -445,6 +445,10 @@ pub async fn restore_db_from(ctx: &CoreContext, src: &std::path::Path) -> CoreRe
 }
 
 /// ATTACH 后的事务内逐表替换(独立成函数便于确保 DETACH 总能执行)。
+///
+/// 按**列名交集**对齐(非 `SELECT *`):备份与活跃库 schema 可能因版本差异列不一致
+/// (如恢复旧代码打的备份),`SELECT *` 会因列数不符直接报错。交集对齐容忍加列/删列;
+/// 只删活跃库中备份也有的表,备份没有的表(如新版新增表)保留现值不动。
 async fn restore_tables_via_attach(db: &sea_orm::DatabaseConnection) -> CoreResult<()> {
     use sea_orm::ConnectionTrait;
     // 目标表集合 = src 中的用户表(排除 sqlite_ 系统表)
@@ -454,7 +458,8 @@ async fn restore_tables_via_attach(db: &sea_orm::DatabaseConnection) -> CoreResu
             "SELECT name FROM src.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
                 .to_string(),
         ))
-        .await?;
+        .await
+        .map_err(db_err("读取备份库表清单"))?;
     let mut tables: Vec<String> = Vec::new();
     for r in &rows {
         let name: String = r
@@ -467,30 +472,84 @@ async fn restore_tables_via_attach(db: &sea_orm::DatabaseConnection) -> CoreResu
         sea_orm::DatabaseBackend::Sqlite,
         "BEGIN IMMEDIATE;".to_string(),
     ))
-    .await?;
+    .await
+    .map_err(db_err("开启恢复事务"))?;
     for t in &tables {
-        // 标识符引用(备份来自本应用,表名可信;仍加引号兜底)
-        let q = format!("DELETE FROM \"{t}\"; INSERT INTO \"{t}\" SELECT * FROM src.\"{t}\";",);
-        if let Err(e) = db
-            .execute(sea_orm::Statement::from_string(
-                sea_orm::DatabaseBackend::Sqlite,
-                q,
-            ))
-            .await
-        {
+        let result = restore_one_table(db, t).await;
+        if let Err(e) = result {
             let _ = db
                 .execute(sea_orm::Statement::from_string(
                     sea_orm::DatabaseBackend::Sqlite,
                     "ROLLBACK;".to_string(),
                 ))
                 .await;
-            return Err(e.into());
+            return Err(e);
         }
     }
     db.execute(sea_orm::Statement::from_string(
         sea_orm::DatabaseBackend::Sqlite,
         "COMMIT;".to_string(),
     ))
-    .await?;
+    .await
+    .map_err(db_err("提交恢复事务"))?;
     Ok(())
+}
+
+/// 单表替换:取活跃库与备份库的列名交集,按交集列 DELETE + INSERT(标识符加引号)。
+async fn restore_one_table(db: &sea_orm::DatabaseConnection, t: &str) -> CoreResult<()> {
+    use sea_orm::ConnectionTrait;
+    let main_cols = table_columns(db, "main", t).await?;
+    if main_cols.is_empty() {
+        // 活跃库没有这张表(备份来自更高版本)—— 跳过,不建表(避免引入未迁移 schema)
+        return Ok(());
+    }
+    let src_cols = table_columns(db, "src", t).await?;
+    let common: Vec<&String> = main_cols.iter().filter(|c| src_cols.contains(c)).collect();
+    if common.is_empty() {
+        return Ok(());
+    }
+    let cols = common
+        .iter()
+        .map(|c| format!("\"{c}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let q = format!(
+        "DELETE FROM \"{t}\"; INSERT INTO \"{t}\" ({cols}) SELECT {cols} FROM src.\"{t}\";",
+    );
+    db.execute(sea_orm::Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        q,
+    ))
+    .await
+    .map_err(db_err(&format!("恢复表 {t}")))?;
+    Ok(())
+}
+
+/// 读某 schema 下某表的列名(PRAGMA table_info)。
+async fn table_columns(
+    db: &sea_orm::DatabaseConnection,
+    schema: &str,
+    table: &str,
+) -> CoreResult<Vec<String>> {
+    use sea_orm::ConnectionTrait;
+    let rows = db
+        .query_all(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            format!("PRAGMA {schema}.table_info(\"{table}\");"),
+        ))
+        .await
+        .map_err(db_err(&format!("读取表 {table} 结构")))?;
+    let mut cols = Vec::new();
+    for r in &rows {
+        let name: String = r
+            .try_get_by_index(1)
+            .map_err(|e| CoreError::internal(format!("解析表 {table} 列名失败: {e}")))?;
+        cols.push(name);
+    }
+    Ok(cols)
+}
+
+/// 把底层 DbErr 透传进恢复错误的 message(恢复是运维诊断场景,需要真因;不套统一抹平)。
+fn db_err(what: &str) -> impl Fn(sea_orm::DbErr) -> CoreError + '_ {
+    move |e| CoreError::internal(format!("{what}失败: {e}"))
 }

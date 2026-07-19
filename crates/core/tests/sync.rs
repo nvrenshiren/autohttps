@@ -213,6 +213,84 @@ async fn online_restore_replaces_live_db_without_rename() {
     );
 }
 
+/// 跨 schema 恢复(列交集对齐的修复点):备份库比活跃库**多一列/多一张表**时,
+/// 恢复应按共有列对齐、跳过活跃库没有的表,而非因 `SELECT *` 列数不符报错。
+#[tokio::test]
+async fn restore_tolerates_wider_backup_schema() {
+    use sea_orm::ConnectionTrait;
+    let (ctx, dir) = test_ctx().await;
+    insert_domain(&ctx.db, "narrow.com").await;
+
+    // 造一个"更宽"的备份库:domains 多一列 extra_col、多一张 future_table
+    let wide = dir.path().join("wide.db");
+    let wdb = file_db(dir.path()).await; // 先建全量当前 schema(autohttps.db)
+    drop(wdb);
+    // 直接在 autohttps.db 上加列/加表,使它成为"未来版本"的库
+    ctx.db
+        .execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "ALTER TABLE domains ADD COLUMN extra_col TEXT;".to_string(),
+        ))
+        .await
+        .expect("加列");
+    ctx.db
+        .execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "CREATE TABLE future_table(id TEXT PRIMARY KEY, v TEXT);".to_string(),
+        ))
+        .await
+        .expect("加表");
+    ctx.db
+        .execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "INSERT INTO future_table VALUES('f1','future');".to_string(),
+        ))
+        .await
+        .expect("插 future 行");
+    ctx.db
+        .execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            format!(
+                "VACUUM INTO '{}';",
+                wide.to_string_lossy().replace('\\', "/")
+            ),
+        ))
+        .await
+        .expect("导出 wide 备份");
+    // 回滚活跃库到"当前"schema:去掉加的列/表(模拟恢复旧版本应用)
+    ctx.db
+        .execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "DROP TABLE future_table;".to_string(),
+        ))
+        .await
+        .expect("drop future");
+    ctx.db
+        .execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "ALTER TABLE domains DROP COLUMN extra_col;".to_string(),
+        ))
+        .await
+        .expect("drop extra_col");
+
+    // 用"更宽"的备份库做在线恢复:应成功(列交集对齐 + 跳过 future_table)
+    sync_svc::restore_db_from(&ctx, &wide)
+        .await
+        .expect("宽 schema 备份应可恢复");
+    let hosts: Vec<String> = domains::Entity::find()
+        .all(&ctx.db)
+        .await
+        .expect("查域名")
+        .into_iter()
+        .map(|d| d.hostname)
+        .collect();
+    assert_eq!(
+        hosts,
+        vec!["narrow.com".to_string()],
+        "共有列数据应正确还原"
+    );
+}
+
 #[tokio::test]
 async fn backup_rejects_short_and_wrong_passphrase() {
     let (ctx, dir) = test_ctx().await;
