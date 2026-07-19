@@ -68,7 +68,8 @@ async fn config_save_keeps_password_out_of_db() {
     let view = sync_svc::save_config(
         &ctx,
         SaveSyncConfigInput {
-            base_url: "https://dav.example.com/dav/autohttps".to_string(),
+            server_url: "https://dav.example.com/dav".to_string(),
+            remote_dir: Some("autohttps".to_string()),
             username: "alice".to_string(),
             password: Some("webdav-secret".to_string()),
         },
@@ -80,6 +81,11 @@ async fn config_save_keeps_password_out_of_db() {
         view.base_url.as_deref(),
         Some("https://dav.example.com/dav/autohttps/")
     );
+    assert_eq!(
+        view.server_url.as_deref(),
+        Some("https://dav.example.com/dav")
+    );
+    assert_eq!(view.remote_dir.as_deref(), Some("autohttps"));
 
     // 库内只有 ref,不出现口令本体
     let row = sync_configs::Entity::find_by_id("webdav")
@@ -92,11 +98,12 @@ async fn config_save_keeps_password_out_of_db() {
     let plain = ctx.secrets.load(&password_ref).expect("ref 可解密");
     assert_eq!(plain, b"webdav-secret");
 
-    // 更新时口令缺省 = 保留
+    // 更新时口令缺省 = 保留;远程目录缺省 = 默认 autohttps
     let view = sync_svc::save_config(
         &ctx,
         SaveSyncConfigInput {
-            base_url: "https://dav.example.com/other/".to_string(),
+            server_url: "https://dav.example.com".to_string(),
+            remote_dir: None,
             username: "alice".to_string(),
             password: None,
         },
@@ -104,6 +111,11 @@ async fn config_save_keeps_password_out_of_db() {
     .await
     .expect("改配置");
     assert!(view.password_set, "缺省口令应保留");
+    assert_eq!(
+        view.base_url.as_deref(),
+        Some("https://dav.example.com/autohttps/"),
+        "缺省远程目录应为 autohttps"
+    );
 
     // 清除配置连同口令密文
     sync_svc::delete_config(&ctx).await.expect("删配置");

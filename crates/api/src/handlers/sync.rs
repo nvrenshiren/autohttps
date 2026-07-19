@@ -17,7 +17,8 @@ pub async fn put_config(
     JsonBody(body): JsonBody<PutSyncConfigRequest>,
 ) -> ApiResult<Json<sync::SyncConfigView>> {
     let input = sync::SaveSyncConfigInput {
-        base_url: body.base_url,
+        server_url: body.server_url,
+        remote_dir: body.remote_dir,
         username: body.username,
         password: body.password,
     };

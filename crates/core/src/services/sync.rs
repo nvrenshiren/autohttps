@@ -20,8 +20,14 @@ const ARCHIVE_DIR_NAME: &str = "restore-archive";
 
 /// 对外暴露的配置视图(**不含口令**;`password_set` 告知前端是否已存口令)。
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncConfigView {
     pub configured: bool,
+    /// 服务器地址(不含远程目录;展示/回填用)。
+    pub server_url: Option<String>,
+    /// 远程目录(相对服务器根,备份文件与其他项目隔离;展示/回填用)。
+    pub remote_dir: Option<String>,
+    /// 拼好的完整远端目录 URL(server_url + remote_dir;实际请求目标)。
     pub base_url: Option<String>,
     pub username: Option<String>,
     pub password_set: bool,
@@ -33,13 +39,17 @@ pub struct SyncConfigView {
 /// 保存配置输入;`password: None` = 保留已存口令,`Some("")` = 清除口令。
 #[derive(Debug, Default)]
 pub struct SaveSyncConfigInput {
-    pub base_url: String,
+    /// 服务器地址(如 `https://dav.example.com/dav`;不带备份目录)。
+    pub server_url: String,
+    /// 远程目录(缺省 `autohttps/`;备份与同一 WebDAV 上其他项目隔离)。
+    pub remote_dir: Option<String>,
     pub username: String,
     pub password: Option<String>,
 }
 
 /// 远端备份文件项(展示用)。
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RemoteBackupItem {
     pub name: String,
     pub size: Option<u64>,
@@ -48,6 +58,7 @@ pub struct RemoteBackupItem {
 
 /// 恢复结果(写回成功后进程需重启以重连 DB/密钥缓存)。
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RestoreOutcome {
     pub restored_from: String,
     pub backup_created_at: String,
@@ -55,16 +66,52 @@ pub struct RestoreOutcome {
     pub requires_restart: bool,
 }
 
-/// 校验并归一 base_url:必须 http(s),剥末尾斜杠后再补一个(webdav 层拼名用)。
-fn normalize_url(raw: &str) -> CoreResult<String> {
-    let url = raw.trim();
+/// 默认远程目录(避免备份散在 WebDAV 根目录、与其他项目混杂)。
+pub const DEFAULT_REMOTE_DIR: &str = "autohttps";
+
+/// 校验并归一服务器地址:必须 http(s),不带末尾斜杠(目录由 remote_dir 拼接)。
+fn normalize_server_url(raw: &str) -> CoreResult<String> {
+    let url = raw.trim().trim_end_matches('/');
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return Err(CoreError::new(
             ErrorCode::ValidationFailed,
-            "WebDAV 地址须以 http:// 或 https:// 开头",
+            "WebDAV 服务器地址须以 http:// 或 https:// 开头",
         ));
     }
-    Ok(format!("{}/", url.trim_end_matches('/')))
+    Ok(url.to_string())
+}
+
+/// 归一远程目录:剥首尾斜杠;空 → 默认目录;拒绝上跳/反斜杠(防路径穿越出服务器根)。
+fn normalize_remote_dir(raw: Option<&str>) -> CoreResult<String> {
+    let dir = raw.unwrap_or(DEFAULT_REMOTE_DIR).trim().trim_matches('/');
+    if dir.is_empty() {
+        return Ok(DEFAULT_REMOTE_DIR.to_string());
+    }
+    if dir.contains("..") || dir.contains('\\') {
+        return Err(CoreError::new(
+            ErrorCode::ValidationFailed,
+            "远程目录不能包含 `..` 或反斜杠",
+        ));
+    }
+    Ok(dir.to_string())
+}
+
+/// 由服务器地址 + 远程目录拼完整 base_url(末尾带斜杠,webdav 层拼文件名用)。
+fn join_base_url(server_url: &str, remote_dir: &str) -> String {
+    format!("{server_url}/{remote_dir}/")
+}
+
+/// 从完整 base_url 拆回(服务器地址, 远程目录)供展示/回填。
+/// 拆不出目录段(历史数据/手填根目录)时,目录段为空串(前端显示为根目录)。
+fn split_base_url(base_url: &str) -> (String, String) {
+    let trimmed = base_url.trim_end_matches('/');
+    match trimmed.rfind('/') {
+        // 排除 scheme 的 `//`:`https://host` 整体算服务器地址,目录为空
+        Some(i) if i > trimmed.find("://").map(|s| s + 2).unwrap_or(0) => {
+            (trimmed[..i].to_string(), trimmed[i + 1..].to_string())
+        }
+        _ => (trimmed.to_string(), String::new()),
+    }
 }
 
 /// 读配置单例;未配置返回 None(读路径不隐式建行,避免半配置行)。
@@ -74,20 +121,27 @@ async fn find(ctx: &CoreContext) -> CoreResult<Option<sync_configs::Model>> {
         .await?)
 }
 
-/// 对外:读取配置视图(不含口令)。
+/// 对外:读取配置视图(不含口令;base_url 拆回服务器地址 + 远程目录供回填)。
 pub async fn get_config(ctx: &CoreContext) -> CoreResult<SyncConfigView> {
     Ok(match find(ctx).await? {
-        Some(m) => SyncConfigView {
-            configured: true,
-            base_url: Some(m.base_url),
-            username: Some(m.username),
-            password_set: m.password_ref.is_some(),
-            last_backup_at: m.last_backup_at,
-            last_backup_result: m.last_backup_result,
-            last_backup_error: m.last_backup_error,
-        },
+        Some(m) => {
+            let (server_url, remote_dir) = split_base_url(&m.base_url);
+            SyncConfigView {
+                configured: true,
+                server_url: Some(server_url),
+                remote_dir: Some(remote_dir),
+                base_url: Some(m.base_url),
+                username: Some(m.username),
+                password_set: m.password_ref.is_some(),
+                last_backup_at: m.last_backup_at,
+                last_backup_result: m.last_backup_result,
+                last_backup_error: m.last_backup_error,
+            }
+        }
         None => SyncConfigView {
             configured: false,
+            server_url: None,
+            remote_dir: None,
             base_url: None,
             username: None,
             password_set: false,
@@ -103,7 +157,9 @@ pub async fn save_config(
     ctx: &CoreContext,
     input: SaveSyncConfigInput,
 ) -> CoreResult<SyncConfigView> {
-    let base_url = normalize_url(&input.base_url)?;
+    let server_url = normalize_server_url(&input.server_url)?;
+    let remote_dir = normalize_remote_dir(input.remote_dir.as_deref())?;
+    let base_url = join_base_url(&server_url, &remote_dir);
     let username = input.username.trim().to_string();
     if username.is_empty() {
         return Err(CoreError::new(

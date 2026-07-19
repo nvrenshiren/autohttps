@@ -237,6 +237,11 @@ export function useUpdateSettings() {
 
 export interface SyncConfigView {
   configured: boolean;
+  /** 服务器地址(不含远程目录) */
+  serverUrl: string | null;
+  /** 远程目录(备份与其他项目隔离) */
+  remoteDir: string | null;
+  /** 拼好的完整远端目录 URL(实际请求目标) */
   baseUrl: string | null;
   username: string | null;
   passwordSet: boolean;
@@ -269,7 +274,8 @@ export function useSaveSyncConfig() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: {
-      baseUrl: string;
+      serverUrl: string;
+      remoteDir?: string;
       username: string;
       password?: string;
     }) => api.put<SyncConfigView>("/sync/webdav-config", body),

@@ -206,8 +206,11 @@ pub struct RootCaListQuery {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PutSyncConfigRequest {
-    /// 远端目录完整 URL(含远程路径)。
-    pub base_url: String,
+    /// 服务器地址(如 `https://dav.example.com/dav`,不含备份目录)。
+    pub server_url: String,
+    /// 远程目录(缺省 `autohttps`;备份与其他项目隔离)。
+    #[serde(default)]
+    pub remote_dir: Option<String>,
     pub username: String,
     /// 口令:缺省 = 保留已存;空串 = 清除;非空 = 重写。读取永不回传。
     #[serde(default)]

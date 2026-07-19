@@ -81,12 +81,14 @@ export function WebdavSyncCard() {
   const configured = config.data?.configured ?? false;
   const backups = useRemoteBackups(configured);
 
-  const [url, setUrl] = useState("");
+  const [serverUrl, setServerUrl] = useState("");
+  const [remoteDir, setRemoteDir] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   useEffect(() => {
     if (config.data) {
-      setUrl(config.data.baseUrl ?? "");
+      setServerUrl(config.data.serverUrl ?? "");
+      setRemoteDir(config.data.remoteDir ?? "");
       setUsername(config.data.username ?? "");
       // 口令不回显:已存则留空,占位文案提示
       setPassword("");
@@ -122,7 +124,8 @@ export function WebdavSyncCard() {
   const onSave = () => {
     save.mutate(
       {
-        baseUrl: url.trim(),
+        serverUrl: serverUrl.trim(),
+        remoteDir: remoteDir.trim() || undefined,
         username: username.trim(),
         // 口令留空且已存过 → 不传(保留);未存过且留空 → 也不传,由测试连接暴露缺口令
         ...(password !== "" ? { password } : {}),
@@ -186,14 +189,24 @@ export function WebdavSyncCard() {
       <CardContent className="space-y-4">
         {/* 配置表单 */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="webdavUrl">服务器地址(含远程路径)</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="webdavServer">服务器地址</Label>
             <Input
-              id="webdavUrl"
+              id="webdavServer"
               className="font-mono text-[13px]"
-              placeholder="https://dav.example.com/dav/autohttps/"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://dav.example.com/dav"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="webdavDir">远程目录</Label>
+            <Input
+              id="webdavDir"
+              className="font-mono text-[13px]"
+              placeholder="autohttps(默认)"
+              value={remoteDir}
+              onChange={(e) => setRemoteDir(e.target.value)}
             />
           </div>
           <div className="space-y-1.5">
@@ -217,8 +230,25 @@ export function WebdavSyncCard() {
             />
           </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          备份将上传到独立远程目录(默认 <span className="font-mono">autohttps/</span>),
+          与同一 WebDAV 上其他项目的文件隔离,不会散在根目录。
+        </p>
+        {configured && config.data?.baseUrl && (
+          <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs">
+            <span className="text-muted-foreground">备份位置:</span>{" "}
+            <span className="font-mono">{config.data.baseUrl}</span>
+            <span className="ml-2 text-muted-foreground">
+              · 用户 {config.data.username} · 口令{config.data.passwordSet ? "已保存" : "未设置"}
+            </span>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={onSave} disabled={save.isPending || !url.trim() || !username.trim()}>
+          <Button
+            size="sm"
+            onClick={onSave}
+            disabled={save.isPending || !serverUrl.trim() || !username.trim()}
+          >
             {save.isPending && <Loader2 className="animate-spin" />}
             保存配置
           </Button>
