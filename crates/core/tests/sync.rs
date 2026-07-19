@@ -293,6 +293,68 @@ async fn restore_tolerates_wider_backup_schema() {
     );
 }
 
+/// 密钥一致性(密码丢失修复的核心):备份带来的密文用**备份里的 master.key** 加密;
+/// 恢复全量替换 secrets + 清身份缓存后,备份里的密码应仍可解密(即恢复后密码不丢)。
+/// 同时验证:备份里没有的旧密文被清除(不残留孤儿/悬空 ref)。
+#[tokio::test]
+async fn restore_keeps_backup_secrets_decryptable_and_prunes_orphans() {
+    let (ctx, dir) = test_ctx().await;
+    // 备份时刻:存一份密码(用当时的 master.key 加密)
+    let backup_ref = autohttps_core::util::new_id();
+    ctx.secrets
+        .store(&backup_ref, b"WEBDAV PASSWORD")
+        .expect("存备份密码");
+    let db_path = dir.path().join("autohttps.db");
+    let encrypted = backup::pack_backup(&ctx.db, &db_path, dir.path(), "keep-secrets-pass", "t")
+        .await
+        .expect("打包");
+
+    // 备份后:master.key 轮换(模拟另一台机器/另一时刻)+ 多一份备份里没有的孤儿密文
+    let master_path = dir.path().join("secrets").join("master.key");
+    let backup_master = std::fs::read_to_string(&master_path).expect("读备份 master.key");
+    // 生成新身份顶掉磁盘 master.key(模拟"当前进程/机器"与备份不同 key)
+    std::fs::remove_file(&master_path).expect("删 master.key");
+    let orphan_ref = autohttps_core::util::new_id();
+    ctx.secrets.invalidate_identity_cache(); // 强制重读(会生成新 key)
+    ctx.secrets
+        .store(&orphan_ref, b"ORPHAN NOT IN BACKUP")
+        .expect("存孤儿密文");
+    let new_master = std::fs::read_to_string(&master_path).expect("读新 master.key");
+    assert_ne!(backup_master, new_master, "应已轮换 master.key");
+
+    // 恢复:parse + 全量替换 secrets(含 master.key 回滚到备份的)+ 清缓存
+    let parsed = backup::parse_backup(&encrypted, "keep-secrets-pass").expect("解析");
+    let secrets_dir = dir.path().join("secrets");
+    let incoming: std::collections::HashSet<&str> =
+        parsed.secrets.iter().map(|(n, _)| n.as_str()).collect();
+    for entry in std::fs::read_dir(&secrets_dir).unwrap().flatten() {
+        let n = entry.file_name();
+        let ns = n.to_str().unwrap().to_string();
+        if ns.ends_with(".age") && !incoming.contains(ns.as_str()) {
+            std::fs::remove_file(entry.path()).unwrap();
+        }
+    }
+    for (name, bytes) in &parsed.secrets {
+        std::fs::write(secrets_dir.join(name), bytes).unwrap();
+    }
+    ctx.secrets.invalidate_identity_cache(); // 清缓存:磁盘 master.key 已换回备份的
+
+    // 恢复+清缓存后:备份密码应可用备份的 master.key 解开(密码不丢)
+    let recovered = ctx.secrets.load(&backup_ref).expect("备份密码应仍可解密");
+    assert_eq!(recovered, b"WEBDAV PASSWORD");
+    // 孤儿密文已被清除(不在备份里)
+    assert!(
+        !secrets_dir.join(format!("{orphan_ref}.age")).exists(),
+        "备份之外的孤儿密文应被清除"
+    );
+    // master.key 已回滚到备份的
+    assert_eq!(
+        std::fs::read_to_string(&master_path).unwrap(),
+        backup_master,
+        "master.key 应回滚到备份版本"
+    );
+}
+
 #[tokio::test]
 async fn backup_rejects_short_and_wrong_passphrase() {
     let (ctx, dir) = test_ctx().await;

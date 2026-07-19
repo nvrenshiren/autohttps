@@ -380,10 +380,27 @@ pub async fn restore(
     restore_db_from(ctx, &incoming).await?;
     let _ = std::fs::remove_file(&incoming);
 
-    // 4) 密钥材料覆盖写(Windows 允许覆盖写,受限的是 rename;`.age` 密文不被本进程常驻打开)
+    // 4) 密钥材料以备份为准做**全量替换**(不是单纯覆盖写):
+    //    a) 删掉不在备份里的 `.age`(恢复后库里不再引用它们;残留会造成 ref 悬空/孤儿);
+    //    b) 写入备份带来的全部密文 + master.key;
+    //    c) 清身份缓存(磁盘 master.key 已换,进程缓存还是旧的会解不开/写错)。
     let secrets_dir = ctx.data_dir.join("secrets");
     std::fs::create_dir_all(&secrets_dir)
         .map_err(|e| CoreError::internal(format!("创建密钥目录失败: {e}")))?;
+    let incoming_names: std::collections::HashSet<&str> =
+        parsed.secrets.iter().map(|(n, _)| n.as_str()).collect();
+    if let Ok(rd) = std::fs::read_dir(&secrets_dir) {
+        for entry in rd.flatten() {
+            let name = entry.file_name();
+            let Some(name_str) = name.to_str() else {
+                continue;
+            };
+            if name_str.ends_with(".age") && !incoming_names.contains(name_str) {
+                // 备份里没有的旧密文:删除(恢复以备份为唯一真相)
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
     let mut restored = 0u32;
     for (name, bytes) in &parsed.secrets {
         std::fs::write(secrets_dir.join(name), bytes)
@@ -392,6 +409,11 @@ pub async fn restore(
             restored += 1;
         }
     }
+    ctx.secrets.invalidate_identity_cache();
+
+    // 5) 一致性对账:恢复后若库里的 `password_ref` 指向的密文不在备份里(ref 悬空),
+    //    把它置空 —— 让 UI 显示「口令未设置,需重新保存」,而不是留一个永远解不开的引用。
+    reconcile_password_ref(ctx).await?;
 
     Ok(RestoreOutcome {
         restored_from: remote_name.to_string(),
@@ -399,6 +421,34 @@ pub async fn restore(
         secrets_restored: restored,
         requires_restart: true,
     })
+}
+
+/// 恢复后对账 `sync_configs.password_ref`:悬空(密文文件不存在)则置空。
+/// WebDAV 口令在目标机器上需重新保存一次 —— 这是口令不随备份迁移的明确语义
+/// (口令密文用恢复来的 master.key 加密,但 ref 必须与库内行一致;不一致即视为未设置)。
+async fn reconcile_password_ref(ctx: &CoreContext) -> CoreResult<()> {
+    let Some(m) = find(ctx).await? else {
+        return Ok(());
+    };
+    let Some(password_ref) = &m.password_ref else {
+        return Ok(());
+    };
+    let path = ctx
+        .data_dir
+        .join("secrets")
+        .join(format!("{password_ref}.age"));
+    if path.exists() {
+        return Ok(()); // ref 有效,无需动
+    }
+    // 悬空:置空 + 记录原因(展示用)
+    let mut am: sync_configs::ActiveModel = m.into();
+    am.password_ref = Set(None);
+    am.last_backup_error = Set(Some(
+        "恢复后备份口令引用失效,请重新保存 WebDAV 密码".to_string(),
+    ));
+    am.updated_at = Set(now_rfc3339());
+    am.update(&ctx.db).await?;
+    Ok(())
 }
 
 /// 把当前活跃库在线导出到 `dest`(VACUUM INTO;不占源句柄,可在活跃连接上执行)。

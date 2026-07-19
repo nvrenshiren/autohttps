@@ -12,14 +12,16 @@ use age::secrecy::ExposeSecret;
 use age::x25519::{Identity, Recipient};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, RwLock};
 
 /// 敏感材料存储 —— 以数据目录下的 `secrets/` 子目录为根,age 加密。
 #[derive(Clone)]
 pub struct SecretStore {
     root: PathBuf,
     /// 主密钥(age 身份字符串 `AGE-SECRET-KEY-…`)—— 懒加载缓存,保 `new` 无副作用可克隆。
-    identity: Arc<OnceLock<String>>,
+    /// 用 `RwLock<Option>` 而非 `OnceLock`:WebDAV 恢复覆盖磁盘 `master.key` 后需能**清缓存**
+    /// (`OnceLock` 无法原地清除,会导致旧身份与磁盘不符)。
+    identity: Arc<RwLock<Option<String>>>,
 }
 
 impl std::fmt::Debug for SecretStore {
@@ -35,7 +37,7 @@ impl SecretStore {
     pub fn new(data_dir: &Path) -> Self {
         Self {
             root: data_dir.join("secrets"),
-            identity: Arc::new(OnceLock::new()),
+            identity: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -50,8 +52,19 @@ impl SecretStore {
 
     /// 取(必要时生成)主密钥身份。首次调用创建 `secrets/` 目录 + `master.key`。
     fn identity(&self) -> CoreResult<Identity> {
-        if let Some(s) = self.identity.get() {
-            return Identity::from_str(s)
+        // 快路径:已缓存
+        if let Some(s) = self.identity.read().ok().and_then(|g| g.clone()) {
+            return Identity::from_str(&s)
+                .map_err(|e| CoreError::internal(format!("主密钥解析失败: {e}")));
+        }
+        // 慢路径:读盘/生成并缓存
+        let mut guard = self
+            .identity
+            .write()
+            .map_err(|_| CoreError::internal("主密钥缓存锁已污染"))?;
+        if let Some(s) = guard.clone() {
+            // 并发下另一线程已填,直接用
+            return Identity::from_str(&s)
                 .map_err(|e| CoreError::internal(format!("主密钥解析失败: {e}")));
         }
         std::fs::create_dir_all(&self.root)
@@ -70,9 +83,19 @@ impl SecretStore {
             restrict_permissions(&key_path);
             s
         };
-        // 缓存(忽略竞态:单进程,先到者胜,值一致)。
-        let _ = self.identity.set(secret.clone());
+        *guard = Some(secret.clone());
+        drop(guard);
         Identity::from_str(&secret).map_err(|e| CoreError::internal(format!("主密钥解析失败: {e}")))
+    }
+
+    /// 清除主密钥身份缓存 —— WebDAV 恢复覆盖了磁盘上的 `master.key` 后调用。
+    /// 否则缓存里的旧身份与磁盘不符:后续 `load` 用旧 key 解不开恢复来的密文、
+    /// `store` 又用旧 key 加密并可能把旧 `master.key` 写回磁盘顶掉恢复结果。
+    /// 恢复语义本就要求重启进程,此为进程内兜底(调用方已提示重启)。
+    pub fn invalidate_identity_cache(&self) {
+        if let Ok(mut guard) = self.identity.write() {
+            *guard = None;
+        }
     }
 
     fn recipient(&self) -> CoreResult<Recipient> {
