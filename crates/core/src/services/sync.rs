@@ -2,7 +2,8 @@
 //!
 //! - 配置单例(`sync_configs` id='webdav');口令只经 `password` 入参写入,读取永远不回传;
 //! - 备份 = `sync::backup::pack_backup` 打包加密 → `webdav::upload`,结果落 last_backup_*;
-//! - 恢复 = `webdav::download` → **先归档现场** → `unpack_backup` 写回,返回 `requires_restart`。
+//! - 恢复 = `webdav::download` → `parse_backup`(内存校验)→ **在线写回**(ATTACH 逐表替换,
+//!   不挪动活跃库文件,规避 Windows 文件锁)→ 返回 `requires_restart`。
 //!
 //! 安全口径(AR4/L6):口令/备份口令绝不入库、绝不入日志;错误 message 不带 URL 凭据段。
 
@@ -328,9 +329,14 @@ async fn record_backup_result(
     Ok(())
 }
 
-/// 从远端恢复:下载 → **归档现场**(db + secrets 挪到 `restore-archive/`)→ 写回 → 要求重启。
+/// 从远端恢复(在线恢复,不挪动活跃库文件 —— Windows 下活跃库被本进程占用,rename 会
+/// 触发 os error 32):下载 → 解密解析(内存,任何失败都在写盘前返回)→ 用 `VACUUM INTO`
+/// 从备份库**反向导入**活跃库连接(单事务,句柄不动)→ 密钥材料覆盖写 → 要求重启。
 ///
-/// 注意:恢复写回的是另一个数据目录的 DB 与密钥材料,当前进程的 DB 连接与密钥缓存即失效,
+/// 回滚保障:恢复前的旧现场即「刚被覆盖的库」本身已随上一次备份留存于远端;
+/// 且本函数先把当前库 VACUUM INTO 到 `restore-archive/pre-restore.db`(在线,不占句柄)。
+///
+/// 注意:写回的是另一个数据目录的密钥材料,当前进程的密钥缓存即失效,
 /// 必须由宿主形态重启应用(server 重启进程 / desktop 重启 App)。
 pub async fn restore(
     ctx: &CoreContext,
@@ -352,43 +358,139 @@ pub async fn restore(
     let cfg = require_webdav(ctx).await?;
     let encrypted = webdav::download(&cfg, remote_name).await?;
 
-    let db_path = ctx.data_dir.join("autohttps.db");
-    let secrets_dir = ctx.data_dir.join("secrets");
-    let archive_dir = ctx.data_dir.join(ARCHIVE_DIR_NAME);
+    // 解密 + 解析(内存;口令错/包损坏在此即返回,尚未写任何盘)
+    let parsed = backup::parse_backup(&encrypted, passphrase)?;
 
-    // 归档现场(若归档目录已存在先清掉——上次恢复留下的旧现场)
-    if archive_dir.exists() {
-        std::fs::remove_dir_all(&archive_dir)
-            .map_err(|e| CoreError::internal(format!("清理旧归档目录失败: {e}")))?;
-    }
+    let archive_dir = ctx.data_dir.join(ARCHIVE_DIR_NAME);
     std::fs::create_dir_all(&archive_dir)
         .map_err(|e| CoreError::internal(format!("创建归档目录失败: {e}")))?;
-    if db_path.exists() {
-        std::fs::rename(&db_path, archive_dir.join("autohttps.db"))
-            .map_err(|e| CoreError::internal(format!("归档当前数据库失败: {e}")))?;
-    }
-    if secrets_dir.exists() {
-        std::fs::rename(&secrets_dir, archive_dir.join("secrets"))
-            .map_err(|e| CoreError::internal(format!("归档当前密钥目录失败: {e}")))?;
-    }
 
-    // 写回(失败时尝试把现场挪回来,尽力而为)
-    let report = match backup::unpack_backup(&encrypted, passphrase, &ctx.data_dir, &db_path) {
-        Ok(r) => r,
-        Err(e) => {
-            let _ = std::fs::remove_file(&db_path);
-            let _ = std::fs::remove_dir_all(&secrets_dir);
-            let _ = std::fs::rename(archive_dir.join("autohttps.db"), &db_path);
-            let _ = std::fs::rename(archive_dir.join("secrets"), &secrets_dir);
-            let _ = std::fs::remove_dir_all(&archive_dir);
-            return Err(e);
+    // 1) 备份库快照落临时文件(VACUUM INTO 需要一个磁盘上的源库)
+    let incoming = archive_dir.join("incoming.db");
+    std::fs::write(&incoming, &parsed.db_bytes)
+        .map_err(|e| CoreError::internal(format!("暂存备份库失败: {e}")))?;
+
+    // 2) 当前现场在线备份(不占句柄):活跃库 VACUUM INTO → pre-restore.db(可回滚)
+    let pre_restore = archive_dir.join("pre-restore.db");
+    let _ = std::fs::remove_file(&pre_restore);
+    vacuum_into(ctx, &pre_restore).await?;
+
+    // 3) 在线恢复:把备份库内容导入活跃库
+    //    SQLite 没有直接 "import from file",用 ATTACH + 逐表复制;在事务内完成。
+    restore_db_from(ctx, &incoming).await?;
+    let _ = std::fs::remove_file(&incoming);
+
+    // 4) 密钥材料覆盖写(Windows 允许覆盖写,受限的是 rename;`.age` 密文不被本进程常驻打开)
+    let secrets_dir = ctx.data_dir.join("secrets");
+    std::fs::create_dir_all(&secrets_dir)
+        .map_err(|e| CoreError::internal(format!("创建密钥目录失败: {e}")))?;
+    let mut restored = 0u32;
+    for (name, bytes) in &parsed.secrets {
+        std::fs::write(secrets_dir.join(name), bytes)
+            .map_err(|e| CoreError::internal(format!("写入密钥材料失败: {e}")))?;
+        if name != "master.key" {
+            restored += 1;
         }
-    };
+    }
 
     Ok(RestoreOutcome {
         restored_from: remote_name.to_string(),
-        backup_created_at: report.manifest.created_at,
-        secrets_restored: report.secrets_restored,
+        backup_created_at: parsed.manifest.created_at,
+        secrets_restored: restored,
         requires_restart: true,
     })
+}
+
+/// 把当前活跃库在线导出到 `dest`(VACUUM INTO;不占源句柄,可在活跃连接上执行)。
+async fn vacuum_into(ctx: &CoreContext, dest: &std::path::Path) -> CoreResult<()> {
+    use sea_orm::ConnectionTrait;
+    let dest_str = dest.to_string_lossy().replace('\\', "/");
+    ctx.db
+        .execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            format!("VACUUM INTO '{}';", dest_str.replace('\'', "''")),
+        ))
+        .await?;
+    Ok(())
+}
+
+/// 在线把 `src` 库文件的内容导入活跃库(ATTACH + 逐表替换,事务内)。
+///
+/// 备份来自同应用,schema 一致;迁移表一并替换以保持版本记录一致。
+/// 对外仅经 `restore` 调用;`pub` 仅供集成测试直接驱动该核心路径(Windows 文件锁修复点)。
+#[doc(hidden)]
+pub async fn restore_db_from(ctx: &CoreContext, src: &std::path::Path) -> CoreResult<()> {
+    use sea_orm::ConnectionTrait;
+    let db = &ctx.db;
+    let src_str = src.to_string_lossy().replace('\\', "/");
+    let esc = src_str.replace('\'', "''");
+
+    // 逐表复制需在事务外 ATTACH(ATTACH 可在事务内,但为清晰起见先 ATTACH 再开事务)
+    db.execute(sea_orm::Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        format!("ATTACH DATABASE '{esc}' AS src;"),
+    ))
+    .await?;
+
+    let result = restore_tables_via_attach(db).await;
+
+    // 无论成败都 DETACH(尽力而为)
+    let _ = db
+        .execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "DETACH DATABASE src;".to_string(),
+        ))
+        .await;
+    result
+}
+
+/// ATTACH 后的事务内逐表替换(独立成函数便于确保 DETACH 总能执行)。
+async fn restore_tables_via_attach(db: &sea_orm::DatabaseConnection) -> CoreResult<()> {
+    use sea_orm::ConnectionTrait;
+    // 目标表集合 = src 中的用户表(排除 sqlite_ 系统表)
+    let rows = db
+        .query_all(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "SELECT name FROM src.sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+                .to_string(),
+        ))
+        .await?;
+    let mut tables: Vec<String> = Vec::new();
+    for r in &rows {
+        let name: String = r
+            .try_get_by_index(0)
+            .map_err(|e| CoreError::internal(format!("读取备份库表名失败: {e}")))?;
+        tables.push(name);
+    }
+
+    db.execute(sea_orm::Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        "BEGIN IMMEDIATE;".to_string(),
+    ))
+    .await?;
+    for t in &tables {
+        // 标识符引用(备份来自本应用,表名可信;仍加引号兜底)
+        let q = format!("DELETE FROM \"{t}\"; INSERT INTO \"{t}\" SELECT * FROM src.\"{t}\";",);
+        if let Err(e) = db
+            .execute(sea_orm::Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                q,
+            ))
+            .await
+        {
+            let _ = db
+                .execute(sea_orm::Statement::from_string(
+                    sea_orm::DatabaseBackend::Sqlite,
+                    "ROLLBACK;".to_string(),
+                ))
+                .await;
+            return Err(e.into());
+        }
+    }
+    db.execute(sea_orm::Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        "COMMIT;".to_string(),
+    ))
+    .await?;
+    Ok(())
 }

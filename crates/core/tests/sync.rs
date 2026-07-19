@@ -171,6 +171,48 @@ async fn backup_pack_unpack_roundtrip_restores_db_and_secrets() {
     assert_eq!(plain, b"PRIVATE KEY BYTES");
 }
 
+/// 在线恢复(Windows 文件锁修复的核心路径):活跃库连接仍开着时,直接 ATTACH 备份库逐表替换,
+/// 不 rename 库文件。验证替换后内容来自备份、且连接仍可用。
+#[tokio::test]
+async fn online_restore_replaces_live_db_without_rename() {
+    let (ctx, dir) = test_ctx().await;
+    insert_domain(&ctx.db, "live-only.com").await;
+    let key_ref = autohttps_core::util::new_id();
+    ctx.secrets.store(&key_ref, b"LIVE KEY").expect("存密钥");
+
+    // 备份(此刻库里有 live-only.com)
+    let db_path = dir.path().join("autohttps.db");
+    let encrypted = backup::pack_backup(&ctx.db, &db_path, dir.path(), "online-restore-pass", "t")
+        .await
+        .expect("打包");
+
+    // 备份后改动现场:加一行(应被恢复覆盖回只剩 live-only.com)
+    insert_domain(&ctx.db, "post-backup.com").await;
+
+    // 走服务层真实在线恢复核心:parse(内存)+ restore_db_from(ATTACH 逐表替换)
+    let parsed = backup::parse_backup(&encrypted, "online-restore-pass").expect("解析");
+    let incoming = dir.path().join("restore-archive").join("incoming.db");
+    std::fs::create_dir_all(incoming.parent().unwrap()).unwrap();
+    std::fs::write(&incoming, &parsed.db_bytes).unwrap();
+    sync_svc::restore_db_from(&ctx, &incoming)
+        .await
+        .expect("在线恢复");
+
+    // 活跃连接仍在用,恢复后只剩备份时的那一行
+    let hosts: Vec<String> = domains::Entity::find()
+        .all(&ctx.db)
+        .await
+        .expect("查域名")
+        .into_iter()
+        .map(|d| d.hostname)
+        .collect();
+    assert_eq!(
+        hosts,
+        vec!["live-only.com".to_string()],
+        "应回到备份时刻的内容"
+    );
+}
+
 #[tokio::test]
 async fn backup_rejects_short_and_wrong_passphrase() {
     let (ctx, dir) = test_ctx().await;

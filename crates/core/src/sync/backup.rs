@@ -170,15 +170,21 @@ pub struct RestoreReport {
     pub secrets_restored: u32,
 }
 
-/// 解包口令加密的备份包,把 DB 与 secrets 写回数据目录(调用方负责先归档现场 + 停库)。
+/// 解包后的内存内容(不落地):供「在线恢复」用 —— 由调用方决定 DB 以何种方式写回
+/// (离线覆盖 / 在线 VACUUM INTO 反向导入),避免挪动活跃库文件(Windows 文件锁)。
+#[derive(Debug)]
+pub struct UnpackedBackup {
+    pub manifest: BackupManifest,
+    /// DB 快照字节(包内 `autohttps.db`)。
+    pub db_bytes: Vec<u8>,
+    /// 密钥材料(文件名 → 密文字节;含 `master.key`)。已做路径穿越过滤。
+    pub secrets: Vec<(String, Vec<u8>)>,
+}
+
+/// 口令解密 + zip 解析 + manifest 校验,返回内存内容(不落任何盘)。
 ///
-/// `db_path` 为目标库文件路径(通常 `<data_dir>/autohttps.db`)。
-pub fn unpack_backup(
-    encrypted: &[u8],
-    passphrase: &str,
-    data_dir: &Path,
-    db_path: &Path,
-) -> CoreResult<RestoreReport> {
+/// 任何一步失败(口令错/包损坏/版本不符)都在**写盘之前**返回,是在线恢复的安全前置。
+pub fn parse_backup(encrypted: &[u8], passphrase: &str) -> CoreResult<UnpackedBackup> {
     let zip_bytes = passphrase_decrypt(passphrase, encrypted)?;
     let mut archive = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes))
         .map_err(|e| CoreError::internal(format!("备份包损坏(非 zip): {e}")))?;
@@ -202,7 +208,7 @@ pub fn unpack_backup(
         )));
     }
 
-    // 还原 DB(写前调用方已归档;此处直接覆盖目标路径)
+    // DB 快照(内存)
     let db_bytes = {
         let mut db_entry = archive
             .by_name(DB_SNAPSHOT_NAME)
@@ -213,50 +219,69 @@ pub fn unpack_backup(
             .map_err(|e| CoreError::internal(format!("读取数据库快照失败: {e}")))?;
         db_bytes
     };
-    if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| CoreError::internal(format!("创建数据目录失败: {e}")))?;
-    }
-    std::fs::write(db_path, &db_bytes)
-        .map_err(|e| CoreError::internal(format!("写入数据库失败: {e}")))?;
 
-    // 还原 secrets:先收集合法条目名,再逐条借用读取(防路径穿越:只取文件名部分)
-    let secrets_dir: PathBuf = data_dir.join("secrets");
-    std::fs::create_dir_all(&secrets_dir)
-        .map_err(|e| CoreError::internal(format!("创建密钥目录失败: {e}")))?;
-    let mut secret_names: Vec<String> = Vec::new();
+    // secrets(内存;防路径穿越:只取文件名部分)
+    let mut secrets: Vec<(String, Vec<u8>)> = Vec::new();
     for i in 0..archive.len() {
-        let entry = archive
+        let mut entry = archive
             .by_index(i)
             .map_err(|e| CoreError::internal(format!("读取备份条目失败: {e}")))?;
         let name = entry.name().to_string();
         let Some(rest) = name.strip_prefix(SECRETS_PREFIX) else {
             continue;
         };
-        // 防路径穿越:拒绝含路径分隔/上跳的条目名
         if rest.is_empty() || rest.contains('/') || rest.contains('\\') || rest.contains("..") {
             continue;
         }
-        secret_names.push(rest.to_string());
-    }
-    let mut restored = 0u32;
-    for rest in secret_names {
-        let mut entry = archive
-            .by_name(&format!("{SECRETS_PREFIX}{rest}"))
-            .map_err(|e| CoreError::internal(format!("读取密钥条目失败: {e}")))?;
         let mut bytes = Vec::new();
         entry
             .read_to_end(&mut bytes)
             .map_err(|e| CoreError::internal(format!("读取密钥条目失败: {e}")))?;
-        std::fs::write(secrets_dir.join(&rest), &bytes)
+        secrets.push((rest.to_string(), bytes));
+    }
+
+    Ok(UnpackedBackup {
+        manifest,
+        db_bytes,
+        secrets,
+    })
+}
+
+/// 解包口令加密的备份包,把 DB 与 secrets 写回数据目录(离线恢复:调用方负责先归档现场 + 停库)。
+///
+/// `db_path` 为目标库文件路径(通常 `<data_dir>/autohttps.db`)。
+/// 进程持有库连接的场景请用 `parse_backup` + 在线写回,勿用本函数(Windows 文件锁)。
+pub fn unpack_backup(
+    encrypted: &[u8],
+    passphrase: &str,
+    data_dir: &Path,
+    db_path: &Path,
+) -> CoreResult<RestoreReport> {
+    let parsed = parse_backup(encrypted, passphrase)?;
+
+    // 还原 DB(写前调用方已归档;此处直接覆盖目标路径)
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| CoreError::internal(format!("创建数据目录失败: {e}")))?;
+    }
+    std::fs::write(db_path, &parsed.db_bytes)
+        .map_err(|e| CoreError::internal(format!("写入数据库失败: {e}")))?;
+
+    // 还原 secrets(覆盖写;防路径穿越已在 parse_backup 过滤)
+    let secrets_dir: PathBuf = data_dir.join("secrets");
+    std::fs::create_dir_all(&secrets_dir)
+        .map_err(|e| CoreError::internal(format!("创建密钥目录失败: {e}")))?;
+    let mut restored = 0u32;
+    for (name, bytes) in &parsed.secrets {
+        std::fs::write(secrets_dir.join(name), bytes)
             .map_err(|e| CoreError::internal(format!("写入密钥材料失败: {e}")))?;
-        if rest != "master.key" {
+        if name != "master.key" {
             restored += 1;
         }
     }
 
     Ok(RestoreReport {
-        manifest,
+        manifest: parsed.manifest,
         secrets_restored: restored,
     })
 }
