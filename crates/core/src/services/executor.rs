@@ -506,6 +506,37 @@ async fn run_acme_issue_or_renew(
                 })?;
 
             match domain.validation_method {
+                // CA 复用仍在有效期内的授权(签发缓存,LE ~30 天):不下发任何挑战,
+                // 该域名直接视为已验证 —— 记一条 passed 挑战行(审计/展示),不再取挑战。
+                _ if authz.status == instant_acme::AuthorizationStatus::Valid => {
+                    let challenge_id = insert_challenge(
+                        ctx,
+                        &task.id,
+                        &domain.id,
+                        domain.validation_method.expect("上文已校验验证方式非空"),
+                        ChallengeFields {
+                            authorization_url: Some(order_url.clone()),
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+                    update_challenge_status(
+                        ctx,
+                        &challenge_id,
+                        &task.id,
+                        &domain.id,
+                        ChallengeStatus::Passed,
+                        None,
+                    )
+                    .await?;
+                    log(
+                        ctx,
+                        &task.id,
+                        "info",
+                        &format!("域名 {identifier}:复用仍在有效期内的授权,无需重复验证"),
+                    )
+                    .await?;
+                }
                 Some(ValidationMethod::Http01) => {
                     let Some(mut challenge) = authz.challenge(ChallengeType::Http01) else {
                         return Err(CoreError::internal(format!(
