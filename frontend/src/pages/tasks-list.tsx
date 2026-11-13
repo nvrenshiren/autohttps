@@ -137,7 +137,7 @@ export function TasksListPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="任务与历史"
         description="签发 / 续签 / 吊销任务的队列与历史统一视图;失败可重试、进行中可取消。"

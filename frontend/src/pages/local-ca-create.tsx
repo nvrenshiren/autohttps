@@ -132,7 +132,7 @@ export function RootCaCreatePage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-3xl p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="新增根 CA"
         crumbs={[{ label: "根 CA", to: "/local-ca" }, { label: "新增" }]}

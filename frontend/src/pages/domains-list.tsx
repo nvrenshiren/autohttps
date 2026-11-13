@@ -79,7 +79,7 @@ export function DomainsListPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="域名"
         description="维护域名与其验证方式;证书态为关联证书的投影。"

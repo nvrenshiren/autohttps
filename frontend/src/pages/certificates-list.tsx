@@ -65,7 +65,7 @@ export function CertificatesListPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="证书"
         description="签发、续签、吊销证书的生命周期管理。"

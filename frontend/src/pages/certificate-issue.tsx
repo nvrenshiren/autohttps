@@ -132,7 +132,7 @@ export function CertificateIssuePage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="发起签发"
         crumbs={[{ label: "证书", to: "/certificates" }, { label: "发起签发" }]}

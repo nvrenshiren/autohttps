@@ -69,7 +69,7 @@ export function RootCaDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-5xl space-y-4 p-4 sm:p-6 lg:p-8">
         <Skeleton className="h-8 w-56" />
         <Skeleton className="h-64 rounded-xl" />
       </div>
@@ -78,7 +78,7 @@ export function RootCaDetailPage() {
   if (isError || !data) {
     const notFound = error instanceof ApiError && error.code === "root_ca_not_found";
     return (
-      <div className="mx-auto max-w-3xl p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-5xl p-4 sm:p-6 lg:p-8">
         <PageHeader title="根 CA 详情" crumbs={[{ label: "根 CA", to: "/local-ca" }]} />
         {notFound ? (
           <EmptyState
@@ -97,7 +97,7 @@ export function RootCaDetailPage() {
   const expired = data.status === "expired";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-5xl space-y-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={data.name}
         crumbs={[{ label: "根 CA", to: "/local-ca" }, { label: data.name }]}

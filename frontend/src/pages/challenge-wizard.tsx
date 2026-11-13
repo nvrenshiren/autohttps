@@ -306,7 +306,7 @@ export function ChallengeWizardPage() {
 
   if (certQ.isLoading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-4xl space-y-4 p-4 sm:p-6 lg:p-8">
         <Skeleton className="h-8 w-56" />
         <Skeleton className="h-40 rounded-xl" />
       </div>
@@ -316,7 +316,7 @@ export function ChallengeWizardPage() {
   if (certQ.isError || !certQ.data) {
     const notFound = certQ.error instanceof ApiError && certQ.error.code === "cert_not_found";
     return (
-      <div className="mx-auto max-w-3xl p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8">
         {header}
         {notFound ? (
           <EmptyState
@@ -337,7 +337,7 @@ export function ChallengeWizardPage() {
   // 自签证书不经 ACME 验证。
   if (cert.issuanceMethod === "self_signed") {
     return (
-      <div className="mx-auto max-w-3xl p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8">
         {header}
         <EmptyState
           Icon={Landmark}
@@ -362,7 +362,7 @@ export function ChallengeWizardPage() {
   challenges.sort((a, b) => (a.domainHostname ?? "").localeCompare(b.domainHostname ?? ""));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-4xl space-y-4 p-4 sm:p-6 lg:p-8">
       {header}
 
       {chalQ.isError ? (

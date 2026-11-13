@@ -47,19 +47,31 @@ function MetricCard({
       ? "text-danger"
       : "text-warning"
     : undefined;
+  const iconAccent = active && emphasis === "danger"
+    ? "border-danger/20 bg-danger-muted text-danger"
+    : active && emphasis === "warning"
+      ? "border-warning/25 bg-warning-muted text-warning-muted-foreground"
+      : primary
+        ? "border-primary/15 bg-accent text-primary"
+        : "border-border bg-muted text-muted-foreground";
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-card sm:p-5">
+    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-card sm:p-5">
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute inset-y-4 left-0 w-0.5 rounded-r-full",
+          active && emphasis === "danger" ? "bg-danger" : active && emphasis === "warning" ? "bg-warning" : primary ? "bg-primary" : "bg-border",
+        )}
+      />
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{label}</span>
         <span
           className={cn(
-            "inline-flex size-8 items-center justify-center rounded-lg",
-            primary ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground",
-            active && emphasis === "danger" && "bg-danger-muted text-danger",
-            active && emphasis === "warning" && "bg-warning-muted text-warning-muted-foreground",
+            "inline-flex size-10 items-center justify-center rounded-md border transition-colors",
+            iconAccent,
           )}
         >
-          <Icon className="size-4" />
+          <Icon aria-hidden="true" className="size-[18px]" />
         </span>
       </div>
       <div
@@ -132,7 +144,7 @@ function QuickAction({
   return (
     <button
       onClick={onClick}
-      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-border-strong hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
+      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:bg-accent/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring motion-reduce:transform-none"
     >
       <span
         className={cn(
@@ -142,7 +154,7 @@ function QuickAction({
             : "bg-secondary text-secondary-foreground",
         )}
       >
-        <Icon className="size-[18px]" />
+        <Icon aria-hidden="true" className="size-[18px]" />
       </span>
       <span className="min-w-0">
         <span className="block text-sm font-medium">{label}</span>
@@ -157,7 +169,7 @@ export function DashboardPage() {
   const { data, isLoading, isError, error, refetch } = useDashboard();
 
   return (
-    <div className="mx-auto max-w-6xl space-y-7 p-4 sm:p-6 lg:p-8">
+    <div className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="证书概览"
         description="快速查看证书健康状态，并处理临期或签发异常。"
@@ -173,7 +185,6 @@ export function DashboardPage() {
         <ErrorState error={error} onRetry={() => void refetch()} />
       ) : data ? (
         <section aria-label="证书指标" className="relative">
-          <div aria-hidden className="grid-paper absolute inset-0 -z-10" />
           <div className="grid gap-3 sm:grid-cols-3 lg:gap-4">
             <MetricCard
               label="证书总数"
@@ -203,7 +214,7 @@ export function DashboardPage() {
       {/* 待处理清单 */}
       {!isLoading && !isError && data && (
         <section aria-labelledby="pending-certificates-title" className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
-          <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4">
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/20 px-5 py-4 sm:px-6">
             <div className="flex items-center gap-2">
               <h2 id="pending-certificates-title" className="font-display text-base font-semibold tracking-tight">
                 待处理证书
@@ -239,7 +250,10 @@ export function DashboardPage() {
 
       {/* 常用操作 */}
       <section>
-        <h2 className="mb-3 font-display text-base font-semibold tracking-tight">快捷入口</h2>
+        <h2 className="mb-3 flex items-center gap-2 font-display text-base font-semibold tracking-tight">
+          <span aria-hidden="true" className="h-4 w-0.5 rounded-full bg-primary" />
+          快捷入口
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <QuickAction
             label="签发证书"

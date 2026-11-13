@@ -88,7 +88,7 @@ export function DomainDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-5xl space-y-4 p-4 sm:p-6 lg:p-8">
         <Skeleton className="h-8 w-56" />
         <Skeleton className="h-52 rounded-xl" />
       </div>
@@ -97,7 +97,7 @@ export function DomainDetailPage() {
   if (isError || !data) {
     const notFound = error instanceof ApiError && error.code === "domain_not_found";
     return (
-      <div className="mx-auto max-w-3xl p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-5xl p-4 sm:p-6 lg:p-8">
         <PageHeader title="域名详情" crumbs={[{ label: "域名", to: "/domains" }]} />
         {notFound ? (
           <EmptyState
@@ -143,7 +143,7 @@ export function DomainDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-5xl space-y-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={data.hostname}
         crumbs={[{ label: "域名", to: "/domains" }, { label: data.hostname }]}

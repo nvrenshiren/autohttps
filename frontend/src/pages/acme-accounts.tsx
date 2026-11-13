@@ -135,7 +135,7 @@ export function AcmeAccountsPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="ACME 账户"
         description="管理 ACME 账户:配置注册、编辑联系邮箱、失败重试、移除。支持多账户并存(不同 CA / 生产·测试环境)。"

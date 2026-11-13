@@ -62,7 +62,7 @@ export function RootCaListPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="根 CA"
         description="管理自签根 CA:创建 / 导入、导出公开证书供客户端信任。支持多根并存。"

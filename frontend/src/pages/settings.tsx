@@ -94,7 +94,7 @@ export function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-6 lg:p-8">
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-48 rounded-xl" />
         <Skeleton className="h-40 rounded-xl" />
@@ -103,7 +103,7 @@ export function SettingsPage() {
   }
   if (isError || !data) {
     return (
-      <div className="mx-auto max-w-3xl p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8">
         <PageHeader title="设置" />
         <ErrorState error={error} onRetry={() => void refetch()} />
       </div>
@@ -111,7 +111,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="设置"
         description="续签策略与运行形态配置。数据存储路径与运行形态为只读。"
