@@ -33,7 +33,7 @@ export function PageHeader({
                 {c.to ? (
                   <Link
                     to={c.to}
-                    className="rounded-sm transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="rounded-sm transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {c.label}
                   </Link>

@@ -7,17 +7,25 @@ function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimi
     <SwitchPrimitive.Root
       data-slot="switch"
       className={cn(
-        "peer inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent shadow-xs outline-none transition-all",
-        "focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-        "data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
+        "group/switch relative inline-flex size-11 shrink-0 items-center justify-center rounded-full outline-none transition-colors",
+        "focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
     >
-      <SwitchPrimitive.Thumb
+      <span
+        aria-hidden="true"
         className={cn(
-          "pointer-events-none block size-4 rounded-full bg-background shadow-sm ring-0 transition-transform",
-          "data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0.5",
+          "absolute left-1/2 top-1/2 h-5 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border border-transparent bg-input transition-colors",
+          "group-data-[state=checked]/switch:bg-primary dark:group-data-[state=unchecked]/switch:bg-input/80",
+        )}
+      />
+      <SwitchPrimitive.Thumb
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute left-1/2 top-1/2 z-10 block size-4 -translate-x-4 -translate-y-1/2 rounded-full bg-background shadow-sm ring-0 transition-transform",
+          "group-data-[state=checked]/switch:translate-x-0 dark:group-data-[state=checked]/switch:bg-primary-foreground dark:group-data-[state=unchecked]/switch:bg-foreground",
         )}
       />
     </SwitchPrimitive.Root>

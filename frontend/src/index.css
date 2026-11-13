@@ -155,6 +155,10 @@
     font-feature-settings: "tnum" 1, "cv11" 1;
   }
 
+  body[data-scroll-locked] {
+    width: calc(100% - var(--removed-body-scroll-bar-size));
+  }
+
   button:not(:disabled) {
     cursor: pointer;
   }

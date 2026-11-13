@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router";
 import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useServerEvents } from "@/hooks/use-server-events";
 import { useUiStore } from "@/stores/ui";
 import { DashboardPage } from "@/pages/dashboard";
@@ -24,7 +25,7 @@ export default function App() {
   const theme = useUiStore((s) => s.theme);
 
   return (
-    <>
+    <TooltipProvider delayDuration={200} disableHoverableContent>
       <AppShell>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
@@ -45,6 +46,6 @@ export default function App() {
         </Routes>
       </AppShell>
       <Toaster theme={theme} />
-    </>
+    </TooltipProvider>
   );
 }

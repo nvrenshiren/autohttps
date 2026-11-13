@@ -143,7 +143,7 @@ export function TasksListPage() {
         description="签发 / 续签 / 吊销任务的队列与历史统一视图;失败可重试、进行中可取消。"
       />
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
         {/* 工具栏(组合筛选:类型 / 状态 / 时间;关联证书经详情页跳入) */}
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
           <Select
@@ -273,7 +273,7 @@ export function TasksListPage() {
                         <Link
                           to={"/tasks/" + t.id}
                           aria-label={"查看" + taskTypeLabel(t.taskType) + "任务详情" + (t.attemptNumber > 1 ? "，第 " + t.attemptNumber + " 次尝试" : "")}
-                          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         >
                           <TaskTypeBadge type={t.taskType} />
                           {t.attemptNumber > 1 && (

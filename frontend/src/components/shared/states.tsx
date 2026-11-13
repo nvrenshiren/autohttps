@@ -24,12 +24,12 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2.5 px-6 py-16 text-center">
-      <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-primary/10 bg-accent text-accent-foreground">
+      <span className="inline-flex size-12 items-center justify-center rounded-xl border border-primary/10 bg-accent text-accent-foreground">
         <Icon aria-hidden="true" className={cn("size-6 text-muted-foreground", iconClassName)} />
       </span>
       <div className="text-sm font-medium text-foreground">{title}</div>
       {description && (
-        <div className="max-w-sm text-[13px] leading-relaxed text-muted-foreground">
+        <div className="max-w-sm text-sm leading-relaxed text-muted-foreground">
           {description}
         </div>
       )}

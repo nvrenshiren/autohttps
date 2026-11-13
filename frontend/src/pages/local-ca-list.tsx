@@ -74,7 +74,7 @@ export function RootCaListPage() {
         }
       />
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
         {isError ? (
           <div className="p-4">
             <ErrorState error={error} onRetry={() => void refetch()} />
@@ -113,7 +113,7 @@ export function RootCaListPage() {
                       <Link
                         to={"/local-ca/" + ca.id}
                         aria-label={"查看根 CA 详情：" + ca.name}
-                        className="flex min-h-11 max-w-[220px] items-center truncate rounded-sm font-medium text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        className="flex min-h-11 max-w-[220px] items-center truncate rounded-sm font-medium text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       >
                         {ca.name}
                       </Link>

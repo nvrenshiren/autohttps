@@ -30,7 +30,7 @@ export function CopyableValue({ value, className }: { value: string; className?:
         type="button"
         onClick={copy}
         aria-label="复制"
-        className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:size-8"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:size-8"
       >
         {copied ? (
           <Check aria-hidden="true" className="size-4 text-success" />

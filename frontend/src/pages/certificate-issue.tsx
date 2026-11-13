@@ -202,7 +202,7 @@ export function CertificateIssuePage() {
                       onClick={() => toggle(d.id)}
                       aria-pressed={isSel}
                       className={cn(
-                        "flex min-h-11 w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        "flex min-h-11 w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         isSel
                           ? "border-primary bg-accent"
                           : "border-border hover:bg-accent/50",
@@ -251,7 +251,7 @@ export function CertificateIssuePage() {
                   }}
                   aria-pressed={method === m}
                   className={cn(
-                    "inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-9",
+                    "inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-9",
                     method === m
                       ? "bg-background text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground",

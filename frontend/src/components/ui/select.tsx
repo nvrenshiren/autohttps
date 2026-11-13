@@ -18,7 +18,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2 text-base whitespace-nowrap shadow-xs outline-none transition-colors md:text-sm",
+        "flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-base whitespace-nowrap shadow-xs outline-none transition-colors md:text-sm",
         "data-[size=default]:h-11 data-[size=sm]:h-11 md:data-[size=default]:h-9 md:data-[size=sm]:h-8",
         "hover:border-border-strong focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&>span]:line-clamp-1",
@@ -45,7 +45,7 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "glass relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-xl border border-border-strong text-popover-foreground shadow-pop",
+          "glass z-50 max-h-[var(--radix-select-content-available-height)] min-w-[8rem] overflow-hidden rounded-md border border-border-strong text-popover-foreground shadow-pop",
           position === "popper" && "data-[side=bottom]:translate-y-1",
           className,
         )}
@@ -81,7 +81,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex min-h-11 w-full cursor-default items-center gap-2 rounded-lg py-1.5 pl-2.5 pr-8 text-sm outline-none select-none md:min-h-0",
+        "relative flex min-h-11 w-full cursor-default items-center gap-2 rounded-sm py-1.5 pl-2.5 pr-8 text-sm outline-none select-none md:min-h-0",
         "focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}

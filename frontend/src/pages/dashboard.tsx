@@ -50,7 +50,7 @@ function MetricCard({
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-card sm:p-5">
       <div className="flex items-center justify-between">
-        <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
+        <span className="text-sm font-medium text-muted-foreground">{label}</span>
         <span
           className={cn(
             "inline-flex size-8 items-center justify-center rounded-lg",
@@ -83,7 +83,7 @@ function PendingRow({ item }: { item: PendingCertItem }) {
     <li>
       <button
         type="button"
-        className="group relative flex w-full items-center gap-3 py-3 pl-5 pr-4 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        className="group relative flex w-full items-center gap-3 py-3 pl-5 pr-4 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring"
         onClick={() => navigate(`/certificates/${item.certificateId}`)}
       >
         <span className={cn("absolute bottom-2 left-0 top-2 w-0.5 rounded-full", failed ? "bg-danger" : "bg-warning")} />
@@ -132,7 +132,7 @@ function QuickAction({
   return (
     <button
       onClick={onClick}
-      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-border-strong hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-border-strong hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring"
     >
       <span
         className={cn(
@@ -166,7 +166,7 @@ export function DashboardPage() {
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-3 lg:gap-4">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-[124px] rounded-2xl" />
+            <Skeleton key={i} className="h-[124px] rounded-xl" />
           ))}
         </div>
       ) : isError ? (

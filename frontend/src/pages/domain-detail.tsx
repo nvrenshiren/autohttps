@@ -239,7 +239,7 @@ export function DomainDetailPage() {
                       <Link
                         to={"/certificates/" + c.id}
                         aria-label={"查看 " + data.hostname + " 的证书详情：" + (c.issuanceMethod === "acme" ? "ACME" : "自签") + "，" + statusLabel(c.status)}
-                        className="inline-flex min-h-11 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        className="inline-flex min-h-11 items-center rounded-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       >
                         <StatusBadge status={c.status} />
                         <ChevronRight aria-hidden="true" className="ml-1 size-4 self-center text-link" />

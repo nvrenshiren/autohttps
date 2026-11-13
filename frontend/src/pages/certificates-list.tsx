@@ -77,7 +77,7 @@ export function CertificatesListPage() {
         }
       />
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
         {/* 工具栏(组合筛选) */}
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
           <div className="relative w-full max-w-xs">
@@ -191,7 +191,7 @@ export function CertificatesListPage() {
                           <Link
                             to={"/certificates/" + c.id}
                             aria-label={"查看证书详情：" + primary}
-                            className="inline-flex min-h-11 items-center rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            className="inline-flex min-h-11 items-center rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           >
                             <Mono className="max-w-[220px] truncate">{primary}</Mono>
                           </Link>

@@ -2,9 +2,8 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Checkbox(设计 §7.5:同意服务条款 / 高风险确认勾选)。轻量实现(button role=checkbox),
- * 遵 v4 / React 19 约定(data-slot / data-state、无 forwardRef);键盘可达经 <button> 原生 Space/Enter。
- * 与 Switch 同 API(checked / onCheckedChange),区别在语义:勾选(tick)非开关(toggle)。
+ * Checkbox with a native input and an expanded 44px hit area for touch.
+ * Keep the visual indicator at the shadcn 16px size.
  */
 export function Checkbox({
   checked,
@@ -28,36 +27,38 @@ export function Checkbox({
   "aria-describedby"?: string;
 }) {
   return (
-    <button
-      type="button"
-      role="checkbox"
-      id={id}
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      aria-labelledby={ariaLabelledby}
-      aria-invalid={ariaInvalid}
-      aria-describedby={ariaDescribedby}
-      disabled={disabled}
-      onClick={() => onCheckedChange(!checked)}
-      data-slot="checkbox"
-      data-state={checked ? "checked" : "unchecked"}
+    <span
       className={cn(
-        "peer inline-flex size-11 shrink-0 items-center justify-center rounded-md outline-none transition-colors hover:bg-accent/50",
-        "focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+        "relative inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-colors",
+        !disabled && "hover:bg-accent/50",
         className,
       )}
     >
+      <input
+        type="checkbox"
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledby}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedby}
+        data-slot="checkbox"
+        onChange={(event) => onCheckedChange(event.currentTarget.checked)}
+        className="peer absolute inset-0 z-10 size-full cursor-pointer appearance-none rounded-md outline-none disabled:cursor-not-allowed"
+      />
       <span
         aria-hidden="true"
         className={cn(
-          "inline-flex size-4 items-center justify-center rounded-[4px] border shadow-xs transition-colors",
-          checked
-            ? "border-primary bg-primary text-primary-foreground"
-            : "border-input bg-background",
+          "inline-flex size-4 items-center justify-center rounded-[4px] border border-input bg-background shadow-xs transition-colors",
+          "peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground",
+          "peer-focus-visible:border-ring peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background",
+          "peer-aria-[invalid=true]:border-destructive peer-aria-[invalid=true]:ring-destructive/20",
+          "peer-disabled:opacity-50",
         )}
       >
-        {checked && <Check className="size-3.5" />}
+        {checked && <Check aria-hidden="true" className="size-3.5" />}
       </span>
-    </button>
+    </span>
   );
 }

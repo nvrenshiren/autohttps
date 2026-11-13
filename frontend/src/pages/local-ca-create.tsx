@@ -152,7 +152,7 @@ export function RootCaCreatePage() {
             onClick={() => switchMode(m)}
             aria-pressed={mode === m}
             className={cn(
-              "inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-9",
+              "inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-9",
               mode === m
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground",

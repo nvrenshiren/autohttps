@@ -91,7 +91,7 @@ export function DomainsListPage() {
         }
       />
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
         {/* 工具栏 */}
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
           <div className="relative w-full max-w-xs">
@@ -164,7 +164,7 @@ export function DomainsListPage() {
                           <Link
                             to={"/domains/" + d.id}
                             aria-label={"查看域名详情：" + d.hostname}
-                            className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           >
                             <Mono className="max-w-[220px] truncate">{d.hostname}</Mono>
                           </Link>
