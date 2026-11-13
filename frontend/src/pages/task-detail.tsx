@@ -345,7 +345,7 @@ export function TaskDetailPage() {
             <AlertDialogAction
               className={
                 confirm === "cancel"
-                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+? "bg-destructive-solid text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-active"
                   : undefined
               }
               disabled={busy}

@@ -1,19 +1,10 @@
 @import "tailwindcss";
+@import "./theme/cohesion-shadcn-tokens.css";
+@import "./theme/cohesion-tokens.css";
 
-/* 类切换暗色(根节点挂 .dark;设计 §10-H7)。默认不跟随系统 prefers-color-scheme。 */
 @custom-variant dark (&:is(.dark *));
 
-/*
- * ===== autohttps 设计系统 v2 ——「极光守护」=====
- *
- * 品牌意象:一把锁立在深夜极光之下。主色是深空靛蓝(Indigo),辅以青(Cyan)极光渐变,
- * 取「证书链路与信任」之意。两主题共享同一套语义 token,只做明暗两套实现:
- *   - 浅色「曜石白」:带极微蓝紫底的白纸,卡片如薄玻璃浮在磨砂底上;
- *   - 暗色「深空墨」:近黑的墨蓝,卡片为半透明玻璃 + 内描边,品牌色发微光。
- * 状态色(success/warning/danger/info/neutral)保持语义不变,仅随品牌微调色相向。
- */
-
-/* ===== @theme inline 映射 —— 唯一 token 落点,原型/前端禁裸色值 ===== */
+/* shadcn roles are generated from the shared COHESION theme. */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -23,7 +14,8 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-primary-strong: var(--primary-strong);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -31,17 +23,20 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-solid: var(--destructive-solid);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-active: var(--destructive-active);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-link-active: var(--link-active);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* 品牌辅助:极光青(渐变/高光/点缀用) */
   --color-aurora: var(--aurora);
   --color-aurora-foreground: var(--aurora-foreground);
-
-  /* 语义状态色(§3 立法用)→ 生成 bg-success / text-danger-muted-foreground 等 */
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-success-muted: var(--success-muted);
@@ -70,7 +65,6 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -85,171 +79,43 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-
-  /* 阴影/海拔:卡片是「薄玻璃」,用内描边 + 极淡投影而不是重阴影 */
-  --shadow-card: var(--elevation-card);
-  --shadow-pop: var(--elevation-pop);
-  --shadow-glow: var(--glow-primary);
-
-  --font-sans: "Outfit", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  --font-display: "Space Grotesk", "Outfit", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", "Cascadia Code",
-    Consolas, "Liberation Mono", Menlo, monospace;
+  --shadow-card: var(--shadow-sm);
+  --shadow-pop: var(--shadow-lg);
+  --shadow-glow: var(--shadow-sm);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-display: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, Menlo, monospace;
 }
 
-/* ===== 色板 v2(浅色 · 曜石白 + 深空靛) ===== */
+/* Functional states come from the generated COHESION Ant Design tokens. */
 :root {
-  --background: oklch(0.977 0.004 258);
-  --foreground: oklch(0.22 0.03 266);
-  --card: oklch(0.996 0.002 258);
-  --card-foreground: oklch(0.22 0.03 266);
-  --popover: oklch(0.99 0.002 258);
-  --popover-foreground: oklch(0.22 0.03 266);
-  --primary: oklch(0.52 0.21 267);
-  --primary-foreground: oklch(0.975 0.006 267);
-  --primary-strong: oklch(0.45 0.2 267);
-  --secondary: oklch(0.95 0.008 262);
-  --secondary-foreground: oklch(0.32 0.025 266);
-  --muted: oklch(0.955 0.007 260);
-  --muted-foreground: oklch(0.52 0.025 266);
-  --accent: oklch(0.935 0.02 262);
-  --accent-foreground: oklch(0.3 0.03 266);
-  --destructive: oklch(0.585 0.2 25);
-  --destructive-foreground: oklch(0.985 0.003 90);
-  --border: oklch(0.905 0.008 262);
-  --border-strong: oklch(0.85 0.014 262);
-  --input: oklch(0.9 0.01 262);
-  --ring: oklch(0.52 0.21 267);
-
-  --aurora: oklch(0.72 0.14 197);
-  --aurora-foreground: oklch(0.25 0.06 240);
-
-  --success: oklch(0.62 0.15 155);
-  --success-foreground: oklch(0.99 0 0);
-  --success-muted: oklch(0.94 0.045 155);
-  --success-muted-foreground: oklch(0.43 0.1 155);
-  --warning: oklch(0.72 0.14 72);
-  --warning-foreground: oklch(0.27 0.05 72);
-  --warning-muted: oklch(0.95 0.05 78);
-  --warning-muted-foreground: oklch(0.47 0.09 68);
-  --danger: oklch(0.585 0.2 25);
-  --danger-foreground: oklch(0.985 0.003 90);
-  --danger-muted: oklch(0.945 0.035 25);
-  --danger-muted-foreground: oklch(0.5 0.17 25);
-  --info: oklch(0.56 0.15 250);
-  --info-foreground: oklch(0.99 0 0);
-  --info-muted: oklch(0.94 0.03 250);
-  --info-muted-foreground: oklch(0.43 0.12 250);
-  --neutral: oklch(0.54 0.02 265);
-  --neutral-foreground: oklch(0.99 0 0);
-  --neutral-muted: oklch(0.95 0.008 262);
-  --neutral-muted-foreground: oklch(0.45 0.015 265);
-
-  --notification: oklch(0.585 0.2 25);
-  --notification-foreground: oklch(0.985 0.003 90);
-
-  --chart-1: oklch(0.52 0.21 267);
-  --chart-2: oklch(0.72 0.14 197);
-  --chart-3: oklch(0.62 0.15 155);
-  --chart-4: oklch(0.72 0.14 72);
-  --chart-5: oklch(0.585 0.2 25);
-
-  --sidebar: oklch(0.968 0.006 260);
-  --sidebar-foreground: oklch(0.22 0.03 266);
-  --sidebar-primary: oklch(0.52 0.21 267);
-  --sidebar-primary-foreground: oklch(0.975 0.006 267);
-  --sidebar-accent: oklch(0.935 0.018 262);
-  --sidebar-accent-foreground: oklch(0.26 0.03 266);
-  --sidebar-border: oklch(0.905 0.008 262);
-  --sidebar-ring: oklch(0.52 0.21 267);
-
-  --radius: 0.625rem;
-
-  /* 海拔:内描边让玻璃有「切边」,投影极淡防脏 */
-  --elevation-card:
-    inset 0 1px 0 0 oklch(1 0 0 / 70%), 0 1px 2px oklch(0.3 0.04 266 / 5%),
-    0 4px 16px -4px oklch(0.3 0.04 266 / 6%);
-  --elevation-pop:
-    inset 0 1px 0 0 oklch(1 0 0 / 70%), 0 8px 32px -8px oklch(0.3 0.05 266 / 18%),
-    0 2px 8px oklch(0.3 0.05 266 / 8%);
-  --glow-primary: 0 0 0 1px oklch(0.52 0.21 267 / 25%), 0 4px 20px -2px oklch(0.52 0.21 267 / 35%);
-}
-
-/* ===== 色板 v2(暗色 · 深空墨 + 极光) ===== */
-.dark {
-  --background: oklch(0.155 0.014 266);
-  --foreground: oklch(0.94 0.01 264);
-  --card: oklch(0.195 0.016 266);
-  --card-foreground: oklch(0.94 0.01 264);
-  --popover: oklch(0.2 0.017 266);
-  --popover-foreground: oklch(0.94 0.01 264);
-  --primary: oklch(0.7 0.17 267);
-  --primary-foreground: oklch(0.16 0.03 267);
-  --primary-strong: oklch(0.78 0.15 267);
-  --secondary: oklch(0.245 0.017 266);
-  --secondary-foreground: oklch(0.94 0.01 264);
-  --muted: oklch(0.24 0.016 266);
-  --muted-foreground: oklch(0.68 0.025 266);
-  --accent: oklch(0.28 0.025 266);
-  --accent-foreground: oklch(0.94 0.01 264);
-  --destructive: oklch(0.66 0.19 25);
-  --destructive-foreground: oklch(0.17 0.03 25);
-  --border: oklch(1 0 0 / 9%);
-  --border-strong: oklch(1 0 0 / 16%);
-  --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.7 0.17 267);
-
-  --aurora: oklch(0.78 0.13 197);
-  --aurora-foreground: oklch(0.16 0.03 240);
-
-  --success: oklch(0.72 0.15 155);
-  --success-foreground: oklch(0.16 0.03 155);
-  --success-muted: oklch(0.28 0.055 155);
-  --success-muted-foreground: oklch(0.83 0.11 155);
-  --warning: oklch(0.8 0.14 75);
-  --warning-foreground: oklch(0.2 0.04 75);
-  --warning-muted: oklch(0.3 0.05 72);
-  --warning-muted-foreground: oklch(0.87 0.11 78);
-  --danger: oklch(0.66 0.19 25);
-  --danger-foreground: oklch(0.17 0.03 25);
-  --danger-muted: oklch(0.3 0.07 25);
-  --danger-muted-foreground: oklch(0.83 0.12 25);
-  --info: oklch(0.72 0.14 250);
-  --info-foreground: oklch(0.16 0.03 250);
-  --info-muted: oklch(0.29 0.05 250);
-  --info-muted-foreground: oklch(0.84 0.1 250);
-  --neutral: oklch(0.7 0.015 265);
-  --neutral-foreground: oklch(0.17 0.01 265);
-  --neutral-muted: oklch(0.25 0.014 265);
-  --neutral-muted-foreground: oklch(0.77 0.015 265);
-
-  --notification: oklch(0.66 0.19 25);
-  --notification-foreground: oklch(0.17 0.03 25);
-
-  --chart-1: oklch(0.7 0.17 267);
-  --chart-2: oklch(0.78 0.13 197);
-  --chart-3: oklch(0.72 0.15 155);
-  --chart-4: oklch(0.8 0.14 75);
-  --chart-5: oklch(0.66 0.19 25);
-
-  --sidebar: oklch(0.175 0.015 266);
-  --sidebar-foreground: oklch(0.94 0.01 264);
-  --sidebar-primary: oklch(0.7 0.17 267);
-  --sidebar-primary-foreground: oklch(0.16 0.03 267);
-  --sidebar-accent: oklch(0.24 0.018 266);
-  --sidebar-accent-foreground: oklch(0.94 0.01 264);
-  --sidebar-border: oklch(1 0 0 / 9%);
-  --sidebar-ring: oklch(0.7 0.17 267);
-
-  --elevation-card:
-    inset 0 1px 0 0 oklch(1 0 0 / 6%), 0 1px 2px oklch(0.08 0.02 266 / 40%),
-    0 8px 24px -8px oklch(0.08 0.02 266 / 50%);
-  --elevation-pop:
-    inset 0 1px 0 0 oklch(1 0 0 / 8%), 0 16px 48px -12px oklch(0.06 0.02 266 / 70%),
-    0 4px 12px oklch(0.06 0.02 266 / 40%);
-  --glow-primary: 0 0 0 1px oklch(0.7 0.17 267 / 40%), 0 4px 24px -2px oklch(0.6 0.2 267 / 45%);
+  --aurora: var(--zk-brand-cyan);
+  --aurora-foreground: var(--foreground);
+  --border-strong: var(--ant-token-color-border);
+  --success: var(--ant-token-color-success);
+  --success-foreground: var(--ant-token-color-text-light-solid);
+  --success-muted: var(--ant-token-color-success-bg);
+  --success-muted-foreground: var(--ant-token-color-success-text);
+  --warning: var(--ant-token-color-warning);
+  --warning-foreground: var(--ant-token-color-text);
+  --warning-muted: var(--ant-token-color-warning-bg);
+  --warning-muted-foreground: var(--ant-token-color-warning-text);
+  --danger: var(--ant-token-color-error);
+  --danger-foreground: var(--ant-token-color-text-light-solid);
+  --danger-muted: var(--ant-token-color-error-bg);
+  --danger-muted-foreground: var(--ant-token-color-error-text);
+  --info: var(--ant-token-color-info);
+  --info-foreground: var(--ant-token-color-text-light-solid);
+  --info-muted: var(--ant-token-color-info-bg);
+  --info-muted-foreground: var(--ant-token-color-info-text);
+  --neutral: var(--muted-foreground);
+  --neutral-foreground: var(--background);
+  --neutral-muted: var(--muted);
+  --neutral-muted-foreground: var(--muted-foreground);
+  --notification: var(--ant-token-color-error);
+  --notification-foreground: var(--ant-token-color-text-light-solid);
 }
 
 @layer base {
@@ -259,115 +125,102 @@
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
   }
+
   html {
     color-scheme: light;
   }
+
   html.dark {
     color-scheme: dark;
   }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   body {
     margin: 0;
     background-color: var(--color-background);
+    background-image:
+      radial-gradient(56rem 32rem at 100% -24%, color-mix(in oklch, var(--color-primary) 5%, transparent), transparent 62%),
+      radial-gradient(44rem 32rem at -12% 112%, color-mix(in oklch, var(--color-aurora) 3%, transparent), transparent 64%);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-size: 0.875rem; /* body 默认 14px(工具型密度) */
-    line-height: 1.25rem;
+    font-size: 1rem;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-feature-settings: "tnum" 1, "cv11" 1;
   }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+
   ::selection {
-    background-color: color-mix(in oklch, var(--color-primary) 22%, transparent);
+    background-color: color-mix(in oklch, var(--color-primary) 18%, transparent);
   }
+}
 
-  /* ===== 环境光:极光在深空边缘弥散,内容区永远干净 ===== */
-  .ambient {
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background:
-      radial-gradient(42rem 28rem at 88% -12%, color-mix(in oklch, var(--color-primary) 9%, transparent), transparent 62%),
-      radial-gradient(36rem 26rem at -8% 112%, color-mix(in oklch, var(--color-aurora) 8%, transparent), transparent 60%);
-  }
-  .dark .ambient {
-    background:
-      radial-gradient(46rem 30rem at 86% -14%, color-mix(in oklch, var(--color-primary) 22%, transparent), transparent 64%),
-      radial-gradient(40rem 28rem at -10% 114%, color-mix(in oklch, var(--color-aurora) 15%, transparent), transparent 62%),
-      radial-gradient(30rem 22rem at 55% 118%, color-mix(in oklch, var(--color-primary) 10%, transparent), transparent 65%);
-  }
+/* Soft brand atmosphere stays on the canvas; content surfaces remain opaque. */
+.dark body {
+  background-image:
+    radial-gradient(56rem 32rem at 100% -24%, color-mix(in oklch, var(--color-primary) 10%, transparent), transparent 62%),
+    radial-gradient(44rem 32rem at -12% 112%, color-mix(in oklch, var(--color-aurora) 6%, transparent), transparent 64%);
+}
 
-  /* ===== 品牌件 ===== */
-  /* 极光渐变文字(标题/大数字用,克制:只给品牌位与一级指标) */
-  .text-aurora {
-    background-image: linear-gradient(
-      100deg,
-      var(--color-primary-strong) 0%,
-      var(--color-primary) 45%,
-      var(--color-aurora) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
+.text-aurora {
+  color: var(--color-primary);
+}
 
-  /* 玻璃浮层(弹窗/下拉/气泡):半透明 + 背滤 + 内切边 */
-  .glass {
-    background-color: color-mix(in oklch, var(--color-popover) 86%, transparent);
-    backdrop-filter: blur(14px) saturate(1.35);
-    -webkit-backdrop-filter: blur(14px) saturate(1.35);
-  }
+.glass {
+  background-color: var(--color-popover);
+}
 
-  /* 品牌渐变面(主按钮/品牌标) */
-  .brand-gradient {
-    background-image: linear-gradient(
-      135deg,
-      var(--color-primary-strong) 0%,
-      var(--color-primary) 55%,
-      oklch(from var(--color-aurora) calc(l - 0.08) c h) 130%
-    );
-  }
+.brand-gradient {
+  background-image: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+}
 
-  /* 细网格纸纹(仪表盘 hero 底,极淡,只在浅色可见) */
-  .grid-paper {
-    background-image:
-      linear-gradient(to right, color-mix(in oklch, var(--color-foreground) 4%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 4%, transparent) 1px, transparent 1px);
-    background-size: 22px 22px;
-    mask-image: radial-gradient(28rem 16rem at 70% 0%, black, transparent 75%);
-    -webkit-mask-image: radial-gradient(28rem 16rem at 70% 0%, black, transparent 75%);
-  }
+.grid-paper {
+  background-image: radial-gradient(circle, color-mix(in oklch, var(--color-primary) 9%, transparent) 1px, transparent 1.5px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(30rem 16rem at 72% 0%, black, transparent 76%);
+  -webkit-mask-image: radial-gradient(30rem 16rem at 72% 0%, black, transparent 76%);
+}
 
-  /* 状态呼吸点(进行中任务/签发中) */
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.45; transform: scale(0.82); }
-  }
-  .pulse-dot {
-    animation: pulse-dot 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
+.pulse-dot {
+  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
 
-  /* 数字滚动感(指标值变化时的轻微上移) */
-  @keyframes rise-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .rise-in {
-    animation: rise-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
+.page-in {
+  animation: page-in 240ms cubic-bezier(0.2, 0, 0, 1) both;
+}
 
-  /* 内容区入场(路由切换的统一微动效) */
-  @keyframes page-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.45;
   }
-  .page-in {
-    animation: page-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
+}
 
-  @media (prefers-reduced-motion: reduce) {
-    .pulse-dot, .rise-in, .page-in {
-      animation: none;
-    }
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
   }
 }

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-// 表格密度:数据行 h-11(44)、表头小字大写化弱呈现;行 hover 微提亮。
+// 数据表保持稳定行高与局部横向滚动，表头以中性底色区分。
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div data-slot="table-container" className="relative w-full overflow-x-auto">
@@ -48,7 +48,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-3 text-left align-middle text-xs font-medium uppercase tracking-wider text-muted-foreground/90 whitespace-nowrap",
+        "h-11 whitespace-nowrap bg-muted/40 px-3 text-left align-middle text-xs font-medium text-muted-foreground",
         className,
       )}
       {...props}

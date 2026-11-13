@@ -18,9 +18,9 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-2 rounded-lg border border-input bg-card/60 px-3 py-2 text-sm whitespace-nowrap shadow-xs outline-none transition-all",
-        "data-[size=default]:h-9 data-[size=sm]:h-8",
-        "hover:border-border-strong focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40",
+        "flex w-fit items-center justify-between gap-2 rounded-lg border border-input bg-background px-3 py-2 text-base whitespace-nowrap shadow-xs outline-none transition-colors md:text-sm",
+        "data-[size=default]:h-11 data-[size=sm]:h-11 md:data-[size=default]:h-9 md:data-[size=sm]:h-8",
+        "hover:border-border-strong focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&>span]:line-clamp-1",
         className,
       )}
@@ -81,7 +81,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-default items-center gap-2 rounded-lg py-1.5 pl-2.5 pr-8 text-sm outline-none select-none",
+        "relative flex min-h-11 w-full cursor-default items-center gap-2 rounded-lg py-1.5 pl-2.5 pr-8 text-sm outline-none select-none md:min-h-0",
         "focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}

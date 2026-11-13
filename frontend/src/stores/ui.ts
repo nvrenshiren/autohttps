@@ -13,9 +13,16 @@ function readInitialTheme(): Theme {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-/** 把主题应用到根节点 .dark class(设计 §10-H7)并持久化。 */
+/** 把品牌主题应用到根节点，供 Tailwind 与两份 COHESION Token 快照共用。 */
 export function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  const root = document.documentElement;
+  root.classList.add("shadcn-scope");
+  root.classList.toggle("dark", theme === "dark");
+  root.dataset.theme = theme;
+  root.dataset.shadcnTheme = theme;
+  root.dataset.density = "comfortable";
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  themeColor?.setAttribute("content", theme === "dark" ? "#141414" : "#ffffff");
   localStorage.setItem(THEME_KEY, theme);
 }
 

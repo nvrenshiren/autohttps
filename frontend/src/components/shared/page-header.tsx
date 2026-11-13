@@ -19,15 +19,15 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
       <div className="min-w-0">
         {crumbs && crumbs.length > 0 && (
-          <nav className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+          <nav aria-label="面包屑" className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
             {crumbs.map((c, i) => (
               <span key={i} className="inline-flex items-center gap-1">
                 {i > 0 && <ChevronRight className="size-3" />}
                 {c.to ? (
-                  <Link to={c.to} className="transition-colors hover:text-primary">
+                  <Link to={c.to} className="transition-colors hover:text-link">
                     {c.label}
                   </Link>
                 ) : (
@@ -37,9 +37,9 @@ export function PageHeader({
             ))}
           </nav>
         )}
-        <h1 className="truncate font-display text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="truncate font-display text-2xl font-semibold tracking-tight">{title}</h1>
         {description && (
-          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
         )}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

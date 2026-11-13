@@ -6,7 +6,7 @@ export function ThemeToggle() {
   const theme = useUiStore((s) => s.theme);
   const toggle = useUiStore((s) => s.toggleTheme);
   return (
-    <Button variant="ghost" size="icon" aria-label="切换明暗主题" onClick={toggle}>
+    <Button variant="ghost" size="icon" aria-label="切换明暗主题" title="切换明暗主题" onClick={toggle}>
       {theme === "dark" ? <Sun /> : <Moon />}
     </Button>
   );

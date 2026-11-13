@@ -3,9 +3,9 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// 状态 Badge:5 语义级(软底 + 同向描边,§3.1 token);分类 Badge:outline 中性(§3.5,防彩虹汤)。
+// 状态使用语义色；普通类别保持中性，并沿用设计系统的胶囊形标签。
 const badgeVariants = cva(
-  "inline-flex items-center justify-center gap-1 rounded-md border px-2 h-5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 [&>svg]:pointer-events-none",
+  "inline-flex h-6 w-fit shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {
@@ -13,11 +13,11 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         outline: "border-border-strong text-muted-foreground",
         "outline-warning": "border-warning/60 text-warning-muted-foreground",
-        success: "border-success/25 bg-success-muted text-success-muted-foreground",
-        warning: "border-warning/30 bg-warning-muted text-warning-muted-foreground",
-        danger: "border-danger/25 bg-danger-muted text-danger-muted-foreground",
-        info: "border-info/25 bg-info-muted text-info-muted-foreground",
-        neutral: "border-border-strong bg-neutral-muted text-neutral-muted-foreground",
+        success: "border-success/20 bg-success-muted text-success-muted-foreground",
+        warning: "border-warning/25 bg-warning-muted text-warning-muted-foreground",
+        danger: "border-danger/20 bg-danger-muted text-danger-muted-foreground",
+        info: "border-info/20 bg-info-muted text-info-muted-foreground",
+        neutral: "border-border bg-neutral-muted text-neutral-muted-foreground",
       },
     },
     defaultVariants: { variant: "default" },

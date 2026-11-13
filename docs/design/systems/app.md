@@ -1,6 +1,7 @@
 # 设计系统 · app 端(端级契约)
 
 > 文档状态: draft(待 orchestrator 统一送审)· 层级: 端级设计契约 · 端点: app · 撰写: designer
+> 视觉实现更新: autohttps 当前 UI 自 2026-11-13 起采用 `docs/design/cohesion-adoption.md` 中的 COHESION 逐科设计系统 v2.0.0。下文的 Blueprint 色板、展示字体、渐变控件和旧 Shell 尺寸不再作为实现依据；页面任务、状态语义与交互约束仍以各 approved PRD/API 契约及本文件对应章节为准。
 > 信任基础(approved,直接消费不重新推导):
 > - **TECH.md §1.4 / AR8**:前端栈已定——shadcn/ui(手写源码,遵 v4 / React 19 约定:`data-slot`、无 `forwardRef`、`@theme inline` OKLCH)+ Radix primitives + Tailwind CSS v4(`@theme` token、CSS-first、OKLCH)+ lucide-react 图标 + sonner。**designer 消费 shadcn + Tailwind v4,定 `@theme` 的 token 值**;前端架构层(react-query/zustand 分工、路由、表单、react-table、ts-rs 绑定)归基线,不在此立法。
 > - **project.md**:跨平台(Win/Linux/macOS)桌面(Tauri)+ 服务器两形态**共享同一前端**;工具 / 管理型 UI,信息密度偏高;两形态差异靠运行模式 + 页面级「仅桌面 / 仅服务器」标注,**不拆端**(D1)。

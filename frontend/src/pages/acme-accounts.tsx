@@ -363,7 +363,7 @@ export function AcmeAccountsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={del.isPending}>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+className="bg-destructive-solid text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-active"
               disabled={del.isPending}
               onClick={(e) => {
                 e.preventDefault();

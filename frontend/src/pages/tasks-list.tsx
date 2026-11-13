@@ -461,7 +461,7 @@ export function ConfirmActionDialog({
           <AlertDialogCancel disabled={busy}>返回</AlertDialogCancel>
           <AlertDialogAction
             className={
-              isRetry ? undefined : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+isRetry ? undefined : "bg-destructive-solid text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-active"
             }
             disabled={busy}
             onClick={(e) => {

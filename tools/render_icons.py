@@ -12,10 +12,10 @@ import math, struct, zlib
 
 OUT_DIR = "crates/desktop/icons"
 
-BG_TOP = (0x35, 0x43, 0xD6)   # 群青渐变顶(Blueprint primary oklch(0.5 0.2 268) 近似)
-BG_BOT = (0x1F, 0x29, 0xA0)   # 群青渐变底
-PAPER  = (0xF7, 0xF3, 0xEA)   # 暖纸白(主题 background oklch(0.982 0.004 90) 近似)
-INK    = (0x22, 0x30, 0xB8)   # 对勾用深群青
+BG_TOP = (0x16, 0x7C, 0x4B)   # COHESION 浅色主色 #167C4B
+BG_BOT = (0x0B, 0x57, 0x35)   # COHESION 主色 active #0B5735
+PAPER  = (0xFF, 0xFF, 0xFF)   # 白色锁体与验证标记
+INK    = (0x0B, 0x57, 0x35)   # 对勾与主色保持一致
 
 def make_shade(W, H, squircle_r, stroke, key, check_w, body, shackle):
     def lerp(a, b, t): return a + (b - a) * t

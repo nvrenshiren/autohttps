@@ -2,16 +2,33 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="autohttps 证书全生命周期管理控制台" />
     <title>autohttps · HTTPS 证书全生命周期管理</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Outfit:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <script>
+      (() => {
+        const root = document.documentElement;
+        let theme;
+        try {
+          theme = localStorage.getItem("autohttps-theme");
+        } catch {}
+        if (theme !== "light" && theme !== "dark") {
+          theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        root.classList.add("shadcn-scope");
+        root.classList.toggle("dark", theme === "dark");
+        root.dataset.theme = theme;
+        root.dataset.shadcnTheme = theme;
+        root.dataset.density = "comfortable";
+        document.querySelector('meta[name="theme-color"]')?.setAttribute(
+          "content",
+          theme === "dark" ? "#141414" : "#ffffff",
+        );
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
