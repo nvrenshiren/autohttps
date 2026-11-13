@@ -151,7 +151,7 @@ export function RegisterAccountDialog({
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label>
+            <Label htmlFor="preset">
               目标 CA <span className="text-danger">*</span>
             </Label>
             <Controller
@@ -159,7 +159,7 @@ export function RegisterAccountDialog({
               name="preset"
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger id="preset" aria-describedby="preset-help" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -170,7 +170,7 @@ export function RegisterAccountDialog({
                 </Select>
               )}
             />
-            <p className="text-xs text-muted-foreground">
+            <p id="preset-help" className="text-xs text-muted-foreground">
               测试环境(Staging)用于验证流程、不产出受信任证书;正式签发选生产。
             </p>
           </div>
@@ -186,10 +186,11 @@ export function RegisterAccountDialog({
                   placeholder="https://ca.example.com/acme/directory"
                   className="font-mono text-[13px]"
                   aria-invalid={!!errors.directoryUrl}
+                  aria-describedby={errors.directoryUrl ? "directory-url-error" : undefined}
                   {...reg("directoryUrl")}
                 />
                 {errors.directoryUrl && (
-                  <p className="text-xs text-danger">{errors.directoryUrl.message}</p>
+                  <p id="directory-url-error" role="alert" className="text-xs text-danger">{errors.directoryUrl.message}</p>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -209,16 +210,17 @@ export function RegisterAccountDialog({
               placeholder="admin@example.com"
               className="font-mono text-[13px]"
               aria-invalid={!!errors.contactEmail}
+              aria-describedby={errors.contactEmail ? "contact-email-error contact-email-help" : "contact-email-help"}
               {...reg("contactEmail")}
             />
             {errors.contactEmail && (
-              <p className="text-xs text-danger">{errors.contactEmail.message}</p>
+              <p id="contact-email-error" role="alert" className="text-xs text-danger">{errors.contactEmail.message}</p>
             )}
-            <p className="text-xs text-muted-foreground">CA 用于到期提醒等通知。</p>
+            <p id="contact-email-help" className="text-xs text-muted-foreground">CA 用于到期提醒等通知。</p>
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-start gap-2">
+            <div className="flex items-center gap-2">
               <Controller
                 control={control}
                 name="tosAgreed"
@@ -227,8 +229,9 @@ export function RegisterAccountDialog({
                     id="tosAgreed"
                     checked={field.value}
                     onCheckedChange={field.onChange}
-                    className="mt-0.5"
                     aria-label="同意服务条款"
+                    aria-invalid={!!errors.tosAgreed}
+                    aria-describedby={errors.tosAgreed ? "tos-error" : undefined}
                   />
                 )}
               />
@@ -236,7 +239,7 @@ export function RegisterAccountDialog({
                 我已阅读并同意该 CA 的服务条款(ToS)
               </Label>
             </div>
-            {errors.tosAgreed && <p className="text-xs text-danger">{errors.tosAgreed.message}</p>}
+            {errors.tosAgreed && <p id="tos-error" role="alert" className="text-xs text-danger">{errors.tosAgreed.message}</p>}
           </div>
 
           <DialogFooter>

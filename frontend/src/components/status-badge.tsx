@@ -80,7 +80,7 @@ export function StatusBadge({ status, className }: { status: string; className?:
   const { label, variant, Icon, spin } = meta;
   return (
     <Badge variant={variant} className={className}>
-      <Icon className={cn("size-3 shrink-0", spin && "animate-spin")} />
+      <Icon aria-hidden="true" className={cn("size-3 shrink-0", spin && "animate-spin")} />
       {label}
     </Badge>
   );
@@ -99,7 +99,7 @@ export function CertProjectionBadge({ status }: { status: CertificateStatus | nu
   if (FAILED_PROJECTION.includes(status)) {
     return (
       <Badge variant="danger">
-        <TriangleAlert className="size-3 shrink-0" />
+        <TriangleAlert aria-hidden="true" className="size-3 shrink-0" />
         失败
       </Badge>
     );
@@ -107,7 +107,7 @@ export function CertProjectionBadge({ status }: { status: CertificateStatus | nu
   if (status === "expiring_soon") {
     return (
       <Badge variant="warning">
-        <Clock className="size-3 shrink-0" />
+        <Clock aria-hidden="true" className="size-3 shrink-0" />
         即将到期
       </Badge>
     );
@@ -115,7 +115,7 @@ export function CertProjectionBadge({ status }: { status: CertificateStatus | nu
   if (status === "valid") {
     return (
       <Badge variant="success">
-        <CircleCheckBig className="size-3 shrink-0" />
+        <CircleCheckBig aria-hidden="true" className="size-3 shrink-0" />
         有效
       </Badge>
     );

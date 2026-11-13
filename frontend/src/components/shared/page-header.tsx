@@ -19,15 +19,22 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+    <div className="mb-6 flex flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         {crumbs && crumbs.length > 0 && (
-          <nav aria-label="面包屑" className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+          <nav aria-label="面包屑" className="mb-2 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
             {crumbs.map((c, i) => (
-              <span key={i} className="inline-flex items-center gap-1">
-                {i > 0 && <ChevronRight className="size-3" />}
+              <span
+                key={i}
+                aria-current={i === crumbs.length - 1 ? "page" : undefined}
+                className="inline-flex items-center gap-1"
+              >
+                {i > 0 && <ChevronRight aria-hidden="true" className="size-3" />}
                 {c.to ? (
-                  <Link to={c.to} className="transition-colors hover:text-link">
+                  <Link
+                    to={c.to}
+                    className="rounded-sm transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
                     {c.label}
                   </Link>
                 ) : (
@@ -37,12 +44,12 @@ export function PageHeader({
             ))}
           </nav>
         )}
-        <h1 className="truncate font-display text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="max-w-full break-words font-display text-2xl font-semibold tracking-tight">{title}</h1>
         {description && (
           <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
         )}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{actions}</div>}
     </div>
   );
 }

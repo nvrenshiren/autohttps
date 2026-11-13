@@ -25,7 +25,7 @@ export function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center gap-2.5 px-6 py-16 text-center">
       <span className="inline-flex size-12 items-center justify-center rounded-2xl border border-primary/10 bg-accent text-accent-foreground">
-        <Icon className={cn("size-6 text-muted-foreground", iconClassName)} />
+        <Icon aria-hidden="true" className={cn("size-6 text-muted-foreground", iconClassName)} />
       </span>
       <div className="text-sm font-medium text-foreground">{title}</div>
       {description && (
@@ -47,13 +47,13 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
         : "加载失败,请稍后重试";
   return (
     <Alert variant="destructive">
-      <CircleAlert />
+      <CircleAlert aria-hidden="true" />
       <AlertTitle>加载失败</AlertTitle>
       <AlertDescription>
         <p>{message}</p>
         {onRetry && (
           <Button size="sm" variant="outline" className="mt-1 w-fit" onClick={onRetry}>
-            <RotateCw />
+            <RotateCw aria-hidden="true" />
             重试
           </Button>
         )}

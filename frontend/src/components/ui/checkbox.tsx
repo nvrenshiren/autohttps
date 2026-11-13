@@ -14,6 +14,8 @@ export function Checkbox({
   className,
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledby,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedby,
 }: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
@@ -22,6 +24,8 @@ export function Checkbox({
   className?: string;
   "aria-label"?: string;
   "aria-labelledby"?: string;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
 }) {
   return (
     <button
@@ -31,18 +35,29 @@ export function Checkbox({
       aria-checked={checked}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabelledby}
+      aria-invalid={ariaInvalid}
+      aria-describedby={ariaDescribedby}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       data-slot="checkbox"
       data-state={checked ? "checked" : "unchecked"}
       className={cn(
-        "peer inline-flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input shadow-xs outline-none transition-colors",
+        "peer inline-flex size-11 shrink-0 items-center justify-center rounded-md outline-none transition-colors hover:bg-accent/50",
         "focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
-        "data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
         className,
       )}
     >
-      {checked && <Check className="size-3.5" />}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "inline-flex size-4 items-center justify-center rounded-[4px] border shadow-xs transition-colors",
+          checked
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-input bg-background",
+        )}
+      >
+        {checked && <Check className="size-3.5" />}
+      </span>
     </button>
   );
 }

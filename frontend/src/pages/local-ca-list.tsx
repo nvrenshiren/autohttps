@@ -3,7 +3,7 @@
  * 无筛选 / 无批量 / 无移除(H12:PRD F1–F4 未列筛选;LC5 不提供删除)。四态齐备(H3)。
  */
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Download, Landmark, Plus } from "lucide-react";
 import { useAppInfo, useRootCas } from "@/lib/queries";
 import type { RootCaSummary } from "@/bindings";
@@ -108,13 +108,15 @@ export function RootCaListPage() {
                 <TableSkeletonRows rows={4} cols={COLS} />
               ) : (
                 items.map((ca) => (
-                  <TableRow
-                    key={ca.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/local-ca/${ca.id}`)}
-                  >
-                    <TableCell>
-                      <span className="block max-w-[220px] truncate font-medium">{ca.name}</span>
+                  <TableRow key={ca.id}>
+                    <TableCell className="py-0">
+                      <Link
+                        to={"/local-ca/" + ca.id}
+                        aria-label={"查看根 CA 详情：" + ca.name}
+                        className="flex min-h-11 max-w-[220px] items-center truncate rounded-sm font-medium text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        {ca.name}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={ca.status} />
@@ -139,7 +141,7 @@ export function RootCaListPage() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button

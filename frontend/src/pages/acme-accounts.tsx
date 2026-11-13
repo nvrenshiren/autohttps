@@ -314,12 +314,13 @@ export function AcmeAccountsPage() {
               className="font-mono text-[13px]"
               value={emailValue}
               aria-invalid={!!emailError}
+              aria-describedby={emailError ? "edit-email-error" : undefined}
               onChange={(e) => {
                 setEmailValue(e.target.value);
                 setEmailError(null);
               }}
             />
-            {emailError && <p className="text-xs text-danger">{emailError}</p>}
+            {emailError && <p id="edit-email-error" role="alert" className="text-xs text-danger">{emailError}</p>}
           </div>
           <DialogFooter>
             <Button

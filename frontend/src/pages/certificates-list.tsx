@@ -1,9 +1,9 @@
 /**
  * 证书列表(certificates/list PRD)—— 状态 / 签发方式 / 域名筛选(可组合)+ 表格 + 四态。
- * 生命周期操作在详情页(H4);列表行点击进详情。禁批量(H12)。
+ * 生命周期操作在详情页(H4);域名入口键盘可达。禁批量(H12)。
  */
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Plus, Search, ShieldCheck } from "lucide-react";
 import { useCertificates } from "@/lib/queries";
 import { CERTIFICATE_STATUSES, ISSUANCE_METHODS } from "@/bindings";
@@ -83,6 +83,7 @@ export function CertificatesListPage() {
           <div className="relative w-full max-w-xs">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              aria-label="按域名搜索证书"
               placeholder="按域名搜索…"
               className="pl-8"
               value={domain}
@@ -99,7 +100,7 @@ export function CertificatesListPage() {
               setPage(1);
             }}
           >
-            <SelectTrigger size="sm" className="w-36">
+            <SelectTrigger aria-label="按证书状态筛选" size="sm" className="w-36">
               <SelectValue placeholder="状态" />
             </SelectTrigger>
             <SelectContent>
@@ -118,7 +119,7 @@ export function CertificatesListPage() {
               setPage(1);
             }}
           >
-            <SelectTrigger size="sm" className="w-32">
+            <SelectTrigger aria-label="按签发方式筛选" size="sm" className="w-32">
               <SelectValue placeholder="签发方式" />
             </SelectTrigger>
             <SelectContent>
@@ -184,14 +185,16 @@ export function CertificatesListPage() {
                 items.map((c) => {
                   const primary = c.domains[0]?.hostname ?? "(无域名)";
                   return (
-                    <TableRow
-                      key={c.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/certificates/${c.id}`)}
-                    >
-                      <TableCell>
+                    <TableRow key={c.id}>
+                      <TableCell className="py-0">
                         <div className="flex items-center gap-2">
-                          <Mono className="max-w-[220px] truncate">{primary}</Mono>
+                          <Link
+                            to={"/certificates/" + c.id}
+                            aria-label={"查看证书详情：" + primary}
+                            className="inline-flex min-h-11 items-center rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          >
+                            <Mono className="max-w-[220px] truncate">{primary}</Mono>
+                          </Link>
                           {c.domains.length > 1 && (
                             <span className="text-xs text-muted-foreground">
                               +{c.domains.length - 1}

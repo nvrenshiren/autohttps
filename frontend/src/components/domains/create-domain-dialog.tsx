@@ -113,10 +113,11 @@ export function CreateDomainDialog({
               placeholder="example.com 或 *.example.com"
               className="font-mono text-[13px]"
               aria-invalid={!!errors.hostname}
+              aria-describedby={errors.hostname ? "hostname-error" : undefined}
               {...register("hostname")}
             />
             {errors.hostname && (
-              <p className="text-xs text-danger">{errors.hostname.message}</p>
+              <p id="hostname-error" className="text-xs text-danger">{errors.hostname.message}</p>
             )}
           </div>
 
@@ -126,13 +127,17 @@ export function CreateDomainDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>验证方式(可选)</Label>
+            <Label htmlFor="validation-method">验证方式(可选)</Label>
             <Controller
               control={control}
               name="validationMethod"
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    id="validation-method"
+                    aria-describedby={errors.validationMethod ? "validation-error" : "validation-help"}
+                    className="w-full"
+                  >
                     <SelectValue placeholder="未设置" />
                   </SelectTrigger>
                   <SelectContent>
@@ -143,9 +148,9 @@ export function CreateDomainDialog({
               )}
             />
             {errors.validationMethod && (
-              <p className="text-xs text-danger">{errors.validationMethod.message}</p>
+              <p id="validation-error" className="text-xs text-danger">{errors.validationMethod.message}</p>
             )}
-            <p className="text-xs text-muted-foreground">通配符域名(*.）必须使用 DNS-01。</p>
+            <p id="validation-help" className="text-xs text-muted-foreground">通配符域名(*.）必须使用 DNS-01。</p>
           </div>
 
           <div className="space-y-1.5">

@@ -227,6 +227,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh min-h-0 bg-transparent text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-background focus:px-4 focus:py-3 focus:text-foreground focus:shadow-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        跳到主要内容
+      </a>
       <Sidebar pendingCount={pendingCount} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur-md sm:px-6">
@@ -257,7 +263,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main id="main-content" className="min-h-0 flex-1 overflow-auto overscroll-contain pb-20 md:pb-0">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-h-0 flex-1 overflow-auto overscroll-contain pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0"
+        >
           <div key={location.pathname} className="page-in min-h-full">
             {children}
           </div>

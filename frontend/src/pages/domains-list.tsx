@@ -3,7 +3,7 @@
  * 四态齐备(H3);删除走 AlertDialog 二次确认(H5);被证书关联则禁用删除并 Tooltip 原因(H4)。
  */
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Globe, MoreHorizontal, Plus, Search, Trash2 } from "lucide-react";
 import { useDeleteDomain, useDomains } from "@/lib/queries";
 import type { DomainSummary } from "@/bindings";
@@ -97,6 +97,7 @@ export function DomainsListPage() {
           <div className="relative w-full max-w-xs">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              aria-label="搜索域名"
               placeholder="搜索 hostname…"
               className="pl-8"
               value={search}
@@ -157,14 +158,16 @@ export function DomainsListPage() {
                 items.map((d) => {
                   const blockedDelete = d.certificateCount > 0;
                   return (
-                    <TableRow
-                      key={d.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/domains/${d.id}`)}
-                    >
-                      <TableCell>
+                    <TableRow key={d.id}>
+                      <TableCell className="py-0">
                         <div className="flex items-center gap-2">
-                          <Mono className="max-w-[220px] truncate">{d.hostname}</Mono>
+                          <Link
+                            to={"/domains/" + d.id}
+                            aria-label={"查看域名详情：" + d.hostname}
+                            className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          >
+                            <Mono className="max-w-[220px] truncate">{d.hostname}</Mono>
+                          </Link>
                           {d.isWildcard && <WildcardBadge />}
                         </div>
                       </TableCell>
@@ -191,10 +194,10 @@ export function DomainsListPage() {
                       <TableCell className="text-muted-foreground">
                         {relativeTime(d.updatedAt)}
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="更多操作">
+                            <Button variant="ghost" size="icon" aria-label={"更多操作：" + d.hostname}>
                               <MoreHorizontal />
                             </Button>
                           </DropdownMenuTrigger>

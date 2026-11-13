@@ -21,9 +21,9 @@ import { toast } from "@/components/ui/sonner";
 type Mode = "create" | "import";
 type Errors = Partial<Record<"name" | "validityDays" | "certPem" | "privateKeyPem" | "keyPassphrase", string>>;
 
-function FieldError({ msg }: { msg?: string }) {
+function FieldError({ id, msg }: { id: string; msg?: string }) {
   if (!msg) return null;
-  return <p className="text-xs text-danger">{msg}</p>;
+  return <p id={id} role="alert" className="text-xs text-danger">{msg}</p>;
 }
 
 export function RootCaCreatePage() {
@@ -139,7 +139,7 @@ export function RootCaCreatePage() {
       />
 
       {/* 分段:创建 / 导入(二选一) */}
-      <div className="mb-5 inline-flex rounded-lg border border-border bg-muted/40 p-1">
+      <div role="group" aria-label="根 CA 操作方式" className="mb-5 inline-flex rounded-lg border border-border bg-muted/40 p-1">
         {(
           [
             { m: "create" as const, label: "创建新根 CA", Icon: Plus },
@@ -150,14 +150,15 @@ export function RootCaCreatePage() {
             key={m}
             type="button"
             onClick={() => switchMode(m)}
+            aria-pressed={mode === m}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              "inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-9",
               mode === m
                 ? "bg-background text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Icon className="size-4" />
+            <Icon aria-hidden="true" className="size-4" />
             {label}
           </button>
         ))}
@@ -183,9 +184,10 @@ export function RootCaCreatePage() {
                 placeholder="如 内网根 CA / Corp Root CA"
                 value={name}
                 aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? "ca-name-error" : undefined}
                 onChange={(e) => setName(e.target.value)}
               />
-              <FieldError msg={errors.name} />
+              <FieldError id="ca-name-error" msg={errors.name} />
             </div>
 
             {mode === "create" ? (
@@ -200,10 +202,11 @@ export function RootCaCreatePage() {
                   className="max-w-40 font-mono text-[13px]"
                   value={validityDays}
                   aria-invalid={!!errors.validityDays}
+                  aria-describedby={errors.validityDays ? "ca-validity-error ca-validity-help" : "ca-validity-help"}
                   onChange={(e) => setValidityDays(e.target.value)}
                 />
-                <FieldError msg={errors.validityDays} />
-                <p className="text-xs text-muted-foreground">
+                <FieldError id="ca-validity-error" msg={errors.validityDays} />
+                <p id="ca-validity-help" className="text-xs text-muted-foreground">
                   自现在起的有效天数(如 3650 ≈ 10 年);到期后需创建 / 导入新根接替。密钥算法等技术参数由系统采用合理默认。
                 </p>
               </div>
@@ -220,9 +223,10 @@ export function RootCaCreatePage() {
                     className="font-mono text-[12px]"
                     value={certPem}
                     aria-invalid={!!errors.certPem}
+                    aria-describedby={errors.certPem ? "ca-cert-error" : undefined}
                     onChange={(e) => setCertPem(e.target.value)}
                   />
-                  <FieldError msg={errors.certPem} />
+                  <FieldError id="ca-cert-error" msg={errors.certPem} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="ca-key">
@@ -235,9 +239,10 @@ export function RootCaCreatePage() {
                     className="font-mono text-[12px]"
                     value={privateKeyPem}
                     aria-invalid={!!errors.privateKeyPem}
+                    aria-describedby={errors.privateKeyPem ? "ca-key-error" : undefined}
                     onChange={(e) => setPrivateKeyPem(e.target.value)}
                   />
-                  <FieldError msg={errors.privateKeyPem} />
+                  <FieldError id="ca-key-error" msg={errors.privateKeyPem} />
                   <p className="text-xs text-muted-foreground">
                     校验证书与私钥配对、且证书为可用根 CA;若证书本身已过期,导入后直接判为「已过期」。私钥为敏感数据,校验后加密落地。
                   </p>
@@ -251,9 +256,10 @@ export function RootCaCreatePage() {
                     placeholder="未加密可留空"
                     value={keyPassphrase}
                     aria-invalid={!!errors.keyPassphrase}
+                    aria-describedby={errors.keyPassphrase ? "ca-pass-error" : undefined}
                     onChange={(e) => setKeyPassphrase(e.target.value)}
                   />
-                  <FieldError msg={errors.keyPassphrase} />
+                  <FieldError id="ca-pass-error" msg={errors.keyPassphrase} />
                 </div>
               </>
             )}

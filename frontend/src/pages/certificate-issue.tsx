@@ -141,7 +141,7 @@ export function CertificateIssuePage() {
       <form onSubmit={onSubmit} className="space-y-5">
         {/* 选择域名 */}
         <Card className="gap-0 overflow-hidden py-0">
-          <CardHeader className="flex-row items-center justify-between border-b border-border py-4">
+          <CardHeader className="flex-col items-stretch justify-between gap-3 border-b border-border py-4 md:flex-row md:items-center">
             <CardTitle className="text-sm">
               选择域名(SAN)
               {selected.size > 0 && (
@@ -150,11 +150,12 @@ export function CertificateIssuePage() {
                 </span>
               )}
             </CardTitle>
-            <div className="relative w-48">
+            <div className="relative w-full md:w-48">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                aria-label="搜索可签发域名"
                 placeholder="搜索域名…"
-                className="h-8 pl-8"
+                className="h-11 pl-8 md:h-9"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -201,7 +202,7 @@ export function CertificateIssuePage() {
                       onClick={() => toggle(d.id)}
                       aria-pressed={isSel}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors",
+                        "flex min-h-11 w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         isSel
                           ? "border-primary bg-accent"
                           : "border-border hover:bg-accent/50",
@@ -213,7 +214,7 @@ export function CertificateIssuePage() {
                           isSel ? "border-primary bg-primary text-primary-foreground" : "border-input",
                         )}
                       >
-                        {isSel && <Check className="size-3" />}
+                        {isSel && <Check aria-hidden="true" className="size-3" />}
                       </span>
                       <Mono className="min-w-0 flex-1 truncate">{d.hostname}</Mono>
                       {d.isWildcard && <WildcardBadge />}
@@ -234,7 +235,7 @@ export function CertificateIssuePage() {
             <CardTitle className="text-sm">签发方式</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 pb-6">
-            <div className="inline-flex rounded-lg border border-border bg-muted/40 p-1">
+            <div role="group" aria-label="签发方式" className="inline-flex rounded-lg border border-border bg-muted/40 p-1">
               {(
                 [
                   { m: "self_signed" as const, label: "自签根 CA", Icon: Landmark },
@@ -248,14 +249,15 @@ export function CertificateIssuePage() {
                     setMethod(m);
                     setFormError(null);
                   }}
+                  aria-pressed={method === m}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    "inline-flex min-h-11 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-9",
                     method === m
                       ? "bg-background text-foreground shadow-xs"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <Icon className="size-4" />
+                  <Icon aria-hidden="true" className="size-4" />
                   {label}
                 </button>
               ))}
@@ -263,7 +265,7 @@ export function CertificateIssuePage() {
 
             {method === "self_signed" ? (
               <div className="space-y-1.5">
-                <Label>根 CA</Label>
+                <Label htmlFor="issue-root-ca">根 CA</Label>
                 {rootCasQ.isLoading ? (
                   <Skeleton className="h-9 w-full max-w-sm" />
                 ) : rootCas.length === 0 ? (
@@ -286,7 +288,7 @@ export function CertificateIssuePage() {
                   </Alert>
                 ) : (
                   <Select value={rootCaId} onValueChange={setRootCaId}>
-                    <SelectTrigger className="w-full max-w-sm">
+                    <SelectTrigger id="issue-root-ca" className="w-full max-w-sm">
                       <SelectValue placeholder="选择用于签发的根 CA" />
                     </SelectTrigger>
                     <SelectContent>
@@ -305,7 +307,7 @@ export function CertificateIssuePage() {
             ) : (
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label>ACME 账户</Label>
+                  <Label htmlFor="issue-acme-account">ACME 账户</Label>
                   {accountsQ.isLoading ? (
                     <Skeleton className="h-9 w-full max-w-sm" />
                   ) : accounts.length === 0 ? (
@@ -328,7 +330,7 @@ export function CertificateIssuePage() {
                     </Alert>
                   ) : (
                     <Select value={acmeAccountId} onValueChange={setAcmeAccountId}>
-                      <SelectTrigger className="w-full max-w-sm">
+                      <SelectTrigger id="issue-acme-account" className="w-full max-w-sm">
                         <SelectValue placeholder="选择用于签发的 ACME 账户" />
                       </SelectTrigger>
                       <SelectContent>

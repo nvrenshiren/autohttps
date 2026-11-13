@@ -2,14 +2,14 @@
  * 域名详情(domains/detail PRD)—— 基本信息 + 编辑(分组/备注/验证方式,PATCH)+ 关联证书投影 + 删除。
  */
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router";
-import { Globe, Loader2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router";
+import { ChevronRight, Globe, Loader2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 import { useDeleteDomain, useDomain, useUpdateDomain } from "@/lib/queries";
 import type { ValidationMethod } from "@/bindings";
 import { ApiError } from "@/lib/api";
 import { PageHeader } from "@/components/shared/page-header";
 import { ErrorState, EmptyState } from "@/components/shared/states";
-import { StatusBadge } from "@/components/status-badge";
+import { StatusBadge, statusLabel } from "@/components/status-badge";
 import { IssuanceMethodBadge, ValidationMethodBadge, WildcardBadge } from "@/components/shared/category-badges";
 import { Mono } from "@/components/shared/mono";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -234,13 +234,16 @@ export function DomainDetailPage() {
               </TableHeader>
               <TableBody>
                 {data.certificates.map((c) => (
-                  <TableRow
-                    key={c.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/certificates/${c.id}`)}
-                  >
-                    <TableCell>
-                      <StatusBadge status={c.status} />
+                  <TableRow key={c.id}>
+                    <TableCell className="py-0">
+                      <Link
+                        to={"/certificates/" + c.id}
+                        aria-label={"查看 " + data.hostname + " 的证书详情：" + (c.issuanceMethod === "acme" ? "ACME" : "自签") + "，" + statusLabel(c.status)}
+                        className="inline-flex min-h-11 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        <StatusBadge status={c.status} />
+                        <ChevronRight aria-hidden="true" className="ml-1 size-4 self-center text-link" />
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <IssuanceMethodBadge method={c.issuanceMethod} />

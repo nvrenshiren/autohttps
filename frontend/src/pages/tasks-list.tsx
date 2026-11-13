@@ -1,11 +1,11 @@
 /**
  * 任务列表(tasks/list PRD)—— 队列 + 历史统一一表(DEC1);类型 / 状态 / 关联证书 / 时间四类可组合筛选
- * (F2–F5)。行内进详情(F6)。重试仅 failed、取消仅 queued/running(H4 禁用 + Tooltip);二次确认后
+ * (F2–F5)。任务类型链接进详情(F6)。重试仅 failed、取消仅 queued/running(H4 禁用 + Tooltip);二次确认后
  * 接真端点(取消驱动证书回退)。无批量(H12)。四态齐备(H3)。
  */
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
-import { ListChecks, MoreHorizontal, RotateCw, Search, XCircle } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { ChevronRight, ListChecks, MoreHorizontal, RotateCw, Search, XCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { qk, useTasks } from "@/lib/queries";
 import type { TaskSummary } from "@/bindings";
@@ -153,7 +153,7 @@ export function TasksListPage() {
               setPage(1);
             }}
           >
-            <SelectTrigger size="sm" className="w-32">
+            <SelectTrigger aria-label="按任务类型筛选" size="sm" className="w-32">
               <SelectValue placeholder="类型" />
             </SelectTrigger>
             <SelectContent>
@@ -172,7 +172,7 @@ export function TasksListPage() {
               setPage(1);
             }}
           >
-            <SelectTrigger size="sm" className="w-40">
+            <SelectTrigger aria-label="按任务状态筛选" size="sm" className="w-40">
               <SelectValue placeholder="状态" />
             </SelectTrigger>
             <SelectContent>
@@ -187,12 +187,12 @@ export function TasksListPage() {
           </Select>
           <div className="flex items-center gap-1.5">
             <Label htmlFor="task-from" className="text-xs text-muted-foreground">
-              入队
+              开始日期
             </Label>
             <Input
               id="task-from"
               type="date"
-              className="h-8 w-36"
+              className="w-36 md:h-8"
               value={dateFrom}
               onChange={(e) => {
                 setDateFrom(e.target.value);
@@ -201,8 +201,10 @@ export function TasksListPage() {
             />
             <span className="text-xs text-muted-foreground">→</span>
             <Input
+              aria-label="结束日期"
+              id="task-to"
               type="date"
-              className="h-8 w-36"
+              className="w-36 md:h-8"
               value={dateTo}
               onChange={(e) => {
                 setDateTo(e.target.value);
@@ -266,20 +268,21 @@ export function TasksListPage() {
                   const primary = domains[0];
                   const summary = t.status === "failed" ? t.failureReason : t.resultSummary;
                   return (
-                    <TableRow
-                      key={t.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/tasks/${t.id}`)}
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
+                    <TableRow key={t.id}>
+                      <TableCell className="py-0">
+                        <Link
+                          to={"/tasks/" + t.id}
+                          aria-label={"查看" + taskTypeLabel(t.taskType) + "任务详情" + (t.attemptNumber > 1 ? "，第 " + t.attemptNumber + " 次尝试" : "")}
+                          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        >
                           <TaskTypeBadge type={t.taskType} />
                           {t.attemptNumber > 1 && (
                             <span className="text-xs text-muted-foreground">
                               #{t.attemptNumber}
                             </span>
                           )}
-                        </div>
+                          <ChevronRight aria-hidden="true" className="size-3.5 text-link" />
+                        </Link>
                       </TableCell>
                       <TableCell>
                         {t.certificateDeleted ? (
@@ -327,7 +330,7 @@ export function TasksListPage() {
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCell>
                         <RowActions
                           task={t}
                           onView={() => navigate(`/tasks/${t.id}`)}
@@ -374,7 +377,13 @@ function RowActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="更多操作">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={
+            "更多操作：" + (task.certificateDomains?.[0] ?? taskTypeLabel(task.taskType))
+          }
+        >
           <MoreHorizontal />
         </Button>
       </DropdownMenuTrigger>

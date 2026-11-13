@@ -6,12 +6,12 @@ import type { IssuanceMethod, TaskTrigger, TaskType, ValidationMethod } from "@/
 export function IssuanceMethodBadge({ method }: { method: IssuanceMethod }) {
   return method === "acme" ? (
     <Badge variant="outline">
-      <KeyRound className="size-3" />
+      <KeyRound aria-hidden="true" className="size-3" />
       ACME
     </Badge>
   ) : (
     <Badge variant="outline">
-      <Landmark className="size-3" />
+      <Landmark aria-hidden="true" className="size-3" />
       自签
     </Badge>
   );
