@@ -19,6 +19,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -40,7 +41,7 @@ const NAV: NavItem[] = [
 ];
 
 const MOBILE_NAV = NAV.filter((item) =>
-  ["/", "/domains", "/certificates", "/tasks", "/settings"].includes(item.to),
+  ["/", "/domains", "/certificates", "/tasks"].includes(item.to),
 );
 
 function BrandMark() {
@@ -150,7 +151,7 @@ function MobileMoreMenu({ active }: { active: boolean }) {
           aria-label="更多导航"
           aria-current={active ? "page" : undefined}
           className={cn(
-            "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium text-muted-foreground transition-colors",
+            "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             active && "bg-accent text-accent-foreground",
           )}
         >
@@ -161,14 +162,21 @@ function MobileMoreMenu({ active }: { active: boolean }) {
       <DropdownMenuContent align="end" side="top" className="mb-2 min-w-48">
         <DropdownMenuItem asChild>
           <NavLink to="/acme" className="flex w-full items-center gap-2">
-            <BadgeCheck />
+            <BadgeCheck aria-hidden="true" />
             ACME 账户
           </NavLink>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <NavLink to="/local-ca" className="flex w-full items-center gap-2">
-            <Landmark />
+            <Landmark aria-hidden="true" />
             根 CA
+          </NavLink>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <NavLink to="/settings" className="flex w-full items-center gap-2">
+            <SettingsIcon aria-hidden="true" />
+            设置
           </NavLink>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -177,7 +185,10 @@ function MobileMoreMenu({ active }: { active: boolean }) {
 }
 
 function MobileNavigation({ pathname }: { pathname: string }) {
-  const moreActive = pathname.startsWith("/acme") || pathname.startsWith("/local-ca");
+  const moreActive =
+    pathname.startsWith("/acme") ||
+    pathname.startsWith("/local-ca") ||
+    pathname.startsWith("/settings");
 
   return (
     <nav
@@ -192,7 +203,7 @@ function MobileNavigation({ pathname }: { pathname: string }) {
           aria-label={label}
           className={({ isActive }) =>
             cn(
-              "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium transition-colors",
+              "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-medium transition-colors hover:bg-accent/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground",
             )
           }
