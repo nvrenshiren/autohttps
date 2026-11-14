@@ -1,17 +1,13 @@
-# 开发过程说明
+# 项目工作流程
 
-本项目的**契约层**(需求 / 架构 / 设计)与**实现层**(代码)采用了不同的产出与追溯方式,如实记录如下,便于未来读者理解本仓库的产出方式。
+## 契约与设计
 
-## 契约层 —— opcflow 信任流程
+- 产品需求、流程和页面契约维护在 `docs/prd/`;API 与数据库约定维护在 `docs/architecture/`;设计系统接入维护在 `docs/design/`。
+- 修改行为前先读对应的项目规则和契约,并遵循各文档标明的审核状态。上游契约变更按角色规则登记、送审。
+- UI 的品牌、token 与组件表达以 `docs/design/cohesion-adoption.md` 和 COHESION 正式规范为准;页面范围与交互以对应 PRD/API 契约为准。
 
-`docs/prd`(需求 PRD / 流程 / 模块 / 页面)、`docs/architecture`(数据库 schema / API 契约 / 技术基线)、`docs/design`(设计系统 + 部分 HTML 原型)由分角色 agent(product-manager / architect / designer)逐层产出,经 [opcflow](https://www.npmjs.com/package/@dawipong/opcflow) 的 `submit → approve` 信任流程**逐份人工审批**(截至定稿:共 55 份产物审批通过、0 打回)。这些是代码的上游契约。
+## 实现与复核
 
-其中若干**产品口径决策**(如一证多域 SAN、多根 CA 并存、存储路径只读、取消→证书回退转移、ACME 选型、UI 栈等)在审批过程中显式提请并由 orchestrator 裁决,决策记录 append-only 保留在对应 `docs/` 文件中。
-
-## 实现层 —— 直接构建 + git 追溯
-
-`crates/`(Rust:`core` / `api` / `server` / `desktop`)与 `frontend/`(React)的实现**未走 opcflow 的 `plan → claim → complete` 任务循环**,而是由 developer agent 按**已审批契约**直接构建:每个切片先保证 `cargo check --workspace` + `npm run build` 全绿,再**运行时验证**(起服务 curl / 浏览器 UI 实测,ACME 对本地 Pebble 测试服务器实测)后提交。
-
-**因此,实现的权威、完整记录是 git 提交历史** —— 每个提交信息描述做了什么,并附带当时的验证结论(如"续签后 serial 变、仍 valid"、"DNS-01 awaiting_manual → confirm → valid")。工作台(opcflow)反映的是契约审批,不反映实现任务谱系;两者互补。
-
-> 这是有意的取舍:优先保证功能端到端做完并逐一验证,而非补一套事后的任务台账。git 历史比事后补录的 claim/complete 记录更可信。
+- 实现任务遵循 `.claude/agents/` 或 `.opencode/agents/` 中对应角色的 claim、gate、complete 流程。代码由 Git 追踪,不单独登记为契约产物。
+- 常用命令见 `CONTRIBUTING.md`;CI 工作流见 `.github/workflows/ci.yml` 与 `.github/workflows/portable.yml`。本地按改动范围执行适用的格式、类型、静态检查、测试和构建。
+- 项目记忆索引位于 `.claude/agent-memory/*/MEMORY.md`;仅记录可复用的结论、理由、验证状态与下一步。

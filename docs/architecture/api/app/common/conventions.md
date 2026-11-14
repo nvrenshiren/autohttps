@@ -1,7 +1,7 @@
 # API 契约 · 跨模块共用约定(common)
 
 > 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `TECH.md §3 编码协议`(REST 风格 / camelCase / 枚举 snake_case / limit-offset 分页 / 错误包络 / RFC3339 UTC)· `TECH.md §4.3 枚举` · `ARCHITECTURE.md §3`(方案 A 统一 HTTP/WS)· `ARCHITECTURE.md §9 / §11`(SSE 推送 + 轮询兜底;D4 无鉴权;D3 止于导出)· 8 份 DB 文档(实体 → DTO)。
+> 依据(approved,唯一设计依据): `TECH.md §3 编码协议`(REST 风格 / camelCase / 枚举 snake_case / limit-offset 分页 / 错误包络 / RFC3339 UTC)· `TECH.md §4.3 枚举` · `ARCHITECTURE.md §3`(方案 A 统一 HTTP + SSE)· `ARCHITECTURE.md §9 / §11`(SSE 推送 + 轮询兜底;D4 无鉴权;D3 止于导出)· 8 份 DB 文档(实体 → DTO)。
 > 本文件是**全部 API 契约文档的共用锚**:错误包络、HTTP 状态映射、分页/排序/过滤、无鉴权模型、导出交付形态差异统一在此;各模块 API 文档服从本约定。全局 SSE 事件流契约见 [`events.md`](./events.md)。
 
 ---

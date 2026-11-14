@@ -1,7 +1,7 @@
 /**
- * StatusBadge —— 状态色语义**单一入口**(设计 §3 / DS2)。5 台状态机全部态 → 5 语义级 + lucide 图标。
+ * StatusBadge —— 状态语义的单一呈现入口(业务映射见 docs/design/systems/app.md §3)。
  *
- * 这是 protocolLint L1 允许的唯一"状态字面量映射"落点(§3.2 的投影):其余组件禁手搓状态色/映射,
+ * 这是状态字面量映射的唯一落点(§3.2):其余组件禁手搓状态色/映射,
  * 一律经此渲染。wire 值跨状态机的碰撞(failed/cancelled/expired)映射到同一 §3.2 语义,故用扁平表。
  */
 import {
@@ -29,7 +29,7 @@ interface StatusMeta {
   spin?: boolean;
 }
 
-// 逐态立法(§3.2)。info 内:排队/待开始用静态 Clock;执行中用旋转 LoaderCircle(DS3)。
+// 状态映射见 §3.2。info 内:排队/待开始用静态 Clock;执行中用旋转 LoaderCircle。
 const STATUS_META: Record<string, StatusMeta> = {
   // 证书 10 态
   pending_issue: { label: "待签发", variant: "info", Icon: Clock },
@@ -48,7 +48,7 @@ const STATUS_META: Record<string, StatusMeta> = {
   succeeded: { label: "成功", variant: "success", Icon: CircleCheckBig },
   failed: { label: "失败", variant: "danger", Icon: CircleX },
   cancelled: { label: "已取消", variant: "neutral", Icon: CircleSlash },
-  // 挑战 6 态(pending/validating/passed 见上/下;awaiting_manual 归 warning,DS4)
+  // 挑战 6 态(pending/validating/passed 见上/下;awaiting_manual 归 warning)
   pending: { label: "待验证", variant: "info", Icon: Clock },
   awaiting_manual: { label: "等待手动配置", variant: "warning", Icon: Hourglass },
   validating: { label: "验证中", variant: "info", Icon: LoaderCircle, spin: true },

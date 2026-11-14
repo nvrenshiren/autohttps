@@ -4,7 +4,7 @@
 > 依据(approved,直接消费):
 > - 页面 PRD `docs/prd/pages/app/dashboard/overview.md`(F1–F5、页面流转、验收 1–14)
 > - API 契约 `docs/architecture/api/app/dashboard.md`(`DashboardOverview` / `PendingCertItem` DTO 字段;**原型不写路径**,仅据其定字段)
-> - 设计系统 `docs/design/systems/app.md`(色板/§2 token/**§3 状态色**/§3.4 dashboard 权重立法/组件/§8 App Shell/**§10 H1–H12**)
+> - 逐科品牌、Token、Shell 与组件样式：`docs/design/cohesion-adoption.md`；业务状态与交互约束：`docs/design/systems/app.md` §3、§7、§8、§10。
 > - 证书状态语义引用 systems §3.2;不复述状态定义。
 
 ---
@@ -17,8 +17,8 @@ autohttps 启动首屏。把散落各模块的证书状态**聚合成一屏**:�
 
 ## 2. 布局结构(承 §8 App Shell)
 
-- **App Shell**:左侧栏 240px(7 导航项,§9.1 图标顺序;**红点仅挂总览项**,§8.2)+ 顶栏 h-14(左=面包屑「总览」;右=主题切换)。活动项为「总览」。
-- **内容区**(`p-6`,满宽但内容块自然宽度):自上而下三区块——
+- **App Shell**:左侧导航与顶栏遵循 COHESION 接入说明及 AppShell 实现;**红点仅挂总览项**(systems §3.4)。活动项为「总览」。
+- **内容区**:沿用 App 页面容器,按可用宽度响应布局,自上而下三区块——
   1. **概览三指标**(F1):3 列指标卡(`grid` 3 列,窄屏折 1 列)。
   2. **待处理清单**(F2/F4):区块标题 + 清单卡片(逐条行)。
   3. **常用操作入口**(F5):4 个快速入口(`grid` 2/4 列)。
@@ -29,27 +29,27 @@ autohttps 启动首屏。把散落各模块的证书状态**聚合成一屏**:�
 
 ### 3.1 概览三指标(F1,唯一允许的统计卡片 · §10-H12)
 
-三张指标卡(`p-5`,`card-title` 标签 + `metric-number` 数字 + 右上语义图标),口径引用 API `DashboardOverview.metrics`:
+三张指标卡使用现有卡片组件,清楚区分指标名称、数值和语义图标;口径引用 API `DashboardOverview.metrics`:
 
-| 卡 | 字段 | 视觉(严格照 §3.4 / DS8) |
+| 卡 | 字段 | 视觉(严格照 systems §3.4) |
 | --- | --- | --- |
 | 证书总数 | `metrics.totalCount` | **中性**:数字 `text-foreground`、标签 `text-muted-foreground`、图标 `ShieldCheck`(muted) |
 | 即将到期数 | `metrics.expiringSoonCount` | `>0` → 数字 `text-warning` + 图标 `Clock text-warning`;`=0` → 退回中性 |
 | 失败数 | `metrics.failedCount` | `>0` → 数字 `text-danger` + 图标 `TriangleAlert text-danger`;`=0` → 退回中性 |
 
-> **规则**:强调色只在计数 `>0` 出现(健康系统=中性,不无谓报警)。**不放第 4 张卡、不放任何分布图表**(§10-H12;chart token 仅预留)。
+> **规则**:强调色只在计数 `>0` 出现(健康系统=中性,不无谓报警)。**不放第 4 张卡、不放任何分布图表**(§10-H12)。
 
 ### 3.2 待处理清单(F2 · F4,数据来自 `pendingItems[]`,服务端已排序)
 
-- 每行字段(引用 `PendingCertItem`):关联域名 `domains[]`、当前状态 `status`(→ StatusBadge,§3.2)、有效期 `notAfter` + `daysUntilExpiry`(相对时间 + Tooltip 绝对,§10-H11;绝对时间 mono §10-H8)。
-- **排序**(§3.4):已过期 `expired` 居首 → 其余告警级(`issue_failed` / `renewal_failed`)→ 关注级(`expiring_soon`)。
-- **行视觉分级**:告警级行左侧 `3px` `bg-danger` 指示条 + `danger` Badge;关注级行左侧 `3px` `bg-warning` 指示条 + `warning` Badge(§3.4)。告警整体权重 > 关注。
+- 每行字段(引用 `PendingCertItem`):关联域名 `domains[]`、当前状态 `status`(→ StatusBadge,systems §3.2)、有效期 `notAfter` + `daysUntilExpiry`(相对时间 + Tooltip 绝对,§10-H11;绝对时间 mono §10-H8)。
+- **排序**(systems §3.4):已过期 `expired` 居首 → 其余告警级(`issue_failed` / `renewal_failed`)→ 关注级(`expiring_soon`)。
+- **行视觉分级**:告警级行使用 danger 语义,关注级行使用 warning 语义(systems §3.4);告警整体权重 > 关注。
 - **跳转(F4)**:行主体点击 → 该证书详情(`certificateId`);失败态行额外给「失败原因 / 查看任务」`link` 按钮 → 最近任务(`latestTaskId`,为 null 时不出该入口)。
-- **正向空态**(§7.9 第 3 语气):当 `pendingCount=0` → `CheckCircle2 text-success` +「全部证书状态良好」,**无 CTA、无红点**。原型主渲染正常态;正向空态在提示词说明,可选演示。
+- **正向空态**(systems §7.9):当 `pendingCount=0` → `CheckCircle2 text-success` +「全部证书状态良好」,**无 CTA、无红点**。原型主渲染正常态;正向空态在提示词说明,可选演示。
 
-### 3.3 红点(F3 · §8.2)
+### 3.3 红点(F3 · systems §3.4)
 
-- 侧栏「总览」项图标右上:`8px bg-notification` 圆点 + 计数徽标(`min-w-4 h-4 px-1 text-[10px] bg-notification text-notification-foreground`),计数 = `pendingCount`(= 即将到期 + 失败),`>99` 显示 `99+`。
+- 侧栏「总览」项展示 `pendingCount`(即将到期 + 失败);具体标记样式由 COHESION 接入组件决定,`>99` 显示 `99+`。
 - **形态差异是页面级标注**(§10-H10):桌面=系统托盘角标(仅桌面);服务器=浏览器内(仅服务器);触发规则一致,原型以窗口内红点演示,附注标注形态差异。
 
 ### 3.4 常用操作入口(F5,前端路由,非 API)
@@ -62,21 +62,21 @@ autohttps 启动首屏。把散落各模块的证书状态**聚合成一屏**:�
 
 - **normal**(主渲染):三指标 + 5 条待处理 + 快速入口。
 - **loading**:指标卡 / 清单行 `Skeleton`(形状贴合)。
-- **empty(正向空)**:待处理清单为空 → §7.9 正向空态。
-- **error**:聚合拉取失败 → 内容区 `destructive` Alert + 「重试」(§7.9)。
+- **empty(正向空)**:待处理清单为空 → systems §7.9 正向空态。
+- **error**:聚合拉取失败 → 内容区 `destructive` Alert + 「重试」(systems §7.9)。
 - 本页无破坏性操作、无表单(纯聚合);无 disabled 操作态。
 
 ---
 
-## 5. 视觉 token 引用(不复制值,指向 systems/app.md)
+## 5. 视觉 token 引用(不复制值)
 
-色板 §1 / `@theme` §2;三指标与清单分级色 §3.1 / §3.4;字号 §4.2(page-title / card-title / metric-number / meta);间距密度 §5(指标卡 `p-5`、内容 `p-6`);圆角描边 §6;图标 §9。**一切颜色走 token 类 / `var(--…)`,禁裸色值(§10-H2)**。
+品牌、色彩、字号、间距、圆角、边界与图标遵循 `docs/design/cohesion-adoption.md` 和现有组件；指标语义与待办排序遵循 systems §3.4。**颜色使用语义 Token，不写裸色值(systems §10-H2)**。
 
 ---
 
 ## 6. 硬约束核对点(本页相关)
 
-- H2 无写死色值;状态经 StatusBadge + §3.2。
+- H2 无写死色值;状态经 StatusBadge + systems §3.2。
 - H3 四态齐(normal 主渲染 + loading/empty(正向空)/error 说明或演示)。
 - H8 有效期绝对时间 mono;H11 相对 + Tooltip 绝对。
 - H10 红点形态差异为页面级标注,一套视觉。

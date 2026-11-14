@@ -3,8 +3,8 @@
  *
  * 机制:core/api 的枚举与 DTO 均 `#[derive(ts_rs::TS)]`;本文件为其提交进版本库的投影
  * (契约允许"生成产物纳入版本库或构建期生成")。**前端只从这里 import 枚举/类型,禁在别处
- * 硬写状态字面量**(§4.2 / protocolLint L1)——唯一例外是设计系统 §3.2 的 StatusBadge 映射表
- * (`@/lib/status`),它是状态→呈现的单一入口。wire 值严格等于 TECH §4.3。
+ * 硬写状态字面量;唯一的状态到呈现映射位于 `@/components/status-badge`(设计系统 §3.2)。
+ * wire 值严格等于 TECH §4.3。
  */
 
 // ============ 枚举(§4.3 wire 值)============
@@ -59,7 +59,6 @@ export type ErrorCode =
   | "validation_failed"
   | "not_found"
   | "internal_error"
-  | "not_implemented"
   | "cert_not_found"
   | "cert_in_progress_cannot_delete"
   | "cert_not_exportable"

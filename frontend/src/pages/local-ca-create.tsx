@@ -1,7 +1,7 @@
 /**
  * 新增根 CA(local-ca/create PRD)—— 二选一:创建(F2,name+validityDays → POST /root-cas)/ 导入
  * (F3,cert+key+口令 → POST /root-cas/import)。本地离线瞬时,无过渡态(LC1);失败留页提示原因(H3)。
- * 分段控件走「分段」范式(设计 §7.5,替代未引入的 RadioGroup)。校验错误行内,提交结果 toast。
+ * 创建/导入方式使用分段控件；校验错误就近显示，提交结果使用 toast。
  */
 import { useState } from "react";
 import { useNavigate } from "react-router";

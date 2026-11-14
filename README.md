@@ -4,7 +4,7 @@
 
 **跨平台 HTTPS 证书全生命周期管理工具 · 桌面 + 服务器双形态**
 
-![Rust](https://img.shields.io/badge/Rust-1.9x-CE412B?logo=rust&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-1.88%2B%20MSRV-CE412B?logo=rust&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)
@@ -28,18 +28,18 @@
 - **实时可见**:总览首屏三指标(总数 / 即将到期 / 失败)+ 待处理清单 + 红点;SSE 实时推送,状态一变界面就刷新。
 - **两种运行形态,一套前端**
   - **桌面形态**(Tauri):800×600 窗口 + 系统托盘常驻、关窗不退出、开机自启、托盘红点角标。
-  - **服务器形态**:守护进程 + 浏览器 Web UI,7×24 常驻。
+  - **服务器形态**:前台服务器进程 + 浏览器 Web UI;可由操作系统服务管理器托管,保持长期运行。
 - **数据安全**:私钥 / ACME 账户密钥 / 根 CA 私钥经 [age](https://github.com/FiloSottile/age) 加密静态存储,数据库内只存引用、绝不明文,日志脱敏。
 
 ---
 
 ## 🚀 快速开始
 
-前置:Rust(1.9x)、Node.js(20+)。
+前置:Rust 1.88+、Node.js 20.19+ 或 22.12+。
 
 ```bash
 # 1) 构建前端(产物内嵌进可执行文件)
-cd frontend && npm install && npm run build && cd ..
+cd frontend && npm ci && npm run build && cd ..
 
 # 服务器形态:浏览器访问 Web UI
 cargo run -p server          # → http://127.0.0.1:8443
@@ -65,7 +65,7 @@ crates/
   core/      领域核心:5 台状态机枚举(单一真相)· SQLite 持久化(SeaORM)· ACME 客户端
              · 自签 CA(rcgen)· age 敏感数据存储 · 任务队列 + 执行器 · 到期扫描器
   api/       传输契约:axum Router(REST + 全局 SSE /events)· DTO · 内嵌 SPA
-  server/    服务器形态守护进程(bin)
+  server/    服务器形态进程(bin,前台运行)
   desktop/   桌面形态 Tauri v2 壳(bin,内嵌 api/core)
 frontend/    React 19 + Vite + TypeScript,两形态共用;经 react-query 打 /api
 docs/        prd(需求契约)· architecture(DB / API 契约)· design(设计系统)
@@ -77,16 +77,25 @@ docs/        prd(需求契约)· architecture(DB / API 契约)· design(设计�
 
 ## 🧪 用 Pebble 本地测 ACME
 
-无需真实域名 / 公网,用 Let's Encrypt 官方测试服务器 [Pebble](https://github.com/letsencrypt/pebble) 本地验证 ACME 客户端全流程:
+需要已安装 Go。无需真实域名 / 公网,用 Let's Encrypt 官方测试服务器 [Pebble](https://github.com/letsencrypt/pebble) 本地验证 ACME 客户端全流程:
 
 ```bash
-# 构建并以 always-valid 模式运行 Pebble(挑战自动判过)
+# 在 Pebble 仓库中运行(挑战自动判过)
 git clone --depth 1 https://github.com/letsencrypt/pebble && cd pebble
-go build -o pebble.exe ./cmd/pebble
-PEBBLE_VA_ALWAYS_VALID=1 ./pebble.exe -config test/config/pebble-config.json   # → https://localhost:14000/dir
 
-# autohttps 侧信任 Pebble 的 CA 根证书
-AUTOHTTPS_ACME_CA_CERT=<pebble>/test/certs/pebble.minica.pem cargo run -p server
+# Linux / macOS
+PEBBLE_VA_ALWAYS_VALID=1 go run ./cmd/pebble -config test/config/pebble-config.json
+
+# Windows PowerShell
+$env:PEBBLE_VA_ALWAYS_VALID = "1"
+go run ./cmd/pebble -config test/config/pebble-config.json
+
+# Linux / macOS
+AUTOHTTPS_ACME_CA_CERT=/path/to/pebble/test/certs/pebble.minica.pem cargo run -p server
+
+# Windows PowerShell
+$env:AUTOHTTPS_ACME_CA_CERT = "<pebble>\test\certs\pebble.minica.pem"
+cargo run -p server
 ```
 
 在 UI 里注册账户(directory 填 `https://localhost:14000/dir`)→ 签 ACME 证书 → HTTP-01 自动通过 / DNS-01 按向导确认 → 证书转「有效」。
@@ -103,11 +112,9 @@ AUTOHTTPS_ACME_CA_CERT=<pebble>/test/certs/pebble.minica.pem cargo run -p server
 
 ---
 
-## 📦 项目状态
+## 📦 当前范围
 
-MVP 核心功能完整可用(自签 + ACME 两条主线,桌面 + 服务器两形态),证书签发 / 续签 / 吊销 / 导出、到期扫描 / 自动续签、实时刷新均端到端验证通过。
-
-**非目标(MVP 明确不做)**:证书自动部署到 nginx / apache(止于导出,由用户自行部署)· 多渠道通知(仅红点)· Web UI 鉴权(默认仅本机 / 可信内网)· DNS-01 厂商 API 自动验证(仅手动)。
+不包含证书自动部署到 nginx / apache(止于导出,由用户自行部署)、多渠道通知、Web UI 鉴权或 DNS-01 厂商 API 自动验证。
 
 ---
 

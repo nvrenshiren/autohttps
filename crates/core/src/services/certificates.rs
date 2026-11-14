@@ -1,8 +1,8 @@
 //! 证书服务(API certificates)—— 全局枢纽。
 //!
 //! list / detail / create(全 §2.3 校验)/ delete / revoke / renew / retry / export 为**真实实现**;
-//! 异步执行(签发/续签/吊销)委托执行器(self_signed 已接入,acme 待后续)。取消经 tasks 端点,
-//! 驱动本模块 `rollback_on_cancel`(T21–T24)。
+//! 异步签发、续签和吊销由执行器承接,支持 self_signed 与 ACME。取消经 tasks 端点驱动
+//! rollback_on_cancel(T21–T24)。
 
 use crate::domain::enums::{
     AcmeAccountStatus, CertificateStatus, IssuanceMethod, RootCaStatus, TaskStatus, TaskTrigger,
@@ -509,7 +509,7 @@ pub async fn create(ctx: &CoreContext, input: IssueCertInput) -> CoreResult<Cert
     txn.commit().await?;
     emit_cert(ctx, &cert_id, CertificateStatus::PendingIssue);
 
-    // 入队 issue 任务(TT1);执行器承接 self_signed 签发 → 驱动证书 T2–T4(acme 待后续)。
+    // 入队 issue 任务(TT1);执行器按签发来源处理 self_signed 或 ACME。
     enqueue_task(
         ctx,
         &cert_id,
@@ -551,7 +551,7 @@ pub async fn revoke(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
     let cert = a.update(db).await?;
     emit_cert(ctx, &cert.id, CertificateStatus::Revoking);
 
-    // 入队 revoke 任务(TT1);执行器承接 self_signed 作废
+    // 入队 revoke 任务(TT1);执行器按签发来源处理本地作废或 ACME 吊销。
     enqueue_task(
         ctx,
         &cert.id,
@@ -568,7 +568,7 @@ pub async fn revoke(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
 }
 
 /// 续签 / 再获取(C1,§2.3 源态门控)→ 证书转 `renewing` + 入队 `renew` 任务;
-/// 执行器承接 self_signed 重签(经原根 CA、刷新同一行 serial/有效期,T12→valid,不新建实体 DC1)。202。
+/// 执行器按签发来源重签并刷新同一证书行(T12→valid,不新建实体 DC1)。202。
 pub async fn renew(ctx: &CoreContext, id: &str) -> CoreResult<CertDetailData> {
     let db = &ctx.db;
     let cert = certificates::Entity::find_by_id(id)

@@ -61,7 +61,7 @@ pub async fn delete(State(st): State<AppState>, Path(id): Path<String>) -> ApiRe
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// 续签 / 再获取(C1,T7/T9/T17/T20 → renewing)→ 入队 renew 任务;执行器承接 self_signed 重签。202。
+/// 续签 / 再获取(C1,T7/T9/T17/T20 → renewing)→ 入队 renew 任务;执行器按来源完成重签。202。
 pub async fn renew(
     State(st): State<AppState>,
     Path(id): Path<String>,
@@ -79,7 +79,7 @@ pub async fn retry(
     Ok((StatusCode::ACCEPTED, Json(dto::cert_detail(data))))
 }
 
-/// 吊销(D1,T8/T11/T16 → revoking)→ 入队 revoke 任务;执行器承接 self_signed 作废 → revoked。202。
+/// 吊销(D1,T8/T11/T16 → revoking)→ 入队 revoke 任务;执行器按来源完成吊销 → revoked。202。
 pub async fn revoke(
     State(st): State<AppState>,
     Path(id): Path<String>,

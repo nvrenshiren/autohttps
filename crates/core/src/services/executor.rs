@@ -3,15 +3,8 @@
 //! `tasks.status=queued` 行即待办队列;单进程单 worker 按 `queued_at` FIFO 取出,
 //! `queued→running→succeeded/failed`(TT2–TT4),据结果驱动证书状态机(唯一真相在 core,不复述)。
 //!
-//! **本切片范围**:承接 `self_signed` 的 `issue`(T2→T3/T4)、`renew`(T12/T13,经原根 CA 重签、
-//! 刷新同一行 serial/有效期,不新建实体 DC1)与 `revoke`(T18/T19);**acme 的 `issue`/`renew`
-//! (HTTP-01 + DNS-01 手动)与 `revoke`** 经 instant-acme 跑通:
-//! - issue/renew:建单→每域名取挑战→HTTP-01 放 webroot 文件通知就绪 / DNS-01 计算 TXT 置
-//!   `awaiting_manual` **挂起等待手动**→(全部就绪后)轮询→finalize→取证(renew 刷新同一行 DC1)。
-//! - revoke:向 CA 发吊销请求(revoke_cert)→ 证书 `revoking→revoked`(T18)。
-//! - **挂起等待手动**(DNS-01):任务遇 `awaiting_manual` 即让出 worker(任务留 `running`,不占 worker);
-//!   `POST /acme/challenges/{id}/confirm` 重建订单通知 CA 校验、全部通过后续推 finalize(见 [`confirm_challenge`])。
-//! - 日志脱敏(AR4/L6):`task_log_entries.message` **绝不含任何密钥材料**。
+//! self_signed 与 ACME 均支持签发、续签和吊销。DNS-01 挑战进入 `awaiting_manual` 后任务让出
+//! worker,由 `/acme/challenges/{id}/confirm` 继续执行。日志不包含密钥材料(AR4/L6)。
 
 use crate::domain::enums::{CertificateStatus, IssuanceMethod, TaskStatus, TaskType};
 use crate::domain::error::{CoreError, CoreResult, ErrorCode};

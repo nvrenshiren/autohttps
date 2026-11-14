@@ -3,7 +3,7 @@
 > 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术基线 · 端点: app · 撰写: architect
 > 信任基础: 全部 17 份 PRD 已 approved(2026-07-16);配套 [ARCHITECTURE.md](./ARCHITECTURE.md)。
 > 定位: 本文件定"用什么技术 + 编码协议"。§1 给技术栈、§2 给逐项决策清单(推荐 + 备选 + 理由);**§2 决策 1–10 已于 2026-07-16 由 orchestrator 全部确认(采纳全部推荐),下文措辞已相应落定**;§3 编码协议**一旦批准即定死、后续不得漂移**;§4 定枚举/字典单一真相机制(architect 唯一变更入口)。
-> 版本核实: 本文所有版本号为 **2026-07-16 经 crates.io / npm registry 实测的当前稳定版**(本会话未接入 context7 MCP,改用官方 registry 核实,详见 §6)。基线只锚定**大版本 + 选型**;精确锁版在实现期定。
+> 版本规则:本表记录当前采用的技术与兼容范围;精确依赖声明和解析版本分别以各 `Cargo.toml`、`Cargo.lock`、`frontend/package.json` 和 `frontend/package-lock.json` 为准。
 
 ---
 
@@ -13,11 +13,11 @@
 
 ### 1.1 语言与运行时
 
-| 维度 | 推荐 | 版本(2026-07-16) | 说明 |
+| 维度 | 推荐 | 当前基线 | 说明 |
 | --- | --- | --- | --- |
-| 后端语言 | Rust | 1.95(工具链实测);workspace MSRV 1.88(锁定依赖实测) | project §4 已定"同一 Rust 核心";跨平台、内存安全、生态齐备 |
-| 异步运行时 | tokio | 1.52 | ACME 在线交互 / 任务执行 / axum 均异步;事实标准 |
-| 前端语言 | TypeScript | **5.8(已确认稳妥线,不采 7.0)** | React 生态标准;已确认(orchestrator, 2026-07-16)采用 5.8 稳妥线——7.0 原生编译器太新、ts-rs 产物 / Vite 8 / shadcn 工具链跟进不确定;`tsc --noEmit` 作为 build 前置检查(§2-决策9) |
+| 后端语言 | Rust | MSRV 1.88 | project §4 已定"同一 Rust 核心";跨平台、内存安全、生态齐备 |
+| 异步运行时 | tokio | 1.x | ACME 在线交互 / 任务执行 / axum 均异步;事实标准 |
+| 前端语言 | TypeScript | **5.8 兼容基线(不采 7.0)** | 已确认采用 5.8 兼容线;决策时 7.0 较新,工具链兼容性未充分确认;`tsc --noEmit` 作为 build 前置检查(§2-决策9) |
 | 前端框架 | React | 19.2 | project §4/§9-D1 已定"同一 React + Vite 前端" |
 | 前端构建 | Vite | 8.1 | project §4/§9-D1 已定;当前主版 8.x |
 
@@ -26,51 +26,49 @@
 | 用途 | 推荐 | 版本 | 备选 | 标记 |
 | --- | --- | --- | --- | --- |
 | Web / HTTP 服务 | axum | 0.8 | actix-web / warp | 承 ARCHITECTURE §3 统一 HTTP 传输 |
-| HTTP 中间件 / 静态资源 | tower-http | 0.7(tower 0.5) | — | ServeDir / CORS / 压缩 |
-| SPA 内嵌打包 | rust-embed | 8.12 | tauri resource | 前端产物内嵌进可执行文件、离线自包含 |
-| SQLite 访问层 | **SeaORM** | 1.1(sea-orm-migration 1.1) | sqlx 0.9 / rusqlite 0.40 / diesel 2.3 | ✅ 决策2(已确认) |
+| HTTP 中间件 / 静态资源 | tower-http | 0.6(tower 0.5) | — | CORS / trace |
+| SPA 内嵌打包 | rust-embed | 8.x | Tauri resource | 前端产物内嵌进可执行文件、离线自包含 |
+| SQLite 访问层 | **SeaORM** | 1.1(sea-orm-migration 1.1) | sqlx(SQL-first) / rusqlite(同步) / diesel | ✅ 决策2(已确认) |
 | ACME 客户端 | **instant-acme** | 0.8 | acme2 / rustls-acme | ✅ 决策4(已确认) |
 | X.509 / 自签 CA | **rcgen** | 0.14 | openssl / rustls 原语 | ✅ 决策5(已确认) |
-| 证书/密钥解析(导入根 CA) | x509-parser + rustls-pemfile | 0.18 / 2.2 | — | 校验导入的根 CA 证书 + 私钥配对 |
-| 敏感数据静态加密 | **age** | 0.12 | aes-gcm 0.11 + argon2 0.5 | ✅ 决策3(已确认·加密基线) |
-| OS keychain | keyring | 4.1 | — | ✅ 决策3(已确认·桌面加固) |
-| DNS-01 本地预检 | hickory-resolver | 0.26 | — | acme flow §4.3 可选提交前预检 TXT 是否生效 |
-| Rust→TS 类型/枚举生成 | **ts-rs** | 12.0 | specta 1.0 + specta-typescript 0.0.12 (+ tauri-specta 1.0) | ✅ 决策6(已确认,随决策1-A) |
+| 证书/密钥解析(导入根 CA) | x509-parser + pem | 0.18 / 3.x | — | 校验导入的根 CA 证书 + 私钥配对 |
+| 敏感数据静态加密 | **age** | 0.11 | aes-gcm + argon2 | ✅ 决策3(已确认·加密基线) |
+| DNS-01 本地预检 | hickory-resolver | 0.25 | — | acme flow §4.3 可选提交前预检 TXT 是否生效 |
+| Rust→TS 类型/枚举描述 | **ts-rs** | 12.0 | specta + tauri-specta | ✅ 决策6(已确认,随决策1-A) |
 | 时间 | time | 0.3 | chrono 0.4 | RFC3339 UTC;与 rustls/x509 生态对齐 |
 | 序列化 | serde | 1.0 | — | — |
 | 错误处理 | thiserror + anyhow | 2.0 / 1.0 | — | 库用 thiserror 定类型化错误、bin 用 anyhow |
 | 日志 / 追踪 | tracing | 0.1 | — | 结构化日志;敏感数据脱敏(tasks DS2) |
-| 实体 ID | uuid | 1.24 | 自增整型 | ✅ 决策10(已确认·UUIDv7) |
+| 实体 ID | uuid | 1.x | 自增整型 | ✅ 决策10(已确认·UUIDv7) |
 
 ### 1.3 桌面形态(Tauri v2)
 
 | 用途 | 推荐 | 版本 | 说明 |
 | --- | --- | --- | --- |
-| 桌面框架 | Tauri | 2.11(@tauri-apps/api 2.11 / cli 2.11) | project §4 已定 Tauri;v2 稳定、跨三平台、托盘/自启/单实例插件齐备 |
-| 单实例 | tauri-plugin-single-instance | 2.4 | 防同一形态跑两份争同库 |
-| 开机自启 | tauri-plugin-autostart | 2.5 | settings 开机自启开关(仅桌面) |
-| 原生对话框 / 文件 | tauri-plugin-dialog / -fs | 2.7 / 2.5 | 导出私钥/证书/根 CA 走原生保存 |
-| 托盘角标 / 通知 | Tauri 内建 tray + tauri-plugin-notification | 2.3 | dashboard 红点托盘角标(仅桌面) |
+| 桌面框架 | Tauri | 2.x | project §4 已定 Tauri;跨平台托盘、自启、单实例 |
+| 单实例 | tauri-plugin-single-instance | 2.x | 防同一形态跑两份争同库 |
+| 开机自启 | tauri-plugin-autostart | 2.x | settings 开机自启开关(仅桌面) |
+| 原生对话框 / 文件 | tauri-plugin-dialog / -fs | 2.x | 导出私钥/证书/根 CA 走原生保存 |
+| 托盘角标 | Tauri 内建 tray | 2.x | dashboard 红点托盘角标(仅桌面) |
 
 ### 1.4 前端关键库(完整前端栈)
 
-> 前端栈由用户敲定(2026-07-16);shadcn 现行约定经 Context7 核实(shadcn 自 2025-02 全面支持 Tailwind v4 + React 19;lucide 为默认图标;自带 toast 已废弃改 sonner)。版本为 2026-07-16 npm registry 实测当前版。
+> 前端组件按 React 19、Tailwind CSS v4 与项目现有 shadcn/Radix 源码维护;详细视觉 token 由 COHESION 接入文档说明。
 
-| 用途 | 推荐 | 版本 | 说明 |
+| 用途 | 推荐 | 当前基线 | 说明 |
 | --- | --- | --- | --- |
-| UI 组件 | shadcn/ui + Radix UI primitives | 源码(radix-ui 1.6) | **手写源码于 `frontend/src/components/ui/`,非 CLI 生成**;须遵 shadcn v4 / React 19 现行约定:`data-slot` 属性、无 `forwardRef`、`@theme inline` 的 OKLCH CSS 变量 |
-| 样式 | Tailwind CSS v4 + @tailwindcss/vite | 4.3 | `@theme` token、CSS-first、OKLCH;`@theme` 的 `--color-*` 即设计系统 token 落点 |
-| 图标 | lucide-react | 1.24 | shadcn 默认图标 |
-| 服务端状态 / 数据获取 | @tanstack/react-query | 5.101 | 列表/详情缓存、后台重取、失效重取;配 SSE `invalidate` 刷新红点 / 列表 |
-| 客户端状态 | zustand | 5.0 | **仅管客户端 / UI 态**(向导步骤、非 URL 临时筛选、SSE 连接状态);**不承载服务端状态**(归 react-query),禁止复制服务端数据 |
-| 路由 | react-router | 7+(当前 8.x) | 或 TanStack Router;低风险,designer/dev 可定 |
-| 表单 | react-hook-form + @hookform/resolvers(zod) | 7.81 / 5.4 | 签发向导 / ACME 账户 / 设置 / 新增根 CA |
-| 数据表格 | @tanstack/react-table | 8.21 | 证书 / 域名 / 任务列表的排序 / 筛选 / 分页;shadcn data-table 基于它 |
-| toast | sonner | 2.0 | 替代 shadcn 已废弃自带 toast;签发 / 续签 / 吊销成功失败反馈 |
-| 运行时校验 | zod | 4.4 | wire 边界运行时校验;类型来自 core 的 ts-rs 绑定,校验在边界 |
-| 类型/枚举来源 | (由 ts-rs 从 core 生成) | — | `frontend/src/bindings/`,勿手写枚举字面量(§4) |
+| UI 组件 | shadcn/ui + Radix UI primitives | React 19 | **手写源码于 `frontend/src/components/ui/`,非 CLI 生成**;维护 `data-slot`、Tailwind token 与无障碍语义 |
+| 样式 | Tailwind CSS v4 + @tailwindcss/vite | 4.x | `@theme` token、CSS-first |
+| 图标 | lucide-react | 1.x | 统一矢量图标 |
+| 服务端状态 / 数据获取 | @tanstack/react-query | 5.x | 列表/详情缓存、后台重取、配 SSE `invalidate` 刷新 |
+| 客户端状态 | zustand | 5.x | **仅管客户端 / UI 态**;不承载服务端状态,避免复制服务端数据 |
+| 路由 | react-router | 8.x | 单一路由实现 |
+| 表单 | react-hook-form + @hookform/resolvers(zod) | 7.x / 5.x | 签发向导 / ACME 账户 / 设置 / 新增根 CA |
+| toast | sonner | 2.x | 操作结果反馈;表单校验错误就近显示 |
+| 运行时校验 | zod | 4.x | wire 边界运行时校验 |
+| 类型/枚举来源 | core/api 使用 ts-rs 派生;TS 投影提交在仓库中 | — | `frontend/src/bindings/` 是前端入口;Rust 类型变化时同步投影(§4) |
 
-> **归属边界(清晰划分)**:**UI 组件库 / 样式 / 设计 token 的具体设计归 designer 设计系统**——designer 消费 shadcn + Tailwind v4,定 `@theme` 的 token 值(颜色 / 间距 / 圆角等 OKLCH 变量);**前端架构层(react-query ↔ zustand 分工、路由、表单、@tanstack/react-table、ts-rs 绑定消费、sonner 反馈)归本基线**。即:基线定"用哪些库、各司何职",designer 定"长什么样"。
+> **归属边界**:组件库、状态管理、路由、表单和运行时校验由本基线约束;品牌、token 与组件表达遵循 [COHESION 接入说明](./docs/design/cohesion-adoption.md)。列表复用项目内组件,当前未引入 `@tanstack/react-table`。
 
 ---
 
@@ -80,10 +78,10 @@
 
 ### ✅ 决策1 · 两形态前后端传输统一方式(最关键,决定 API 契约形态)
 
-- **推荐**:方案 A · **统一 HTTP/WS**——两形态跑同一 axum 服务,桌面内嵌回环服务,前端始终走 HTTP(REST)+ SSE/WS。
+- **推荐**:方案 A · **统一 HTTP + SSE**——两形态跑同一 axum 服务,桌面内嵌回环服务,前端始终走 HTTP(REST)+ SSE。
 - **备选**:方案 B · **双传输**——桌面 Tauri IPC(`invoke`)+ 服务器 HTTP,客户端抽象层屏蔽。
 - **理由**:A 让前端只有一层网络代码、API 契约只定义一次、实时推送统一,直接落实 D1、最小化契约漂移;B 需两套传输 + 两套绑定、契约实质重复(D1 所警惕)。详见 [ARCHITECTURE §3]。
-- **已确认(orchestrator, 2026-07-16):方案 A · 统一 HTTP/WS**(桌面内嵌回环)。API 契约据此按 REST + SSE/WS 形态展开,不再切换;方案 B 留作记录。
+- **已确认(orchestrator, 2026-07-16):方案 A · 统一 HTTP + SSE**(桌面内嵌回环)。API 契约据此按 REST + SSE 形态展开,不再切换;方案 B 留作记录。
 
 ### ✅ 决策2 · 本地持久化访问层
 
@@ -113,17 +111,17 @@
 
 ### ✅ 决策5 · X.509 / 自签根 CA 库
 
-- **推荐**:**rcgen 0.14**(生成自签根 CA + 用根 CA 签发内网叶子证书 + SAN + 自定义有效期)+ x509-parser/rustls-pemfile(导入根 CA 时解析校验)。
+- **推荐**:**rcgen 0.14**(生成自签根 CA + 用根 CA 签发内网叶子证书 + SAN + 自定义有效期)+ x509-parser 与 `pem`(解析证书并校验导入材料)。
 - **备选**:openssl crate(功能全,但引入原生 OpenSSL 构建依赖,跨平台尤其 Windows 构建痛,损"三平台对等")。
 - **理由**:rcgen 纯 Rust(底层 aws-lc-rs/ring)、跨平台构建无痛、直接支持 CA 签名与 SAN,契合 local-ca 本地离线签发(project §7)。**避免 openssl 原生依赖**以保跨平台对等。
 - **已确认(orchestrator, 2026-07-16):rcgen 0.14 + x509-parser,避免 openssl 原生依赖**;openssl 备选留作记录。
 - 注(作废机制):rcgen 不产出 CRL/OCSP;local-ca 的"内网证书作废标记"(§3.5 / DS3)在 MVP 落为**本地作废记录**(根 CA 名下的已作废序列号清单,属数据),非签发标准 CRL——与 PRD"作废记录 / 作废清单"口径一致。CRL/OCSP 生成后置。
 
-### ✅ 决策6 · Rust↔TS 类型/枚举生成(与决策1耦合)
+### ✅ 决策6 · Rust↔TS 类型/枚举映射(与决策1耦合)
 
-- **推荐**(配决策1-A):**ts-rs 12**——`#[derive(TS)]` 把 core 的结构体/枚举(含 5 台状态机枚举)导出为 `.ts`,传输无关,覆盖 REST/WS 的 DTO + 共享枚举。
+- **推荐**(配决策1-A):**ts-rs 12**——`#[derive(TS)]` 为 core/api 的结构体与枚举(含 5 台状态机枚举)提供 TS 映射,传输无关,覆盖 REST 与 SSE event DTO 及共享枚举。
 - **备选**(配决策1-B):**specta 1.0 + specta-typescript 0.0.12 + tauri-specta 1.0**——与 Tauri IPC 配套生成强类型命令绑定;若走双传输更划算。
-- **理由**:统一 HTTP 传输下类型需覆盖 REST/WS DTO 且传输无关,ts-rs 更贴切且版本线干净(稳定 v12);specta 在 Tauri IPC 场景最亮眼但 v2 生态版本较碎(specta/specta-typescript 处 0.0.x)。**决策6 跟随决策1**:选 A 用 ts-rs,选 B 用 specta 系。
+- **理由**:统一 HTTP 传输下类型需覆盖 REST + SSE events DTO 且传输无关,ts-rs 更贴切且版本线干净(稳定 v12);specta 在 Tauri IPC 场景最亮眼但 v2 生态版本较碎(specta/specta-typescript 处 0.0.x)。**决策6 跟随决策1**:选 A 用 ts-rs,选 B 用 specta 系。
 - **已确认(orchestrator, 2026-07-16):ts-rs 12**(随决策1-A);specta + tauri-specta 留作备选记录。
 
 ### ✅ 决策7 · 任务队列 + 崩溃恢复策略
@@ -142,9 +140,9 @@
 
 ### ✅ 决策9 · TypeScript 版本线(低风险)
 
-- **原推荐**:当前稳定 TypeScript(2026-07 主版 **7.0**,原生编译器、极快),存疑回退 5.8。
+- **原推荐**:当时评估的 TypeScript 7.0 原生编译器路线,存疑时回退 5.8。
 - **备选(即最终所选)**:**5.8 稳妥线**——成熟、工具链全面兼容。
-- 理由:7.0 是原生移植编译器、构建/检查显著更快,但属很新的大版本;ts-rs 产物 / Vite 8 / shadcn 工具链对 7.0 的跟进尚不确定。
+- 理由:当时评估 7.0 属新版本,ts-rs 产物 / Vite 8 / shadcn 工具链兼容性尚不确定。
 - **已确认(orchestrator, 2026-07-16):TypeScript 5.8 稳妥线(不采 7.0)**——用户就此项改选稳妥线;`tsc --noEmit` 作为 build 前置检查(typecheck 步骤)。低风险。
 
 ### ✅ 决策10 · 实体主键 ID(低风险)
@@ -214,12 +212,12 @@
 
 ### 4.1 单一定义位置
 
-- 全部共享枚举/字典在 **`crates/core/src/domain/enums.rs`** 单一定义(Rust `enum`),派生 `#[derive(Serialize, Deserialize, TS)]`,serde `rename_all = "snake_case"` 使 wire 值等于 PRD 标识。
+- 领域状态与分类枚举在 **`crates/core/src/domain/enums.rs`** 定义;通用错误码在 `crates/core/src/domain/error.rs` 定义;API DTO 在 `crates/api/src/dto.rs` 定义。Rust 类型派生 `ts-rs` 描述,serde 按约定保留 wire 命名。
 
-### 4.2 跨端同步机制(Rust 定义 → 导出 TS)
+### 4.2 跨端同步机制(Rust 定义 → TS 投影)
 
-- 经 **ts-rs**(决策6-A)把 core 枚举/DTO 导出到 **`frontend/src/bindings/`**;前端只从该目录 import 枚举与类型,**严禁手写状态字符串字面量**。
-- 生成产物纳入版本库或构建期生成(实现期定);任一枚举变更 = 改 core `enums.rs` → 重新导出 → 前端类型自动更新。**Rust 是唯一真相,TS 是投影。**
+- 共享 Rust 类型经 **ts-rs** 描述,前端绑定投影维护于 **`frontend/src/bindings/index.ts`** 并纳入版本库;当前仓库没有独立的绑定生成命令。前端只从该目录 import 枚举与类型,**严禁手写状态字符串字面量**。
+- Rust 类型变化时,同步更新并复核绑定投影。**Rust 是契约真相,TS 是消费侧投影。**
 - 若决策1 改选 B,则改用 specta + tauri-specta 生成绑定(机制同:core 单一定义 → 生成 TS),枚举真相仍在 core。
 
 ### 4.3 必须单一定义的枚举清单(标识严格照 PRD,不得漂移)
@@ -258,12 +256,11 @@
 
 ---
 
-## 6. 版本核实说明
+## 6. 版本与锁文件
 
-- 本会话 **未接入 context7 MCP**(项目 `.mcp.json` 仅配置 opcflow;architect 可调用工具集不含 context7)。为遵守"不凭记忆下版本结论",改用**本机 cargo 1.95 + npm**直接查询 **crates.io / npm registry** 核实当前版本(结果比知识截止 2026-01 更新)。
-- **已核实且注意到显著新于旧知识的事实**:Tauri **2.11**、SeaORM 已达 **1.x 稳定**(sea-orm 1.1 / sea-orm-migration 1.1)、sqlx **0.9**、keyring **4.x**、rcgen **0.14**、instant-acme **0.8**、ts-rs **12**、specta **1.0** + specta-typescript **0.0.12**、Vite **8**、React **19.2**、TypeScript **7.0**、Zod **4**、axum **0.8**、rustls **0.23**。
-- **与 PRD 约束的冲突核查**:未发现选型与 PRD 冲突。关键印证——instant-acme 支持"调用方控制挑战就绪时机" ⇒ 可承接手动 DNS-01 的 `awaiting_manual` 长停留(acme DA2);rcgen 纯 Rust ⇒ 满足跨平台对等 + 本地离线签发(project §7);加密静态存储路线 ⇒ 满足无头服务器 + 离线 + 无人值守重启(否则 Linux Secret Service 依赖 D-Bus 会破服务器形态)。
-- 精确锁版(含 patch)在实现期由 developer 于 Cargo.lock / package-lock 固定;基线只锚定大版本 + 选型。
+- Cargo 依赖范围以各 crate 的 `Cargo.toml` 声明,解析结果以根目录 `Cargo.lock` 为准。
+- 前端依赖范围以 `frontend/package.json` 声明,解析结果以 `frontend/package-lock.json` 为准;使用 `npm ci` 安装。
+- CI 使用 `--locked` 与 `npm ci`;依赖更新需同步检查声明的 MSRV、各平台构建与锁文件。
 
 ---
 
@@ -278,7 +275,7 @@
 - **AR5(2026-07-16)· 任务表即持久队列、无外部队列中间件**:任务状态机表承担队列 + 历史双职责。为什么:天然持久化 + 崩溃可恢复 + 契合"任务不持独立重试参数、自动再尝试依附扫描"(SF2/DT5),避免引入与 PRD 相抵的框架内建重试。
 - **AR6(2026-07-16)· 编码协议定死项**:JSON camelCase / 枚举 snake_case / limit-offset 分页 / `{error:{code,message}}` 错误包络 / RFC3339 UTC 时间。为什么:承 architect 红线"协议定死不得漂移",并可沉淀为 protocolLints 机器拦截(§5)。
 - **AR7(2026-07-16)· §2 决策清单最终取定(orchestrator 拍板,全部采纳 architect 推荐)**:
-  - 决策1 传输 = **方案 A 统一 HTTP/WS**(桌面内嵌回环)⇒ API 契约为 REST + SSE/WS。
+  - 决策1 传输 = **方案 A 统一 HTTP + SSE**(桌面内嵌回环)⇒ API 契约为 REST + SSE。
   - 决策2 持久化 = **SQLite + SeaORM 1.x**。
   - 决策3 敏感存储 = **加密静态存储(age)为跨形态基线 + 桌面可选叠加 OS keychain 加固**。
   - 决策4 ACME = **instant-acme 0.8**。
@@ -289,7 +286,7 @@
   - 决策9 TS 版本 = **TypeScript 5.8 稳妥线(不采 7.0;`tsc --noEmit` 作 build 前置检查)**(用户就此项改选稳妥线,见 AR8)。
   - 决策10 实体 ID = **UUIDv7 文本 ID**。
   - 为什么记此一条:让批准后的基线不含悬空待决标记;各决策的备选与理由仍保留在 §2 供追溯,备选不删、仅落定取向。
-- **AR8(2026-07-16)· 前端 UI 栈敲定(用户拍板)**:并入 §1.4——UI 组件 **shadcn/ui**(手写源码于 `frontend/src/components/ui/`,遵 v4/React19 约定:`data-slot`、无 forwardRef、`@theme inline` OKLCH)+ **Radix** primitives;样式 **Tailwind CSS v4**(`@theme` token、CSS-first、OKLCH);图标 **lucide-react**;服务端状态 **@tanstack/react-query**;客户端状态 **zustand**;路由 **react-router**;表单 **react-hook-form + zod resolver**;数据表格 **@tanstack/react-table**;toast **sonner**;校验 **zod 4**。
-  - **react-query ↔ zustand 分工(定死)**:服务端数据(证书 / 域名 / 任务 / 账户等)一律走 react-query(缓存 + SSE invalidate 刷新);zustand **仅**管客户端 / UI 态(向导步骤、临时筛选、SSE 连接状态),**禁止复制服务端数据**。为什么:混用会制造"服务端数据两处副本"的漂移,与 §4 单一真相精神一致。
-  - **决策9 改选 5.8**:7.0 原生编译器太新、ts-rs 产物 / Vite 8 / shadcn 工具链跟进不确定,用户就此改选 TypeScript 5.8 稳妥线,`tsc --noEmit` 作 build 前置检查(AR7 决策9 已同步)。
-  - **归属边界**:UI 组件 / 样式 / 设计 token 的具体设计归 designer 设计系统(消费 shadcn + Tailwind v4、定 `@theme` token 值);前端架构层(库选型与各司其职、react-query/zustand 分工、ts-rs 绑定消费)归本基线(§1.4)。
+- **AR8(2026-07-16)· 前端 UI 栈初始决定(用户拍板)**:当时规划使用 shadcn/ui + Radix、Tailwind CSS、lucide-react、react-query、zustand、react-router、react-hook-form、TanStack Table、sonner 与 zod。当前实际采用项和未采用项以 §1.4 及 `frontend/package.json` 为准；TanStack Table 未接入。
+  - **react-query ↔ zustand 分工(定死)**:服务端数据一律走 react-query;zustand 仅管客户端 / UI 态,不复制服务端数据。
+  - **决策9 改选 5.8**:用户改选 TypeScript 5.8 稳妥线,`tsc --noEmit` 作 build 前置检查。
+  - **归属边界**:组件选型与分层归技术基线;品牌、token 与组件表达遵循 COHESION 设计系统。

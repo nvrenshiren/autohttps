@@ -4,11 +4,11 @@
 
 ## 开发环境
 
-前置:Rust 1.88+（workspace 声明并实测的 MSRV，含 `rustfmt`/`clippy`）、Node.js 20+。
+前置:Rust 1.88+（workspace MSRV，含 `rustfmt`/`clippy`）、Node.js 20.19+ 或 22.12+。
 
 ```bash
 # 前端(产物内嵌进可执行文件)
-cd frontend && npm install && npm run build && cd ..
+cd frontend && npm ci && npm run build && cd ..
 
 # 服务器形态
 cargo run -p server            # → http://127.0.0.1:8443
@@ -31,7 +31,7 @@ cargo run -p desktop
 
 ## 提交与 PR
 
-1. 从 `main` 切分支开发(`feat/…`、`fix/…`)。
+1. 从仓库默认分支切分支开发(`feat/…`、`fix/…`)。
 2. **提交信息**:祈使句、简洁描述实际改动(如 `Add DNS-01 manual challenge flow`);一个提交聚焦一件事。
 3. 提交前本地跑通：
    - `cargo fmt --all -- --check`

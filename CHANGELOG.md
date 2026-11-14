@@ -17,12 +17,14 @@
 
 ### Changed
 
-- **设计系统 v2「极光守护」**:重塑整体视觉。深空靛 × 极光青品牌渐变,浅色「曜石白」/暗色「深空墨」双主题统一语义 token;卡片改为带内切边的薄玻璃浮层,弹窗/下拉/气泡用半透明玻璃 + 背滤;引入 Space Grotesk / Outfit / JetBrains Mono 字体,标题与一级指标用品牌渐变字;侧栏激活项为玻璃胶囊 + 品牌描边微光,列表/详情/设置全面升级;加入路由切换与指标的克制动效(遵循 prefers-reduced-motion)。
+- 设计表达统一遵循 COHESION 接入规范；移除重复维护的旧色板、玻璃材质样式和未登记的旧 HTML 原型。
+- 移除没有调用方的通用 `NotImplemented` 501 错误码及对应 TS 联合项。
 - 证书创建(证书 + SAN 关联)与删除(任务取消 + 关联清理 + 行删除)的库内多步写纳入事务,失败整体回滚;事件广播与文件清理移至提交之后。
 - CI 收紧:`cargo fmt --check` 与 `cargo clippy` 不再 `continue-on-error`,clippy 以 `--all-targets -D warnings` 作为硬门禁。
 
 ### Fixed
 
+- ACME 证书导出会将存储的 fullchain 拆分为叶子证书与中间链；自签证书继续附加其根 CA 证书。
 - 修复全部 clippy `doc_lazy_continuation` 文档警告(clippy 现零警告)。
 - 修复 WebDAV 恢复后重开应用「已存口令丢失需重输」:boot 孤儿密钥清扫漏算 `sync_configs.password_ref` 引用,每次启动把 WebDAV 口令密文当孤儿删掉;现纳入引用全集(回归测试锁定)。
 - 修复 ACME 签发偶发「域名 X 无 HTTP-01 挑战」失败:CA 复用仍在有效期内的授权(Let's Encrypt ~30 天)时不下发任何挑战,执行器误当异常;现识别授权已为 `valid` 即直接视为该域名已验证(记一条 passed 挑战行供审计),不再取挑战。
@@ -41,7 +43,7 @@
 - **实时可见**:dashboard 三指标 + 待处理清单;SSE 全局事件推送(证书/任务/挑战/根 CA 状态变更)。
 - **两种运行形态**
   - 桌面(Tauri):800×600 窗口、系统托盘常驻、关窗隐藏、开机自启、托盘红点角标、原生保存对话框导出、单实例。
-  - 服务器:守护进程 + 内嵌 SPA Web UI(rust-embed),REST/SSE 统一挂 `/api`。
+  - 服务器:前台服务器进程 + 内嵌 SPA Web UI(rust-embed),REST/SSE 统一挂 `/api`。
 - **数据安全**:私钥/账户密钥/根 CA 私钥经 age(X25519 + ChaCha20-Poly1305)加密静态存储,库内只存引用;日志脱敏。
 - **工程**:SeaORM + SQLite(WAL)持久化;枚举单一定义(ts-rs 投影 TS 契约);CI(fmt/clippy/check/test + 前端构建);Windows portable zip 与 semver 预发布(`vX.Y.Z-dev.N`)工作流。
 

@@ -15,8 +15,6 @@ pub enum ErrorCode {
     ValidationFailed,
     NotFound,
     InternalError,
-    /// 通用未实现动作码(501,non-contract);各功能均已落地,当前无产出方,保留作将来占位。
-    NotImplemented,
 
     // --- certificates ---
     CertNotFound,
@@ -133,7 +131,6 @@ impl ErrorCode {
             | StoragePathReadOnly
             | SettingNotApplicable => 422,
 
-            NotImplemented => 501,
             InternalError => 500,
 
             // sync:口令/格式 → 422;未配置 → 409;远端问题 → 502 下游错误
@@ -176,10 +173,6 @@ impl CoreError {
 
     pub fn internal(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::InternalError, message)
-    }
-
-    pub fn not_implemented(message: impl Into<String>) -> Self {
-        Self::new(ErrorCode::NotImplemented, message)
     }
 
     pub fn http_status(&self) -> u16 {

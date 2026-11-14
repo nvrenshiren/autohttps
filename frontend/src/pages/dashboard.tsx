@@ -1,6 +1,5 @@
 /**
- * 总览(设计系统 v2)—— Hero 指标带(品牌渐变光晕 + 大数字)+ 待处理清单 + 常用操作。
- * 强调色仅在计数>0 出现(DS8);待处理告警级优先、已过期居首(§3.4,服务端已排序)。
+ * 总览页：指标、待处理清单与常用操作。仅在计数大于零时强调告警；待处理项按紧急程度排序(§3.4)。
  */
 import { useNavigate } from "react-router";
 import {
@@ -40,7 +39,7 @@ function MetricCard({
   emphasis?: "warning" | "danger";
   primary?: boolean;
 }) {
-  // 强调色仅计数>0 时出现(DS8);健康=中性
+  // 强调色仅计数大于零时出现；健康状态保持中性(§3.4)。
   const active = emphasis && value > 0;
   const color = active
     ? emphasis === "danger"

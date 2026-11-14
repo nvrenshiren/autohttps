@@ -11,15 +11,15 @@
 
 autohttps 是一个**单一 Rust 核心 + 单一 React 前端**、以**两种运行形态**(桌面 / 服务器)分别部署的 HTTPS 证书全生命周期管理工具(project §1/§4)。两形态各自独立部署、各持各的数据、互不共享(project §4/§7)。
 
-架构的第一性原理来自 **project §9-D1(端点单端)**:两形态共享同一前端,页面契约只维护一套。为把这一约束贯彻到传输层,本架构令**两形态运行同一套 Rust HTTP+WS 服务**,前端**始终且只**经 HTTP/WS 与之通信(见 §3,最关键决策)。
+架构的第一性原理来自 **project §9-D1(端点单端)**:两形态共享同一前端,页面契约只维护一套。为把这一约束贯彻到传输层,本架构令**两形态运行同一套 Rust HTTP + SSE 服务**,前端**始终且只**经 HTTP + SSE 与之通信(见 §3,最关键决策)。
 
 ```mermaid
 graph TB
     subgraph FE["前端 · React + Vite SPA（两形态共用同一份）"]
-        UI["页面 / 组件<br/>只经 HTTP(REST) + SSE/WS 通信"]
+        UI["页面 / 组件<br/>只经 HTTP(REST) + SSE 通信"]
     end
 
-    subgraph SRV["服务器形态 · crates/server（守护进程）"]
+    subgraph SRV["服务器形态 · crates/server（服务器进程）"]
         S_AX["内嵌 axum 服务<br/>绑定 settings 监听地址:端口"]
     end
 
@@ -30,7 +30,7 @@ graph TB
     end
 
     subgraph API["crates/api · 共享 HTTP 表面（两形态挂载同一 Router）"]
-        AX["axum Router：REST handlers + SSE/WS + 静态资源(内嵌 SPA)"]
+        AX["axum Router：REST handlers + SSE + 静态资源(内嵌 SPA)"]
     end
 
     subgraph CORE["crates/core · 领域核心库（两形态共用）"]
@@ -44,8 +44,8 @@ graph TB
         SCAN["扫描调度器（到期判定 / 自动续签触发）"]
     end
 
-    UI -->|HTTP/WS| S_AX
-    D_WV -->|HTTP/WS 回环| D_AX
+    UI -->|HTTP + SSE| S_AX
+    D_WV -->|HTTP + SSE 回环| D_AX
     S_AX --> AX
     D_AX --> AX
     AX --> SVC
@@ -55,7 +55,7 @@ graph TB
 ```
 
 要点:
-- **前端零形态分支**:UI 不感知自己跑在桌面还是服务器,只知道"有一个 HTTP/WS 服务在某个 origin"。形态差异(托盘红点、导出走原生保存 vs 浏览器下载)由后端/外壳承接,前端按运行形态标志做极少量显隐(page PRD 已约定"仅桌面 / 仅服务器"标注)。
+- **前端零形态分支**:UI 不感知自己跑在桌面还是服务器,只知道"有一个 HTTP + SSE 服务在某个 origin"。形态差异(托盘红点、导出走原生保存 vs 浏览器下载)由后端/外壳承接,前端按运行形态标志做极少量显隐(page PRD 已约定"仅桌面 / 仅服务器"标注)。
 - **core 是唯一业务真相**:5 台状态机、枚举、持久化、ACME、CA、任务、扫描全在 `crates/core`;两个可执行形态(server / desktop)只是**外壳 + 传输 + 生命周期宿主**,不重复业务逻辑。
 - **单库单实例**:每个部署实例一个 SQLite 库,落于 settings 数据存储路径下;敏感私钥不明文入库(§6 / TECH §2-决策3)。
 
@@ -66,10 +66,10 @@ graph TB
 | 组件 | 路径 | 类型 | 职责 | 依赖 |
 | --- | --- | --- | --- | --- |
 | 领域核心 | `crates/core` | lib | 领域模型、**5 台状态机枚举(单一真相)**、用例服务、SQLite 持久化、ACME 客户端封装、自签 CA、敏感数据存储、任务队列 + 执行器、扫描调度器。**全部业务真相在此** | — |
-| 共享 API 表面 | `crates/api` | lib | axum Router:REST handlers + SSE/WS 推送 + 内嵌 SPA 静态资源;DTO 定义(派生 TS 类型)。**两形态挂载同一个 Router** | core |
-| 服务器守护 | `crates/server` | bin | 守护进程宿主:绑定 settings 监听地址:端口,7×24 常驻,承载 tokio 运行时(axum + 任务执行器 + 扫描器);设计为在 OS 服务管理器下被监督自恢复 | core, api |
+| 共享 API 表面 | `crates/api` | lib | axum Router:REST handlers + SSE 推送 + 内嵌 SPA 静态资源;DTO 定义并提供 ts-rs 类型映射。**两形态挂载同一个 Router** | core |
+| 服务器进程 | `crates/server` | bin | 前台服务器进程:绑定 settings 监听地址:端口,承载 tokio 运行时(axum + 任务执行器 + 扫描器);可由 OS 服务管理器托管并在异常退出后重启 | core, api |
 | 桌面壳 | `crates/desktop` | bin | Tauri v2 宿主:进程内启动 axum(回环)、系统托盘常驻、关窗不退出、单实例、开机自启、原生保存对话框;webview 指向回环服务 | core, api |
-| 前端 | `frontend/` | SPA | React + Vite + TypeScript 单页应用,两形态共用;经 HTTP/WS 访问 API;消费 core 导出的 TS 类型/枚举绑定 | (构建产物内嵌进 api) |
+| 前端 | `frontend/` | SPA | React + Vite + TypeScript 单页应用,两形态共用;经 HTTP + SSE 访问 API;使用 core/api 类型的 TS 绑定投影 | (构建产物内嵌进 api) |
 
 > 命名约定沉淀:`crates/core` = 业务真相层,`crates/api` = 传输契约层,`crates/{server,desktop}` = 形态宿主层。三层分离保证"业务只写一遍、传输定义一遍、形态各自装配"。此分层是后续所有 Rust 产物的落位基准(见 [TECH.md §4 枚举单一定义位置])。
 
@@ -79,17 +79,17 @@ graph TB
 
 这是本基线**决定后续 API 契约形态**的决策(TECH §2-决策1)。**已确认方案 A(orchestrator, 2026-07-16)**。
 
-### 3.1 推荐方案 A · 统一 HTTP/WS 传输 · 桌面内嵌同一服务
+### 3.1 推荐方案 A · 统一 HTTP + SSE 传输 · 桌面内嵌同一服务
 
-**两形态运行同一个 Rust HTTP+WS 服务(axum)。前端是标准 SPA,永远只经 HTTP(REST)+ SSE/WS(推送)通信。**
+**两形态运行同一个 Rust HTTP + SSE 服务(axum)。前端是标准 SPA,永远只经 HTTP(REST)+ SSE(推送)通信。**
 
-- **服务器形态**:`crates/server` 守护进程绑定 settings 的监听地址:端口,对外提供内嵌 SPA 静态资源 + API;浏览器访问 Web UI。
+- **服务器形态**:`crates/server` 前台进程绑定 settings 的监听地址:端口,对外提供内嵌 SPA 静态资源 + API;可由 OS 服务管理器托管,浏览器访问 Web UI。
 - **桌面形态**:`crates/desktop`(Tauri v2)在进程内启动**同一** axum 服务,绑定 `127.0.0.1:<临时端口>`(仅回环、不可机外访问),Tauri WebView 导航到 `http://127.0.0.1:<port>`。前端代码与网络层**完全相同**;Tauri 只提供原生外壳(托盘、窗口、自启、原生保存对话框)。
 
 ```mermaid
 graph LR
-    subgraph A["方案 A（推荐）：统一 HTTP/WS"]
-        FEa["同一 React SPA<br/>只有 HTTP/WS 一条网络路径"]
+    subgraph A["方案 A（推荐）：统一 HTTP + SSE"]
+        FEa["同一 React SPA<br/>只有 HTTP + SSE 一条网络路径"]
         FEa -->|"服务器: 浏览器 → addr:port"| SVa["axum 服务"]
         FEa -->|"桌面: WebView → 127.0.0.1:port"| SVa
         SVa --> COa["core（业务真相）"]
@@ -97,10 +97,10 @@ graph LR
 ```
 
 **为什么推荐**:
-- **单一传输、单一契约**:前端只有一层网络代码(HTTP/WS),无 `invoke()` 与 `fetch()` 的形态分叉;API 契约**只定义一次**(REST + SSE/WS)。直接落实 D1、把契约漂移面降到最低。
-- **实时天然统一**:5 台状态机的实时诉求(dashboard 红点、DNS-01 挑战"等待手动配置"待处理提示、任务进度/日志流)统一用 SSE/WS 从同一服务推送,两形态行为一致(见 §9)。
+- **单一传输、单一契约**:前端只有一层网络代码(HTTP + SSE),无 `invoke()` 与 `fetch()` 的形态分叉;API 契约**只定义一次**(REST + SSE)。直接落实 D1、把契约漂移面降到最低。
+- **实时天然统一**:5 台状态机的实时诉求(dashboard 红点、DNS-01 挑战"等待手动配置"待处理提示、任务进度/日志流)统一用 SSE 从同一服务推送,两形态行为一致(见 §9)。
 - **离线可用**:桌面回环服务无需外网即可跑(project §7 离线可用);ACME 在线签发才依赖外网,与本地服务解耦。
-- **契约形态影响**:据此,下一步 API 契约 = **REST + SSE/WS**,产出于 `docs/architecture/api/app/{模块}.md`。
+- **契约形态影响**:据此,下一步 API 契约 = **REST + SSE**,产出于 `docs/architecture/api/app/{模块}.md`。
 
 **回环安全**:桌面服务仅绑 `127.0.0.1`,机外不可达,契合 D4(信任 = 网络可达性)+ 桌面单本机用户信任模型。可选加固(每会话 localhost token)MVP 按 D4 不做应用层鉴权,回环边界即安全边界。
 
@@ -108,13 +108,13 @@ graph LR
 
 前端在桌面走 Tauri `invoke()` 命令 IPC、在服务器走 `fetch()` HTTP,以客户端抽象层屏蔽差异。
 
-- **代价**:两套传输实现 + 两套绑定层(Tauri commands 与 HTTP handlers 各定义一遍),契约实质重复;实时需 Tauri events + WS 两套;漂移面更大——正是 D1 所警惕的"页面契约重复维护"在传输层的翻版。
+- **代价**:两套传输实现 + 两套绑定层(Tauri commands 与 HTTP handlers 各定义一遍),契约实质重复;实时需 Tauri events + SSE 两套;漂移面更大——正是 D1 所警惕的"页面契约重复维护"在传输层的翻版。
 - **好处**:桌面获 Tauri 原生 IPC(无回环端口、无本地 HTTP 开销、略"更原生"),且可用 tauri-specta 生成强类型命令绑定。
 - **连带影响**:若选 B,类型生成改用 specta + tauri-specta(与 IPC 配套,见 TECH §2-决策6)。
 
 ### 3.3 结论
 
-**已确认方案 A(orchestrator, 2026-07-16)**。它是"共享一套前端"从页面层贯彻到传输层的唯一低漂移路径,且让 API 契约单一化。后续 API 契约按方案 A 的 REST + SSE/WS 形态展开,不再切换;方案 B 留作记录。
+**已确认方案 A(orchestrator, 2026-07-16)**。它是"共享一套前端"从页面层贯彻到传输层的唯一低漂移路径,且让 API 契约单一化。后续 API 契约按方案 A 的 REST + SSE 形态展开,不再切换;方案 B 留作记录。
 
 ---
 
@@ -122,16 +122,16 @@ graph LR
 
 两形态是**各自独立的部署实例**(project §4/§9-D1),不共享数据。
 
-### 4.1 服务器形态(守护进程)
+### 4.1 服务器形态(前台进程)
 
 | 维度 | 落点 |
 | --- | --- |
-| 载体 | `crates/server` 可执行文件,前台/后台守护进程 |
+| 载体 | `crates/server` 可执行文件,以前台进程运行;可交由 OS 服务管理器托管,不自行 daemonize |
 | 监听 | 绑定 settings 监听地址:端口(默认仅本机 / 可信内网,project §7);设为对外可达须界面提示公网暴露风险(settings A3 / roles §3) |
 | 7×24 常驻 + 异常自恢复 | 进程设计为在 **OS 服务管理器**(Linux systemd / Windows 服务 / macOS launchd)下运行,由其在硬崩溃后拉起(`Restart=always` 类语义);进程内 tokio 任务 panic 相互隔离,顶层守护 + 启动恢复(§7)兜底"进程重启后任务不卡死"(tasks §3.3) |
 | 无托盘 | 红点体现在浏览器内 dashboard(dashboard flow §3.3) |
 
-> 进程自恢复是"OS supervisor 拉起进程 + 进程启动恢复任务"两层协作,不是进程自己"复活"。TECH/交付需给出各平台的服务单元样例(实现期),本基线只锚定该架构位置。
+> 崩溃恢复由"OS supervisor 拉起进程 + 进程启动恢复任务"两层协作完成。server 不自行后台化或安装系统服务;部署时由服务管理器负责守护。
 
 ### 4.2 桌面形态(Tauri v2)
 
@@ -166,13 +166,13 @@ autohttps/
 │   │       ├── tasks/              # 任务队列 + tokio 执行器 + 启动恢复
 │   │       ├── scan/               # 扫描调度器（证书 / 根 CA 到期判定、自动续签触发）
 │   │       └── services/           # 各模块用例服务（编排状态机流转）
-│   ├── api/                        # 共享 HTTP 表面：axum Router + handlers + DTO(派生 TS) + SSE/WS + 内嵌 SPA
-│   ├── server/                     # bin：服务器守护进程
+│   ├── api/                        # 共享 HTTP 表面：axum Router + handlers + DTO(派生 TS) + SSE + 内嵌 SPA
+│   ├── server/                     # bin：服务器前台进程
 │   └── desktop/                    # bin：Tauri v2 桌面壳（含 tauri.conf、图标、权限）
 ├── frontend/                       # React + Vite + TS SPA（两形态共用）
 │   └── src/
 │       ├── bindings/               # 由 core 生成的 TS 类型/枚举绑定（勿手改，见 TECH §4）
-│       ├── api/                    # 单一 HTTP/WS 客户端层（react-query hooks + SSE）
+│       ├── api/                    # 单一 HTTP + SSE 客户端层（react-query hooks + SSE）
 │       ├── components/ui/          # shadcn/ui 手写组件（遵 v4/React19 约定；设计 token 归 designer）
 │       ├── stores/                 # zustand 客户端/UI 态（不含服务端数据，见 TECH §1.4）
 │       ├── pages/                  # 对应 pages/app/{模块}/{页面}
@@ -181,7 +181,7 @@ autohttps/
 │   ├── prd/                        # 上游 PRD（approved）
 │   └── architecture/               # 本层产出
 │       ├── database/{模块}.md       # DB 文档（字段说明 + Mermaid 关系图）——基线批准后逐模块产出
-│       └── api/app/{模块}.md        # API 契约（REST + SSE/WS）——基线批准后逐模块产出
+│       └── api/app/{模块}.md        # API 契约（REST + SSE）——基线批准后逐模块产出
 ├── ARCHITECTURE.md                 # 本文件
 └── TECH.md                         # 技术选型 + 编码协议
 ```
@@ -192,7 +192,7 @@ autohttps/
 
 ## 6. 任务队列 + 扫描调度器的架构位置
 
-两者都在 `crates/core`,是"证书主线自动化"的两个引擎,均在**每个形态进程内**运行(桌面进程与守护进程各跑一套,因数据各自独立)。
+两者都在 `crates/core`,是"证书主线自动化"的两个引擎,均在**每个形态进程内**运行(桌面进程与服务器进程各跑一套,因数据各自独立)。
 
 ### 6.1 任务队列 + 执行器(tasks)
 
@@ -239,7 +239,7 @@ graph LR
 3. 依 settings 自动续签开关,对扫描判定为"即将到期 / 续签失败未过期"的证书发起自动续签(经任务队列)。
 4. 启动 axum 服务 + 扫描周期任务 + 任务执行器 → 开始对外服务。
 
-> 崩溃恢复分两层:**进程级**(OS supervisor 拉起崩溃的守护进程 / 桌面单实例保证不重复;§4)+ **任务级**(上面 boot 序列第 1 步)。两层缺一不可:OS 拉起进程,进程恢复任务。
+> 崩溃恢复分两层:**进程级**(OS supervisor 拉起崩溃的服务器进程 / 桌面单实例保证不重复;§4)+ **任务级**(上面 boot 序列第 1 步)。两层缺一不可:OS 拉起进程,进程恢复任务。
 
 ---
 
@@ -281,7 +281,7 @@ dashboard 是纯聚合、只读(dashboard DD1):它经 API 读 certificates 的�
 
 以下关键选型曾有实质权衡,**已于 2026-07-16 由 orchestrator 全部确认(采纳 architect 推荐)**;方案 + 备选 + 理由集中在 [TECH.md §2](./TECH.md),此处登记其架构决策身份与最终取定:
 
-1. 两形态传输统一方式(§3)——**已确认:方案 A 统一 HTTP/WS**(桌面内嵌回环),决定 API 契约为 REST + SSE/WS。
+1. 两形态传输统一方式(§3)——**已确认:方案 A 统一 HTTP + SSE**(桌面内嵌回环),决定 API 契约为 REST + SSE。
 2. 本地持久化访问层——**已确认:SQLite + SeaORM 1.x**。
 3. 敏感数据静态存储机制——**已确认:加密静态存储(age)为跨形态基线 + 桌面可选叠加 OS keychain 加固**。
 4. ACME 客户端库——**已确认:instant-acme 0.8**。

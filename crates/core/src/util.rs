@@ -1,7 +1,7 @@
 //! 时间(RFC3339 UTC,TECH §3.5)与 ID(UUIDv7,决策10)工具。
 //!
 //! 时间列在库内以 `TEXT·RFC3339` 存储(DB _overview §1),与 wire 表示一致 —— 直接存字符串,
-//! 避免时区/整型漂移(protocolLint L3)。计算类字段(`daysUntilExpiry`)在服务层解析后相对
+//! 避免时区/整型漂移。计算类字段(`daysUntilExpiry`)在服务层解析后相对
 //! 服务器当前 UTC 时刻算出(common §1)。
 
 use time::format_description::well_known::Rfc3339;

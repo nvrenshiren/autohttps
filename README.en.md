@@ -4,7 +4,7 @@
 
 **Cross-platform HTTPS certificate lifecycle manager · desktop + server**
 
-![Rust](https://img.shields.io/badge/Rust-1.9x-CE412B?logo=rust&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-1.88%2B%20MSRV-CE412B?logo=rust&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)
@@ -28,18 +28,18 @@ Make "keep a list of domains and their certificates" effortless — detect on st
 - **Real-time visibility**: dashboard with three metrics (total / expiring-soon / failed) + a to-do list + a red dot; SSE pushes state changes so the UI refreshes instantly.
 - **Two run modes, one frontend**
   - **Desktop** (Tauri): 800×600 window + system tray (stays resident, close-to-tray), autostart, tray red-dot badge.
-  - **Server**: daemon + browser Web UI, 24/7.
+  - **Server**: foreground server process + browser Web UI; an OS service manager can supervise it for long-running operation.
 - **Data safety**: private keys / ACME account keys / root-CA keys are encrypted at rest with [age](https://github.com/FiloSottile/age); the database stores only references, never plaintext, and logs are redacted.
 
 ---
 
 ## 🚀 Quick start
 
-Prerequisites: Rust (1.9x), Node.js (20+).
+Prerequisites: Rust 1.88+, Node.js 20.19+ or 22.12+.
 
 ```bash
 # 1) Build the frontend (embedded into the binary)
-cd frontend && npm install && npm run build && cd ..
+cd frontend && npm ci && npm run build && cd ..
 
 # Server mode: browser Web UI
 cargo run -p server          # → http://127.0.0.1:8443
@@ -64,7 +64,7 @@ crates/
              · ACME client · self-signed CA (rcgen) · age secret storage
              · task queue + executor · expiry scanner
   api/       transport: axum router (REST + global SSE /events) · DTOs · embedded SPA
-  server/    server-mode daemon (bin)
+  server/    server-mode foreground process (bin)
   desktop/   desktop-mode Tauri v2 shell (bin, embeds api/core)
 frontend/    React 19 + Vite + TypeScript, shared by both modes; talks to /api via react-query
 docs/        prd (requirements) · architecture (DB / API contracts) · design (design system)
@@ -76,15 +76,25 @@ The **task queue is a SQLite table** (durable + crash-recoverable); **enums are 
 
 ## 🧪 Testing ACME locally with Pebble
 
-No real domain or public network needed — verify the full ACME client flow against Let's Encrypt's official test server [Pebble](https://github.com/letsencrypt/pebble):
+Go must be installed. No real domain or public network needed — verify the full ACME client flow against Let's Encrypt's official test server [Pebble](https://github.com/letsencrypt/pebble):
 
 ```bash
 git clone --depth 1 https://github.com/letsencrypt/pebble && cd pebble
-go build -o pebble.exe ./cmd/pebble
-PEBBLE_VA_ALWAYS_VALID=1 ./pebble.exe -config test/config/pebble-config.json   # → https://localhost:14000/dir
+
+# Linux / macOS
+PEBBLE_VA_ALWAYS_VALID=1 go run ./cmd/pebble -config test/config/pebble-config.json
+
+# Windows PowerShell
+$env:PEBBLE_VA_ALWAYS_VALID = "1"
+go run ./cmd/pebble -config test/config/pebble-config.json
 
 # Trust Pebble's CA root on the autohttps side
-AUTOHTTPS_ACME_CA_CERT=<pebble>/test/certs/pebble.minica.pem cargo run -p server
+# Linux / macOS
+AUTOHTTPS_ACME_CA_CERT=/path/to/pebble/test/certs/pebble.minica.pem cargo run -p server
+
+# Windows PowerShell
+$env:AUTOHTTPS_ACME_CA_CERT = "<pebble>\test\certs\pebble.minica.pem"
+cargo run -p server
 ```
 
 In the UI, register an account (directory `https://localhost:14000/dir`) → issue an ACME certificate → HTTP-01 passes automatically / DNS-01 confirms via the wizard → the certificate becomes "valid".
@@ -101,11 +111,9 @@ In the UI, register an account (directory `https://localhost:14000/dir`) → iss
 
 ---
 
-## 📦 Status
+## 📦 Scope
 
-The MVP is functionally complete (both the self-signed and ACME paths, both desktop and server modes); issue / renew / revoke / export, expiry scanning / auto-renewal, and real-time refresh are all verified end-to-end.
-
-**Non-goals (out of scope for the MVP)**: auto-deploying certificates to nginx / apache (export only) · multi-channel notifications (red dot only) · Web UI authentication (local / trusted network only) · DNS-01 provider-API automation (manual only).
+The current scope excludes certificate deployment to nginx / apache (certificates are exported for user-managed deployment), multi-channel notifications, Web UI authentication, and DNS-01 provider-API automation.
 
 ---
 

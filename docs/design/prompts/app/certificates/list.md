@@ -4,7 +4,7 @@
 > 依据(approved,直接消费):
 > - 页面 PRD `docs/prd/pages/app/certificates/list.md`(F1–F6、页面流转、验收 1–11)
 > - API 契约 `docs/architecture/api/app/certificates.md`(`CertificateSummary` DTO、`GET /certificates` 过滤字段;**原型不写路径**)
-> - 设计系统 `docs/design/systems/app.md`(§3 状态色 / §3.5 分类标签 / §7.3 Table / §10 硬约束)
+> - 逐科品牌、Token、Shell 与组件样式：`docs/design/cohesion-adoption.md`；业务状态与交互约束：`docs/design/systems/app.md` §3、§7、§10。
 > - 证书状态语义引用 systems §3.2;不复述。
 
 ---
@@ -18,10 +18,10 @@
 ## 2. 布局结构
 
 - **App Shell**:活动项「证书」;面包屑「证书」。
-- **内容区**(`p-6`):
+- **内容区**:沿用 App 页面容器与当前响应式布局:
   1. **页首行**:页标题「证书」 + 右侧主操作「发起签发」(`default` `Plus`,F6)。
-  2. **筛选工具栏**(§7.3,置表格上方):域名关键字 `Input`(前置 `Search`,F4)· 状态 `Select`(F2)· 签发方式 `Select`(F3);组合生效(验收 7)。
-  3. **证书表格**(满幅,§5.2):`DataTable`,底部 `Pagination`。
+  2. **筛选工具栏**(systems §7.3、§7.6,置表格上方):域名关键字 `Input`(前置 `Search`,F4)· 状态 `Select`(F2)· 签发方式 `Select`(F3);组合生效(验收 7)。
+  3. **证书表格**(满幅):复用现有表格组件,底部 `Pagination`。
 
 ---
 
@@ -41,7 +41,7 @@
 
 ---
 
-## 4. 交互与四态(§7.3 / §10-H3)
+## 4. 交互与四态(systems §7.9 / §10-H3)
 
 - **normal**(主渲染):~10 行覆盖多状态。行 hover 高亮,点击进详情(F5)。
 - **loading**:骨架行(`Skeleton`)。
@@ -51,9 +51,9 @@
 
 ---
 
-## 5. 视觉 token 引用
+## 5. 视觉与组件引用
 
-状态色 §3.1/§3.2;分类标签中性 §3.5;表格密度 §5.2(行 `h-11`、`px-3 py-2.5`,表头 `h-10` `text-[13px]` muted、sticky);字号 §4.2;图标 §9。颜色走 token(§10-H2)。
+状态与分类语义见 systems §3;表格、筛选器与交互沿用 COHESION Token 和 frontend 中的现有组件实现。颜色走 Token(systems §10-H2)。
 
 ---
 

@@ -3,7 +3,7 @@ import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
 
-/** 行内技术值(mono,设计 §4.1 / H8):指纹 / 序列号 / 路径 / 地址端口等。 */
+/** 行内技术值(mono,设计 §4 / H8):指纹 / 序列号 / 路径 / 地址端口等。 */
 export function Mono({ children, className }: { children: React.ReactNode; className?: string }) {
   return <span className={cn("font-mono text-[13px]", className)}>{children}</span>;
 }

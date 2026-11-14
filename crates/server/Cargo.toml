@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "autohttps 服务器守护进程(形态宿主):绑定 settings 监听地址,7×24 常驻"
+description = "autohttps 服务器进程(形态宿主):前台绑定 settings 监听地址"
 
 [[bin]]
 name = "server"

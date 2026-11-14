@@ -1,4 +1,4 @@
-//! autohttps 服务器守护进程(形态宿主,ARCHITECTURE §4.1)。
+//! autohttps 服务器进程(前台运行,可由操作系统服务管理器托管;ARCHITECTURE §4.1)。
 //!
 //! boot 序列(§7):建/迁移 SQLite(WAL)→ 崩溃恢复 → 启动 axum(REST + SSE + 内嵌 SPA)。
 //! 执行器/扫描器/自动续签均已接线;进程起来即 serve API + SPA、连 SQLite、消费任务队列。

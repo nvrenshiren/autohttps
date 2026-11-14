@@ -30,7 +30,7 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
-          "glass fixed left-1/2 top-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border-strong p-6 shadow-pop sm:max-w-md",
+          "bg-popover fixed left-1/2 top-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border border-border-strong p-6 shadow-pop sm:max-w-md",
           "max-h-[calc(100dvh-2rem)] overflow-y-auto",
           className,
         )}

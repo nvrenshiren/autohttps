@@ -4,7 +4,7 @@
 > 依据(approved,直接消费):
 > - 页面 PRD `docs/prd/pages/app/certificates/detail.md`(F1 信息、F2–F8 生命周期操作、验收 1–13、**§5 脚注:吊销不含已过期**)
 > - API 契约 `docs/architecture/api/app/certificates.md`(`CertificateDetail` DTO、各动作适用源态、导出 `parts`/`acknowledgeKeyExport`、`activeTaskId`;**原型不写路径**)
-> - 设计系统 `docs/design/systems/app.md`(§3 状态色 / §7.1 Button / §7.4 Dialog·AlertDialog / §7.8 Alert / §7.10 可复制技术值 / §10 硬约束)
+> - 逐科品牌、Token、Shell 与组件样式：`docs/design/cohesion-adoption.md`；业务状态与交互约束：`docs/design/systems/app.md` §3、§7、§10。
 > - 证书状态语义与流转引用 systems §3.2 / flows/certificates §2.3;不复述。
 
 ---
@@ -18,7 +18,7 @@
 ## 2. 布局结构
 
 - **App Shell**:活动项「证书」;面包屑「证书 / {主域名}」。
-- **内容区**(单列 `max-w-3xl` 或两栏,§5.2):
+- **内容区**:按 COHESION 和当前详情页布局控制阅读宽度,单列或两栏依内容组织:
   1. **页首**:主域名(`page-title`)+ 当前状态 `StatusBadge` + **操作按钮行**(按状态可用 / 禁用)。
   2. **信息卡**(F1):关联域名 / 当前状态 / 有效期 / 签发方式与来源 / 证书链概要 + 指纹 / 序列号 / 时间戳。
   3. **交互与状态设计态**区(说明性):导出面板 Dialog、吊销/删除 AlertDialog、操作可用性随状态(H4)、失败态原因入口(F8)——静态平铺预览,运行时按状态动态呈现。
@@ -78,9 +78,9 @@
 
 ---
 
-## 7. 视觉 token 引用
+## 7. 视觉与组件引用
 
-状态色 §3.1/§3.2;按钮变体 §7.1;Dialog/AlertDialog §7.4;Alert 变体 §7.8;可复制技术值 §7.10;mono §4.1;间距 §5.2(详情 `max-w-3xl`、卡片 `p-6`);图标 §9.2。颜色走 token(§10-H2)。
+状态与交互语义见 systems §3、§7;按钮、Dialog、Alert、Tooltip 与可复制值复用现有组件。视觉 Token 和内容宽度沿用 COHESION 接入与前端现有实现(systems §10-H2)。
 
 ---
 

@@ -43,10 +43,10 @@ ACME 全线接入用 **instant-acme 0.8**(实测 0.8.5),核心集成点(照 api/
     `confirm_challenge`(执行器,api 请求线程跑,非 worker):重建 order → 按域名匹配 authz → `set_ready` → 挑战 validating;
     本任务已无 awaiting_manual/pending 挑战且证书仍进行中 → `finalize_acme_order` 续推 → 证书 valid + 任务 succeeded。confirm/finalize 都在 executor 里(私有 helper 可复用),acme.rs 仅 thin wrapper。
   - **挑战 retry(CT7)**:ACME 失败挑战/订单不可原地复用,委派 `certificates::retry`(派生新任务重建订单取新挑战),非原地转 pending。
-- **ACME 全线已去桩并对 Pebble 实测通过**(issue/renew HTTP-01 自动完成;DNS-01 issue+renew 挂起→confirm→valid;
-  revoke→revoked;account patch/retry/delete 去桩)。`dns-precheck`(B4 可选)**也已实现**(hickory-resolver 本地查 TXT,
-  见 [[hickory-resolver-dns-precheck]])——`ErrorCode::NotImplemented`(501)自此**无产出方**(保留变体作占位,
-  未删以免 desync 手写 TS bindings 的 `not_implemented` 联合项)。前端预检按钮仍未接(PRD 可选,designer/前端后续决定)。
+- **ACME 全线已实现并对 Pebble 实测通过**(issue/renew HTTP-01 自动完成;DNS-01 issue+renew 挂起→confirm→valid;
+  revoke→revoked;account patch/retry/delete)。`dns-precheck`(B4 可选)也已实现(hickory-resolver 本地查 TXT,
+  见 [[hickory-resolver-dns-precheck]])。通用 `NotImplemented` 错误码及对应 TS 联合项已移除。前端预检按钮仍未接
+  (PRD 可选,后续 UI 如采用需同步补上交互)。
 - **前端 acme 两页已实现并对 Pebble 实测通过**(账户页 `/acme` + 验证向导 `/certificates/:id/challenges`):UI 驱动全程
   register→registered、issue DNS-01→`awaiting_manual`→读 TXT(`GET /acme/challenges/{id}` 的 dnsTxtName/Value)→confirm→
   `passed`→证书 `valid` 实测通。`challenge_status_changed` payload **无 certificateId**,故 SSE 失效用挑战根键 `["challenges"]`

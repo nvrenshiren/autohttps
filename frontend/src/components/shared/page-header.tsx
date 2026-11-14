@@ -6,7 +6,7 @@ export interface Crumb {
   to?: string;
 }
 
-/** 页首:面包屑 + 标题 + 右侧操作区。详情页承载层级面包屑(设计 §7.6)。 */
+/** 页首:面包屑 + 标题 + 右侧操作区。详情页通过面包屑承载页面层级。 */
 export function PageHeader({
   title,
   description,

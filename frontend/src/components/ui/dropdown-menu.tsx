@@ -18,7 +18,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          "glass z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[9rem] overflow-x-hidden overflow-y-auto rounded-md border border-border-strong p-1 text-popover-foreground shadow-pop",
+          "bg-popover z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[9rem] overflow-x-hidden overflow-y-auto rounded-md border border-border-strong p-1 text-popover-foreground shadow-pop",
           className,
         )}
         {...props}

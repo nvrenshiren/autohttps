@@ -43,7 +43,7 @@ interface UpdateSettingsRequest {          // 均可选;仅改传入字段
 - **形态适用校验**:改与当前 `runMode` 不适用的字段(服务器形态改 `autostartEnabled`,或桌面形态改 `listenAddress` / `listenPort`)→ `422 setting_not_applicable`(`details.field` / `details.runMode`)。
 - **默认账户校验**:`defaultAcmeAccountId` 指向不存在的账户 → `422 acme_account_not_found`(`details.id`);账户本体在 acme,本模块只存指向(database 纪律)。
 - **入参校验**:`renewalAdvanceDays` 非正整数 / `listenPort` 越界 → `400 validation_failed`。
-- **生效时机**:`renewalAdvanceDays` / `autoRenewEnabled` / `defaultAcmeAccountId` 对后续扫描与签发即时生效;`listenAddress` / `listenPort` / `autostartEnabled` 涉运行载体,**生效时机**(即时 / 需重启守护进程 / 需重登录桌面会话)属实现(flows/settings §2 生效口径),契约层标注、不承诺机制。
+- **生效时机**:`renewalAdvanceDays` / `autoRenewEnabled` / `defaultAcmeAccountId` 对后续扫描与签发即时生效;`listenAddress` / `listenPort` / `autostartEnabled` 涉运行载体,**生效时机**(即时 / 需重启服务器进程 / 需重登录桌面会话)属实现(flows/settings §2 生效口径),契约层标注、不承诺机制。
 
 ---
 

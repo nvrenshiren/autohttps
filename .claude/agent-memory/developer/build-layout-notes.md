@@ -12,16 +12,10 @@ metadata:
   desktop 单独 `cargo check -p desktop`(约 1 分钟首编,通过)。
   **Why:** 里程碑1 server 必须能跑是硬指标,不该被 Tauri 系统依赖拖累。
 
-- **rust-embed 需 `frontend/dist` 目录存在**(编译期):`crates/api/src/embed.rs` `#[folder="../../frontend/dist"]`。
-  fresh clone 未跑 npm build 时目录不存在,proc-macro 展开报"folder does not exist"。
-  **真相纠正**:`.gitignore` 虽有 `!/frontend/dist/.gitkeep` 例外,但 `.gitkeep` **从未真正 commit**
-  (`git ls-files frontend/dist/` 为空),占位 index.html 也没有——所以旧"靠 .gitkeep 兜底"的说法是错的,
-  fresh clone `cargo build` 确实会挂。**现兜底机制 = `crates/api/build.rs`**:编译期(先于本 crate 编译)
-  `create_dir_all(../../frontend/dist)` + 写 `.gitkeep`,让 `cargo build` 不依赖先跑前端;不发
-  `rerun-if-changed`(用 Cargo 默认:包内文件变动即重跑,保证 `embed.rs` 变更触发 proc-macro 重展开的
-  同一次构建里先重建目录)。`frontend/vite.config.ts` 另加 `keepDistPlaceholder` 插件在 `closeBundle`
-  写回 `.gitkeep`(vite build 会清空 dist)。验证兜底:`rm -rf frontend/dist && cargo clean -p autohttps-api
-  && cargo build -p server` 应自动重建 dist 并编译通过。
+- **rust-embed 需要 `frontend/dist` 目录**:`crates/api/src/embed.rs` 在编译期读取该目录。fresh clone
+  尚未构建前端时,`crates/api/build.rs` 会先创建空目录；`.gitignore` 忽略整个 dist。`npm run build`
+  生成正式 SPA 产物,不需要 `.gitkeep` 或 Vite 占位插件。需要验证空目录兜底时,删除 `frontend/dist`
+  后执行 `cargo clean -p autohttps-api` 与 `cargo build -p server`。
 
 - **debug 构建下 rust-embed 运行时从磁盘读 `frontend/dist`(非编译期内嵌)**:验证前端改动**无需重建
   server 二进制**——`npm run build` 后,已在跑的(或缓存链接的)debug server 直接服务新 dist(实测served

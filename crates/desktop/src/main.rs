@@ -1,6 +1,6 @@
 //! autohttps 桌面壳(形态宿主,ARCHITECTURE §4.2)。
 //!
-//! 方案 A(统一 HTTP/WS):进程内启动**同一** axum 服务,绑定 `127.0.0.1:<回环端口>`(仅回环、机外不可达),
+//! 方案 A(统一 HTTP + SSE):进程内启动**同一** axum 服务,绑定 `127.0.0.1:<回环端口>`(仅回环、机外不可达),
 //! Tauri WebView 导航到 `http://127.0.0.1:<port>`(见 tauri.conf.json 的 window.url)。前端与网络层
 //! 与服务器形态完全相同;Tauri 只提供原生外壳。
 //!

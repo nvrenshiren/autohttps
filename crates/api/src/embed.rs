@@ -48,7 +48,7 @@ pub async fn spa_handler(uri: Uri) -> Response {
     }
     (
         StatusCode::NOT_FOUND,
-        "SPA 未构建:请先 `cd frontend && npm install && npm run build`",
+        "SPA 未构建:请先 `cd frontend && npm ci && npm run build`",
     )
         .into_response()
 }

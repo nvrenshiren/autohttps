@@ -207,7 +207,7 @@ export function SettingsPage() {
           <CardDescription>
             {isDesktop
               ? "桌面形态专属配置(仅桌面)。"
-              : "守护进程监听配置(仅服务器)。"}
+              : "服务器监听配置(仅服务器)。"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

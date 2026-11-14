@@ -55,6 +55,5 @@
 | 续签策略   | Renewal Policy  | 全局设置:提前多少天续签、是否自动(project §5 settings)                    |
 | 续签失败   | Renewal Failed  | 续签任务执行未成功的状态(如验证失败 / 网络问题);需红点提醒并可重试        |
 | 任务       | Task            | 一次签发 / 续签的执行单元,含时间、结果、日志;历史留痕(project §5 tasks)  |
-| 运行形态   | Run Mode        | 桌面形态(Tauri 窗口 + 托盘)或服务器形态(守护进程 + Web UI)(project §4)  |
-| 守护进程   | Daemon          | 服务器形态下 7×24 常驻的后台进程                                            |
+| 运行形态   | Run Mode        | 桌面形态(Tauri 窗口 + 托盘)或服务器形态(服务器进程 + Web UI)(project §4)    |
 | 系统托盘   | Tray            | 桌面形态常驻于系统托盘的入口,关窗不退出                                    |

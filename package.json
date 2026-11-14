@@ -1,8 +1,0 @@
-{
-  "name": "opcflow-project",
-  "version": "0.0.0",
-  "private": true,
-  "devDependencies": {
-    "tsx": "^4"
-  }
-}

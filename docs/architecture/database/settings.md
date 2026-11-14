@@ -27,7 +27,7 @@
 | `auto_renew_enabled` | `BOOLEAN` | NOT NULL | 否 | `true` | 自动续签开关(DS3/C2);开启则"即将到期"自动续签 + 续签失败未过期者随周期扫描再尝试(SF2,无独立重试参数) |
 | `default_acme_account_id` | `TEXT·UUIDv7` | FK→`acme_accounts.id` ON DELETE SET NULL | 是 | NULL | 默认 ACME 账户**指向**(DS4/D1);仅存引用,账户本体归 acme;账户被删则置空,签发处引导显式选择(settings D1) |
 | `autostart_enabled` | `BOOLEAN` | — | 是 | NULL | **仅桌面**:开机自启开关(DS1/A2);服务器形态无意义,留空 |
-| `listen_address` | `TEXT` | — | 是 | NULL | **仅服务器**:守护进程 Web UI 监听地址(DS1/A3);默认仅本机/可信内网,设为对外可达须界面提示公网暴露风险(roles §3) |
+| `listen_address` | `TEXT` | — | 是 | NULL | **仅服务器**:服务器进程 Web UI 监听地址(DS1/A3);默认仅本机/可信内网,设为对外可达须界面提示公网暴露风险(roles §3) |
 | `listen_port` | `INTEGER` | — | 是 | NULL | **仅服务器**:Web UI 监听端口(DS1/A3);有合理默认 |
 | `data_storage_path` | `TEXT` | NOT NULL | 否 | 部署时定 | 数据存储根路径(DS2/B1);其下含私钥/账户密钥等敏感材料;**运行期只读、不可改、无迁移语义**(SF5/DEC3),库内仅记录既定路径供展示 |
 | `updated_at` | `TEXT·RFC3339` | NOT NULL | 否 | now | 最近保存时间 |

@@ -59,6 +59,33 @@ fn push_pem(out: &mut String, pem: &str) {
     out.push('\n');
 }
 
+/// 将保存的证书 PEM 拆成叶子证书与其余证书链。
+fn split_certificate_material(material: &str) -> CoreResult<(String, String)> {
+    let mut certificates =
+        pem::parse_many(material).map_err(|_| CoreError::internal("证书材料 PEM 解析失败"))?;
+    if certificates.is_empty()
+        || certificates
+            .iter()
+            .any(|block| block.tag() != "CERTIFICATE")
+    {
+        return Err(CoreError::internal("证书材料不包含有效的 CERTIFICATE 区块"));
+    }
+
+    let leaf = certificates.remove(0);
+    Ok((pem::encode(&leaf), pem::encode_many(&certificates)))
+}
+
+async fn root_ca_chain(ctx: &CoreContext, root_ca_id: Option<&str>) -> CoreResult<String> {
+    let Some(root_ca_id) = root_ca_id else {
+        return Ok(String::new());
+    };
+    root_cas::Entity::find_by_id(root_ca_id)
+        .one(&ctx.db)
+        .await?
+        .map(|root_ca| root_ca.cert_pem)
+        .ok_or_else(|| CoreError::internal("证书引用的根 CA 不存在"))
+}
+
 /// 导出证书材料(E1)。读 `cert_pem_ref`/`private_key_ref` → age 解密 → 拼 PEM(二进制下载)。
 /// - 无文件态(未签发/签发中/签发失败,或缺 `cert_pem_ref`)→ `409 cert_not_exportable`;
 /// - 含 `private_key` 未确认 → `422 key_export_not_acknowledged`;
@@ -95,19 +122,12 @@ pub async fn export(ctx: &CoreContext, id: &str, input: ExportInput) -> CoreResu
         ));
     }
 
-    // 叶子证书(公开材料,age 解密)
-    let leaf_pem = String::from_utf8(ctx.secrets.load(cert_ref)?)
+    // age 解密后的材料可能是 ACME 完整证书链;按 PEM 区块拆出叶子与中间链。
+    let stored_cert_pem = String::from_utf8(ctx.secrets.load(cert_ref)?)
         .map_err(|_| CoreError::internal("证书文件材料损坏"))?;
-
-    // 链:self_signed 取根 CA 证书;acme 的中间链在其 fullchain 落地(待后续)
-    let chain_pem = match cert.root_ca_id.as_deref() {
-        Some(rid) => root_cas::Entity::find_by_id(rid)
-            .one(db)
-            .await?
-            .map(|r| r.cert_pem)
-            .unwrap_or_default(),
-        None => String::new(),
-    };
+    let (leaf_pem, mut chain_pem) = split_certificate_material(&stored_cert_pem)?;
+    let root_chain = root_ca_chain(ctx, cert.root_ca_id.as_deref()).await?;
+    push_pem(&mut chain_pem, &root_chain);
 
     // 私钥(敏感 AR4,仅此出口;须已确认)
     let key_pem = if wants_key {
@@ -277,16 +297,11 @@ pub async fn export_target(
         ));
     }
 
-    let leaf_pem = String::from_utf8(ctx.secrets.load(cert_ref)?)
+    let stored_cert_pem = String::from_utf8(ctx.secrets.load(cert_ref)?)
         .map_err(|_| CoreError::internal("证书文件材料损坏"))?;
-    let chain_pem = match cert.root_ca_id.as_deref() {
-        Some(rid) => root_cas::Entity::find_by_id(rid)
-            .one(db)
-            .await?
-            .map(|r| r.cert_pem)
-            .unwrap_or_default(),
-        None => String::new(),
-    };
+    let (leaf_pem, mut chain_pem) = split_certificate_material(&stored_cert_pem)?;
+    let root_chain = root_ca_chain(ctx, cert.root_ca_id.as_deref()).await?;
+    push_pem(&mut chain_pem, &root_chain);
     let key_ref = cert
         .private_key_ref
         .as_deref()
@@ -353,6 +368,25 @@ pub async fn export_target(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn acme_fullchain_is_split_into_leaf_and_intermediates() {
+        let leaf = pem::encode(&pem::Pem::new("CERTIFICATE", vec![1, 2, 3]));
+        let intermediate = pem::encode(&pem::Pem::new("CERTIFICATE", vec![4, 5, 6]));
+        let fullchain = format!("{leaf}{intermediate}");
+
+        let (actual_leaf, actual_chain) =
+            split_certificate_material(&fullchain).expect("valid PEM blocks");
+
+        let leaf_der = pem::parse(&actual_leaf).expect("leaf PEM").into_contents();
+        let chain_der = pem::parse_many(&actual_chain)
+            .expect("chain PEM")
+            .into_iter()
+            .map(|block| block.into_contents())
+            .collect::<Vec<_>>();
+        assert_eq!(leaf_der, vec![1, 2, 3]);
+        assert_eq!(chain_der, vec![vec![4, 5, 6]]);
+    }
 
     /// 生成自签叶子材料(leaf/key PEM)供 PFX 打包测试。
     fn self_signed_materials() -> (String, String) {
