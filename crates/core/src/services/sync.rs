@@ -359,57 +359,98 @@ pub async fn restore(
     let encrypted = webdav::download(&cfg, remote_name).await?;
 
     // 解密 + 解析(内存;口令错/包损坏在此即返回,尚未写任何盘)
-    let parsed = backup::parse_backup(&encrypted, passphrase)?;
+    let passphrase = passphrase.to_string();
+    let parsed = tokio::task::spawn_blocking(move || backup::parse_backup(&encrypted, &passphrase))
+        .await
+        .map_err(|error| CoreError::internal(format!("备份解析后台任务失败: {error}")))??;
 
     let archive_dir = ctx.data_dir.join(ARCHIVE_DIR_NAME);
-    std::fs::create_dir_all(&archive_dir)
+    tokio::fs::create_dir_all(&archive_dir)
+        .await
         .map_err(|e| CoreError::internal(format!("创建归档目录失败: {e}")))?;
 
     // 1) 备份库快照落临时文件(VACUUM INTO 需要一个磁盘上的源库)
     let incoming = archive_dir.join("incoming.db");
-    std::fs::write(&incoming, &parsed.db_bytes)
+    tokio::fs::write(&incoming, &parsed.db_bytes)
+        .await
         .map_err(|e| CoreError::internal(format!("暂存备份库失败: {e}")))?;
 
     // 2) 当前现场在线备份(不占句柄):活跃库 VACUUM INTO → pre-restore.db(可回滚)
     let pre_restore = archive_dir.join("pre-restore.db");
-    let _ = std::fs::remove_file(&pre_restore);
-    vacuum_into(ctx, &pre_restore).await?;
+    match tokio::fs::remove_file(&pre_restore).await {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            let _ = tokio::fs::remove_file(&incoming).await;
+            return Err(CoreError::internal(format!("清理旧恢复快照失败: {error}")));
+        }
+    }
+    if let Err(error) = vacuum_into(ctx, &pre_restore).await {
+        let _ = tokio::fs::remove_file(&pre_restore).await;
+        let _ = tokio::fs::remove_file(&incoming).await;
+        return Err(error);
+    }
 
     // 3) 在线恢复:把备份库内容导入活跃库
     //    SQLite 没有直接 "import from file",用 ATTACH + 逐表复制;在事务内完成。
-    restore_db_from(ctx, &incoming).await?;
-    let _ = std::fs::remove_file(&incoming);
+    if let Err(error) = restore_db_from(ctx, &incoming).await {
+        let _ = tokio::fs::remove_file(&incoming).await;
+        return Err(error);
+    }
+    if let Err(error) = tokio::fs::remove_file(&incoming).await {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            tracing::warn!(path = %incoming.display(), error = %error, "清理暂存恢复库失败");
+        }
+    }
 
     // 4) 密钥材料以备份为准做**全量替换**(不是单纯覆盖写):
     //    a) 删掉不在备份里的 `.age`(恢复后库里不再引用它们;残留会造成 ref 悬空/孤儿);
     //    b) 写入备份带来的全部密文 + master.key;
     //    c) 清身份缓存(磁盘 master.key 已换,进程缓存还是旧的会解不开/写错)。
     let secrets_dir = ctx.data_dir.join("secrets");
-    std::fs::create_dir_all(&secrets_dir)
+    tokio::fs::create_dir_all(&secrets_dir)
+        .await
         .map_err(|e| CoreError::internal(format!("创建密钥目录失败: {e}")))?;
     let incoming_names: std::collections::HashSet<&str> =
         parsed.secrets.iter().map(|(n, _)| n.as_str()).collect();
-    if let Ok(rd) = std::fs::read_dir(&secrets_dir) {
-        for entry in rd.flatten() {
-            let name = entry.file_name();
-            let Some(name_str) = name.to_str() else {
-                continue;
-            };
-            if name_str.ends_with(".age") && !incoming_names.contains(name_str) {
-                // 备份里没有的旧密文:删除(恢复以备份为唯一真相)
-                let _ = std::fs::remove_file(entry.path());
+    let mut entries = tokio::fs::read_dir(&secrets_dir)
+        .await
+        .map_err(|e| CoreError::internal(format!("读取密钥目录失败: {e}")))?;
+    loop {
+        let entry = entries
+            .next_entry()
+            .await
+            .map_err(|e| CoreError::internal(format!("读取密钥目录项失败: {e}")))?;
+        let Some(entry) = entry else {
+            break;
+        };
+        let name = entry.file_name();
+        let Some(name_str) = name.to_str() else {
+            continue;
+        };
+        if name_str.ends_with(".age") && !incoming_names.contains(name_str) {
+            // 备份里没有的旧密文:删除(恢复以备份为唯一真相)
+            match tokio::fs::remove_file(entry.path()).await {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(CoreError::internal(format!(
+                        "删除未在备份中的旧密钥材料失败: {error}"
+                    )))
+                }
             }
         }
     }
     let mut restored = 0u32;
     for (name, bytes) in &parsed.secrets {
-        std::fs::write(secrets_dir.join(name), bytes)
+        tokio::fs::write(secrets_dir.join(name), bytes)
+            .await
             .map_err(|e| CoreError::internal(format!("写入密钥材料失败: {e}")))?;
         if name != "master.key" {
             restored += 1;
         }
     }
-    ctx.secrets.invalidate_identity_cache();
+    ctx.secrets.invalidate_identity_cache()?;
 
     // 5) 一致性对账:恢复后若库里的 `password_ref` 指向的密文不在备份里(ref 悬空),
     //    把它置空 —— 让 UI 显示「口令未设置,需重新保存」,而不是留一个永远解不开的引用。
@@ -437,8 +478,14 @@ async fn reconcile_password_ref(ctx: &CoreContext) -> CoreResult<()> {
         .data_dir
         .join("secrets")
         .join(format!("{password_ref}.age"));
-    if path.exists() {
-        return Ok(()); // ref 有效,无需动
+    match tokio::fs::metadata(&path).await {
+        Ok(_) => return Ok(()), // ref 有效,无需动
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(CoreError::internal(format!(
+                "检查 WebDAV 密钥材料失败: {error}"
+            )))
+        }
     }
     // 悬空:置空 + 记录原因(展示用)
     let mut am: sync_configs::ActiveModel = m.into();

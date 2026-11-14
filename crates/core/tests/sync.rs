@@ -315,7 +315,9 @@ async fn restore_keeps_backup_secrets_decryptable_and_prunes_orphans() {
     // 生成新身份顶掉磁盘 master.key(模拟"当前进程/机器"与备份不同 key)
     std::fs::remove_file(&master_path).expect("删 master.key");
     let orphan_ref = autohttps_core::util::new_id();
-    ctx.secrets.invalidate_identity_cache(); // 强制重读(会生成新 key)
+    ctx.secrets
+        .invalidate_identity_cache()
+        .expect("清除身份缓存"); // 强制重读(会生成新 key)
     ctx.secrets
         .store(&orphan_ref, b"ORPHAN NOT IN BACKUP")
         .expect("存孤儿密文");
@@ -337,7 +339,9 @@ async fn restore_keeps_backup_secrets_decryptable_and_prunes_orphans() {
     for (name, bytes) in &parsed.secrets {
         std::fs::write(secrets_dir.join(name), bytes).unwrap();
     }
-    ctx.secrets.invalidate_identity_cache(); // 清缓存:磁盘 master.key 已换回备份的
+    ctx.secrets
+        .invalidate_identity_cache()
+        .expect("清除身份缓存"); // 清缓存:磁盘 master.key 已换回备份的
 
     // 恢复+清缓存后:备份密码应可用备份的 master.key 解开(密码不丢)
     let recovered = ctx.secrets.load(&backup_ref).expect("备份密码应仍可解密");

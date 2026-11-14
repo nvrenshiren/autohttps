@@ -42,14 +42,28 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      # core / api / server exclude the Tauri desktop crate, which needs
-      # platform WebView/GTK system libraries; the desktop bundle is built
-      # locally via `tauri build`.
+      # Linux covers the server crates; the Windows job below checks the Tauri desktop crate.
       - name: Format check
-        run: cargo fmt --all --check
+        run: cargo fmt --all -- --check
       - name: Clippy (warnings as errors)
-        run: cargo clippy -p autohttps-core -p autohttps-api -p server --all-targets -- -D warnings
+        run: cargo clippy --locked -p autohttps-core -p autohttps-api -p server --all-targets -- -D warnings
       - name: Check
-        run: cargo check -p autohttps-core -p autohttps-api -p server
+        run: cargo check --locked -p autohttps-core -p autohttps-api -p server
       - name: Test
-        run: cargo test -p autohttps-core -p autohttps-api -p server
+        run: cargo test --locked -p autohttps-core -p autohttps-api -p server
+
+  rust-desktop:
+    name: Rust (Windows desktop check)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy desktop (warnings as errors)
+        run: cargo clippy --locked -p desktop --all-targets -- -D warnings
+      - name: Check desktop
+        run: cargo check --locked -p desktop
+      - name: Test desktop
+        run: cargo test --locked -p desktop

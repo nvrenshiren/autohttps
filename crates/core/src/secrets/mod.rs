@@ -5,6 +5,9 @@
 //! 严格文件权限保护(Unix 0600;Windows 依赖用户目录 ACL)。每份材料以 age 加密后落
 //! `<data>/secrets/<ref>.age`,**明文绝不落盘、绝不入库/入日志**。
 //!
+//! 身份缓存锁按 fail-closed 处理:一旦 poisoned,读写和恢复缓存均返回错误,不恢复可能不完整的身份状态,
+//! 避免用不确定密钥继续加/解密。单份密钥材料通常只有几 KB;当前同步文件原语仍在调用服务的线程上执行。
+//!
 //! 桌面可选叠加 OS keychain 加固(决策3)留待后续;当前跨形态基线为加密静态存储。
 
 use crate::domain::error::{CoreError, CoreResult};
@@ -53,7 +56,12 @@ impl SecretStore {
     /// 取(必要时生成)主密钥身份。首次调用创建 `secrets/` 目录 + `master.key`。
     fn identity(&self) -> CoreResult<Identity> {
         // 快路径:已缓存
-        if let Some(s) = self.identity.read().ok().and_then(|g| g.clone()) {
+        if let Some(s) = self
+            .identity
+            .read()
+            .map_err(|_| CoreError::internal("主密钥缓存锁已污染"))?
+            .clone()
+        {
             return Identity::from_str(&s)
                 .map_err(|e| CoreError::internal(format!("主密钥解析失败: {e}")));
         }
@@ -80,7 +88,7 @@ impl SecretStore {
             let s = id.to_string().expose_secret().to_string();
             std::fs::write(&key_path, &s)
                 .map_err(|e| CoreError::internal(format!("写入主密钥失败: {e}")))?;
-            restrict_permissions(&key_path);
+            restrict_permissions(&key_path)?;
             s
         };
         *guard = Some(secret.clone());
@@ -92,10 +100,13 @@ impl SecretStore {
     /// 否则缓存里的旧身份与磁盘不符:后续 `load` 用旧 key 解不开恢复来的密文、
     /// `store` 又用旧 key 加密并可能把旧 `master.key` 写回磁盘顶掉恢复结果。
     /// 恢复语义本就要求重启进程,此为进程内兜底(调用方已提示重启)。
-    pub fn invalidate_identity_cache(&self) {
-        if let Ok(mut guard) = self.identity.write() {
-            *guard = None;
-        }
+    pub fn invalidate_identity_cache(&self) -> CoreResult<()> {
+        let mut guard = self
+            .identity
+            .write()
+            .map_err(|_| CoreError::internal("主密钥缓存锁已污染"))?;
+        *guard = None;
+        Ok(())
     }
 
     fn recipient(&self) -> CoreResult<Recipient> {
@@ -124,9 +135,12 @@ impl SecretStore {
     /// 按引用键清除敏感材料(证书/账户/根 CA 移除时)。
     pub fn remove(&self, reference: &str) -> CoreResult<()> {
         let p = self.path_for(reference);
-        if p.exists() {
-            std::fs::remove_file(p)
-                .map_err(|e| CoreError::internal(format!("清除密钥材料失败: {e}")))?;
+        match std::fs::remove_file(p) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(CoreError::internal(format!("清除密钥材料失败: {error}")));
+            }
         }
         Ok(())
     }
@@ -134,14 +148,39 @@ impl SecretStore {
 
 /// 收紧主密钥文件权限(Unix 0600)。Windows 依赖用户目录 ACL(不额外处理)。
 #[cfg(unix)]
-fn restrict_permissions(path: &Path) {
+fn restrict_permissions(path: &Path) -> CoreResult<()> {
     use std::os::unix::fs::PermissionsExt;
-    if let Ok(meta) = std::fs::metadata(path) {
-        let mut perms = meta.permissions();
-        perms.set_mode(0o600);
-        let _ = std::fs::set_permissions(path, perms);
-    }
+    let mut perms = std::fs::metadata(path)
+        .map_err(|e| CoreError::internal(format!("读取主密钥权限失败: {e}")))?
+        .permissions();
+    perms.set_mode(0o600);
+    std::fs::set_permissions(path, perms)
+        .map_err(|e| CoreError::internal(format!("收紧主密钥权限失败: {e}")))?;
+    Ok(())
 }
 
 #[cfg(not(unix))]
-fn restrict_permissions(_path: &Path) {}
+fn restrict_permissions(_path: &Path) -> CoreResult<()> {
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SecretStore;
+    use std::path::Path;
+
+    #[test]
+    fn poisoned_identity_lock_fails_closed() {
+        let store = SecretStore::new(Path::new("unused"));
+        let lock = store.identity.clone();
+        let result = std::thread::spawn(move || {
+            let _guard = lock.write().expect("fresh identity lock");
+            panic!("poison identity lock for policy test");
+        })
+        .join();
+
+        assert!(result.is_err());
+        assert!(store.identity().is_err());
+        assert!(store.invalidate_identity_cache().is_err());
+    }
+}

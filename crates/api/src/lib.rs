@@ -160,3 +160,44 @@ async fn security_headers(
 
 /// SSE wire 契约(单一定义,导出 TS):事件类型枚举 + 包络 + core `DomainEvent` → 包络的映射。
 pub use events::{to_server_event, EventType, ServerEvent};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use autohttps_core::enums::RunMode;
+    use axum::body::{to_bytes, Body};
+    use axum::http::{Request, StatusCode};
+    use sea_orm::Database;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn app_mounts_app_info_under_api_prefix() {
+        let db = Database::connect("sqlite::memory:")
+            .await
+            .expect("connect in-memory database");
+        let ctx = CoreContext::new(
+            db,
+            std::env::temp_dir(),
+            RunMode::Server,
+            "test-version".to_string(),
+        );
+
+        let response = app(ctx)
+            .oneshot(
+                Request::builder()
+                    .uri("/api/app-info")
+                    .body(Body::empty())
+                    .expect("build request"),
+            )
+            .await
+            .expect("serve request");
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("read body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("parse JSON");
+        assert_eq!(json["runMode"], "server");
+        assert_eq!(json["appVersion"], "test-version");
+    }
+}

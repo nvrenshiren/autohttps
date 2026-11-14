@@ -13,7 +13,7 @@ use std::time::Duration;
 /// 打开(必要时创建)SQLite 库并返回 SeaORM 连接。
 pub async fn connect(db_path: &Path) -> anyhow::Result<DatabaseConnection> {
     if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent)?;
+        tokio::fs::create_dir_all(parent).await?;
     }
 
     let opts = SqliteConnectOptions::new()

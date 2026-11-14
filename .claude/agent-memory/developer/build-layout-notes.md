@@ -1,6 +1,6 @@
 ---
 name: build-layout-notes
-description: 工作区构建落位:默认成员排除 desktop;rust-embed 需 frontend/dist 存在;server 默认 8443;CI 硬门禁仅 check+test(fmt/clippy 非阻断)
+description: 工作区构建落位:默认成员排除 desktop;rust-embed 需 frontend/dist 存在;server 默认 8443;Rust MSRV 1.88;CI 覆盖 Linux core/API/server 与 Windows desktop
 metadata:
   type: project
 ---
@@ -39,11 +39,24 @@ metadata:
   等于 wire 表示、避免时区漂移;DB `_overview §1` 的 "TEXT·RFC3339" 即此。`sea_orm(db_type="Text")`
   对 DeriveActiveEnum 可用(1.1 实测通过)。
 
-- **CI 硬门禁只有 `cargo check` + `cargo test`;`.github/workflows/ci.yml` 的 `cargo fmt --all --check`
-  与 `cargo clippy` 两步都 `continue-on-error: true`(仅信息、不阻断)**。本机 rustc/clippy/rustfmt
-  (实测 1.95/1.9,2026-04 stable)比仓库写就时的目标版本新,会对**全仓预存代码**刷一堆 fmt diff
-  (默认 rustfmt 把项目惯用的紧凑单行 struct 字面量展开成多行,dto.rs/executor.rs 等我从没碰的文件全中)
-  + clippy error(如 `services/executor.rs` 的 `never_loop`)——这些都是**预存、CI 容忍**的假 blocker。
-  **别去 `cargo fmt` 重排全仓、别改无关文件的 clippy**(会炸出巨型无关 diff、毁掉作者紧凑风格)。
-  判"我的改动是否干净":`cargo check --workspace` 绿 + `cargo test` 绿 + 对自己改的文件 scoped grep
-  fmt/clippy 输出确认不出现即可。
+- **Rust MSRV 为 1.88**:workspace 四个 package 均以 `rust-version.workspace = true` 继承。用锁定依赖分别验证：
+  `cargo +1.88.0 check --locked -p autohttps-core -p autohttps-api -p server -p desktop` 通过；
+  `cargo +1.85.0 check` 被锁定依赖拒绝，涉及 `darling 0.23.0`、`image 0.25.10`、`time 0.3.53`、
+  `rcgen 0.14.8`、`serde_with 3.21.0` 等声明需要 Rust 1.88 的包，以及 ICU 2.2 需要 1.86 的包。
+  更早的 Rust 1.82 还无法解析 `block-buffer 0.12.1` 的 edition 2024 manifest。依赖锁文件变化后，重新以声明的
+  MSRV 验证所有生产 package；不要凭 `rust-version` 单字段或稳定版构建通过推断 MSRV。
+
+- **CI 覆盖范围与门禁**:`.github/workflows/ci.yml` 在 Linux 对 `autohttps-core`、`autohttps-api`、`server`
+  运行 `cargo fmt --all -- --check`、带 `--locked` 的严格 Clippy、check、test；
+  Windows job 对 `desktop` 执行带 `--locked` 的 Clippy、check、test；`.github/workflows/portable.yml` 在 Windows 执行带 `--locked` 的 Release build。
+  `CONTRIBUTING.md` 保持相同 crate 集合与命令。所有这些 CI 步骤都是阻断门禁；不得把 fmt/Clippy 当作可忽略提示。
+
+- **async 文件 I/O 与密钥缓存锁**:在线恢复、启动密钥目录清扫、ACME webroot 文件使用 Tokio fs;备份 zip/scrypt/大包解密放进 `spawn_blocking`。
+  `SecretStore` 仍同步读写本地小密钥文件,慢速或网络数据目录可能短暂阻塞 Tokio worker,是已知剩余项;不要机械改写所有调用点。
+  identity `RwLock` poison fail-closed,读取/写入/失效均返回 `CoreError`;不恢复身份缓存,避免用未知密钥状态继续加解密。
+
+- **已知依赖警告**:严格 Clippy/check/test 当前会提示 `proc-macro-error2 v2.0.1` 的 future-incompat E0365
+  (`extern crate proc_macro` 为私有却被重新导出; rust-lang/rust#127909)。它经
+  `i18n-embed-fl 0.9.4 → age 0.11.5` 和 `sea-bae 0.2.1 → sea-orm-macros 1.1.20` 两条传递依赖链引入。
+  对该 crate 的 `cargo update --dry-run` 没有可更新项；此轮未更换宏/ORM/加密依赖或打本地 patch，避免改变生成宏及运行时依赖行为。
+  上游发布修复版本，或上述直接依赖更新且 Clippy、测试通过后，再移除该已知警告记录。

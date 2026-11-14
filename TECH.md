@@ -15,7 +15,7 @@
 
 | 维度 | 推荐 | 版本(2026-07-16) | 说明 |
 | --- | --- | --- | --- |
-| 后端语言 | Rust | 1.95(工具链实测) | project §4 已定"同一 Rust 核心";跨平台、内存安全、生态齐备 |
+| 后端语言 | Rust | 1.95(工具链实测);workspace MSRV 1.88(锁定依赖实测) | project §4 已定"同一 Rust 核心";跨平台、内存安全、生态齐备 |
 | 异步运行时 | tokio | 1.52 | ACME 在线交互 / 任务执行 / axum 均异步;事实标准 |
 | 前端语言 | TypeScript | **5.8(已确认稳妥线,不采 7.0)** | React 生态标准;已确认(orchestrator, 2026-07-16)采用 5.8 稳妥线——7.0 原生编译器太新、ts-rs 产物 / Vite 8 / shadcn 工具链跟进不确定;`tsc --noEmit` 作为 build 前置检查(§2-决策9) |
 | 前端框架 | React | 19.2 | project §4/§9-D1 已定"同一 React + Vite 前端" |
@@ -197,6 +197,14 @@
 ### 3.6 运行形态标志
 
 - 前端经 API 取"当前运行形态"(`desktop` / `server`,settings DS5)以做仅桌面/仅服务器显隐;该值由运行载体探测、非可切换配置(settings SF4)。
+
+### 3.7 Rust 错误、锁与阻塞 I/O
+
+- 生产 Rust 代码不得用 `unwrap()` / `expect()` 处理用户输入、文件、数据库、网络或子进程结果;对外部失败返回领域错误或在宿主入口向操作系统传播错误。测试代码可对测试前置条件使用 `expect()`。
+- `async` 路径中的大文件 I/O、CPU 密集压缩/解密或长耗时同步库操作,使用 Tokio 异步 API 或把完整同步工作放入 `tokio::task::spawn_blocking`。同步进程和阻塞网络调用不得在 Tokio worker 上执行。构建脚本与进程入口在 Tokio runtime 启动前可同步执行。
+- `SecretStore` 当前仍同步读写本地 `master.key` 和单份加密材料;文件通常只有几 KB,调用点较多,本轮不为短文件 I/O 做全量 API 异步化。慢速或网络挂载的数据目录可能让这些短操作阻塞 Tokio worker,这是已知剩余风险;若密钥文件变大或该存储迁移到慢介质,应整体将读写调用移入 blocking pool。
+- `backup::pack_backup` 的快照读取、密钥目录遍历、zip 压缩和 scrypt 加密,以及在线恢复的备份解密/解包,都放到 blocking pool;在线恢复文件操作和 ACME challenge webroot、启动孤儿清扫使用 Tokio fs。`unpack_backup` 是仅供离线场景的同步接口,不得从 async handler 直接调用。
+- `SecretStore.identity` 使用 `std::sync::RwLock<Option<String>>`,锁中毒统一 fail-closed:读取、写入和缓存失效均转为 `CoreError`,不调用 `PoisonError::into_inner` 恢复身份。panic 可能使缓存状态不确定,继续加/解密可能让密文与磁盘 `master.key` 不匹配。首次身份读取/创建会在持写锁时访问主密钥文件,对慢速或网络挂载的数据目录的锁竞争风险与小文件阻塞风险一并记录。
 
 ---
 

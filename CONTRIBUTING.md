@@ -4,7 +4,7 @@
 
 ## 开发环境
 
-前置:Rust(1.9x,含 `rustfmt`/`clippy`)、Node.js 20+。
+前置:Rust 1.88+（workspace 声明并实测的 MSRV，含 `rustfmt`/`clippy`）、Node.js 20+。
 
 ```bash
 # 前端(产物内嵌进可执行文件)
@@ -23,7 +23,8 @@ cargo run -p desktop
 
 ## 代码规范
 
-- **Rust**:`cargo fmt --all` 格式化;`cargo clippy` 无告警;`cargo check --workspace` 通过。
+- **Rust**:`cargo fmt --all -- --check` 通过;Linux CI 对 core/API/server 执行严格 Clippy、check 和 test；Windows CI 对 desktop 执行严格 Clippy、check 和 test，portable 工作流执行 Release build。所有依赖检查使用 `--locked`，完整命令如下。
+- **Rust 错误与阻塞 I/O**:生产代码不对输入、文件、数据库、网络或子进程结果 `unwrap()`/`expect()`；大文件 I/O、压缩/加密交给 Tokio fs 或 `spawn_blocking`。`SecretStore` 的少量本地小文件仍同步读写,慢速数据目录可能阻塞 Tokio worker,需评估后整体异步化；其标准 `RwLock` poison 一律 fail-closed 并返回错误。
 - **前端**:`npm run build`(含 `tsc --noEmit`)通过;遵循 Prettier(`.prettierrc`)。
 - **契约优先**:领域枚举/状态机的单一真相在 `crates/core`;敏感数据只存 `*_ref`、绝不明文入库或入日志;DTO 不暴露密钥字段。
 - 不引入需求未明示的功能(批量操作、额外统计等);改动对齐 `docs/` 下的契约。
@@ -32,7 +33,13 @@ cargo run -p desktop
 
 1. 从 `main` 切分支开发(`feat/…`、`fix/…`)。
 2. **提交信息**:祈使句、简洁描述实际改动(如 `Add DNS-01 manual challenge flow`);一个提交聚焦一件事。
-3. 提交前本地跑通:`cargo check --workspace`、`cargo test`、`cd frontend && npm run build`。
+3. 提交前本地跑通：
+   - `cargo fmt --all -- --check`
+   - `cargo clippy --locked -p autohttps-core -p autohttps-api -p server --all-targets -- -D warnings`
+   - `cargo check --locked -p autohttps-core -p autohttps-api -p server`
+   - `cargo test --locked -p autohttps-core -p autohttps-api -p server`
+   - Windows 桌面环境执行 `cargo clippy --locked -p desktop --all-targets -- -D warnings`、`cargo check --locked -p desktop` 和 `cargo test --locked -p desktop`；portable 发布工作流执行 `cargo build --release --locked -p desktop`
+   - `cd frontend && npm run build`
 4. 开 PR,填写 PR 模板的测试 checklist;CI(见 `.github/workflows/ci.yml`)须通过。
 5. 涉及行为变更请更新对应文档/README。
 

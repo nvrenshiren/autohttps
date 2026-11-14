@@ -80,7 +80,7 @@ fn passphrase_decrypt(passphrase: &str, ciphertext: &[u8]) -> CoreResult<Vec<u8>
 /// 返回加密后的字节流(可直接上传)。`app_version` 写入 manifest。
 pub async fn pack_backup(
     db: &sea_orm::DatabaseConnection,
-    db_path: &Path,
+    _db_path: &Path,
     data_dir: &Path,
     passphrase: &str,
     app_version: &str,
@@ -96,22 +96,48 @@ pub async fn pack_backup(
     let snapshot =
         std::env::temp_dir().join(format!("autohttps-backup-{}.db", crate::util::new_id()));
     let snapshot_str = snapshot.to_string_lossy().replace('\\', "/");
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        "PRAGMA wal_checkpoint(TRUNCATE);".to_string(),
-    ))
-    .await?;
-    db.execute(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Sqlite,
-        format!("VACUUM INTO '{}';", snapshot_str.replace('\'', "''")),
-    ))
-    .await?;
-    let db_bytes = std::fs::read(&snapshot)
-        .map_err(|e| CoreError::internal(format!("读取 DB 快照失败: {e}")))?;
-    let _ = std::fs::remove_file(&snapshot);
-    let _ = db_path; // 语义保留:快照由连接导出,与文件路径无关
+    let snapshot_result: CoreResult<()> = async {
+        db.execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            "PRAGMA wal_checkpoint(TRUNCATE);".to_string(),
+        ))
+        .await?;
+        db.execute(sea_orm::Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            format!("VACUUM INTO '{}';", snapshot_str.replace('\'', "''")),
+        ))
+        .await?;
+        Ok(())
+    }
+    .await;
+    if let Err(error) = snapshot_result {
+        let _ = tokio::fs::remove_file(&snapshot).await;
+        return Err(error);
+    }
 
-    // 2) zip:manifest + db 快照 + secrets(密文 + master.key)
+    // 2) DB/secret 文件读取、zip 压缩和 scrypt 加密放 blocking pool,不占 Tokio worker。
+    let data_dir = data_dir.to_path_buf();
+    let passphrase = passphrase.to_string();
+    let app_version = app_version.to_string();
+    tokio::task::spawn_blocking(move || {
+        let _cleanup = RemoveFileOnDrop(snapshot.clone());
+        pack_snapshot(&snapshot, &data_dir, &passphrase, &app_version)
+    })
+    .await
+    .map_err(|error| CoreError::internal(format!("备份打包后台任务失败: {error}")))?
+}
+
+/// blocking pool 内读取快照/密钥、构建 zip 并执行 age scrypt 加密。
+fn pack_snapshot(
+    snapshot: &Path,
+    data_dir: &Path,
+    passphrase: &str,
+    app_version: &str,
+) -> CoreResult<Vec<u8>> {
+    let db_bytes = std::fs::read(snapshot)
+        .map_err(|e| CoreError::internal(format!("读取 DB 快照失败: {e}")))?;
+
+    // zip:manifest + db 快照 + secrets(密文 + master.key)
     let secrets_dir = data_dir.join("secrets");
     let mut secret_files: Vec<String> = Vec::new();
     let mut zw = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
@@ -122,26 +148,31 @@ pub async fn pack_backup(
     zw.start_file(DB_SNAPSHOT_NAME, opts).map_err(zerr)?;
     zw.write_all(&db_bytes).map_err(|e| zerr(e.into()))?;
 
-    if secrets_dir.exists() {
-        for entry in std::fs::read_dir(&secrets_dir)
-            .map_err(|e| CoreError::internal(format!("读取密钥目录失败: {e}")))?
-            .flatten()
-        {
-            let name = entry.file_name();
-            let Some(name_str) = name.to_str() else {
-                continue;
-            };
-            if !name_str.ends_with(".age") && name_str != "master.key" {
-                continue;
+    match std::fs::read_dir(&secrets_dir) {
+        Ok(entries) => {
+            for entry in entries {
+                let entry =
+                    entry.map_err(|e| CoreError::internal(format!("读取密钥目录项失败: {e}")))?;
+                let name = entry.file_name();
+                let Some(name_str) = name.to_str() else {
+                    continue;
+                };
+                if !name_str.ends_with(".age") && name_str != "master.key" {
+                    continue;
+                }
+                let bytes = std::fs::read(entry.path())
+                    .map_err(|e| CoreError::internal(format!("读取密钥材料失败: {e}")))?;
+                zw.start_file(format!("{SECRETS_PREFIX}{name_str}"), opts)
+                    .map_err(zerr)?;
+                zw.write_all(&bytes).map_err(|e| zerr(e.into()))?;
+                if name_str != "master.key" {
+                    secret_files.push(name_str.to_string());
+                }
             }
-            let bytes = std::fs::read(entry.path())
-                .map_err(|e| CoreError::internal(format!("读取密钥材料失败: {e}")))?;
-            zw.start_file(format!("{SECRETS_PREFIX}{name_str}"), opts)
-                .map_err(zerr)?;
-            zw.write_all(&bytes).map_err(|e| zerr(e.into()))?;
-            if name_str != "master.key" {
-                secret_files.push(name_str.to_string());
-            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(CoreError::internal(format!("读取密钥目录失败: {error}")));
         }
     }
 
@@ -158,9 +189,19 @@ pub async fn pack_backup(
         .map_err(|e| zerr(e.into()))?;
 
     let zip_bytes = zw.finish().map_err(zerr)?.into_inner();
-
-    // 3) 整包口令加密
     passphrase_encrypt(passphrase, &zip_bytes)
+}
+
+struct RemoveFileOnDrop(PathBuf);
+
+impl Drop for RemoveFileOnDrop {
+    fn drop(&mut self) {
+        if let Err(error) = std::fs::remove_file(&self.0) {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!(path = %self.0.display(), error = %error, "清理备份 DB 快照失败");
+            }
+        }
+    }
 }
 
 /// 还原用结果(还原的文件统计,供摘要/测试)。

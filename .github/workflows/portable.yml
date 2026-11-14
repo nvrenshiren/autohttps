@@ -36,7 +36,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build desktop (release)
-        run: cargo build --release -p desktop
+        run: cargo build --release --locked -p desktop
 
       # 版本号 = tauri.conf.json version + CI 运行序号(semver 预发布),如 0.1.0-dev.42
       - name: Resolve version

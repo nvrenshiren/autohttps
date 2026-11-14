@@ -140,7 +140,9 @@ pub async fn test_connection(cfg: &WebDavConfig) -> CoreResult<()> {
 async fn ensure_collection(cfg: &WebDavConfig) -> CoreResult<()> {
     let http = client()?;
     let url = normalize_base(&cfg.base_url);
-    let req = request(cfg, Method::from_bytes(b"MKCOL").unwrap(), &url, Vec::new())?;
+    let method = Method::from_bytes(b"MKCOL")
+        .map_err(|e| CoreError::internal(format!("构造 MKCOL 请求方法失败: {e}")))?;
+    let req = request(cfg, method, &url, Vec::new())?;
     let (status, _) = send(&http, req).await?;
     if status == StatusCode::METHOD_NOT_ALLOWED || status == StatusCode::CONFLICT {
         return Ok(()); // 已存在
@@ -175,11 +177,16 @@ pub async fn list(cfg: &WebDavConfig) -> CoreResult<Vec<RemoteFile>> {
     let url = normalize_base(&cfg.base_url);
     let body = br#"<?xml version="1.0" encoding="utf-8"?>
 <D:propfind xmlns:D="DAV:"><D:prop><D:getcontentlength/><D:getlastmodified/><D:resourcetype/></D:prop></D:propfind>"#.to_vec();
-    let mut req = request(cfg, Method::from_bytes(b"PROPFIND").unwrap(), &url, body)?;
-    req.headers_mut().insert("Depth", "1".parse().unwrap());
+    let method = Method::from_bytes(b"PROPFIND")
+        .map_err(|e| CoreError::internal(format!("构造 PROPFIND 请求方法失败: {e}")))?;
+    let mut req = request(cfg, method, &url, body)?;
+    req.headers_mut().insert(
+        hyper::header::HeaderName::from_static("depth"),
+        hyper::header::HeaderValue::from_static("1"),
+    );
     req.headers_mut().insert(
         hyper::header::CONTENT_TYPE,
-        "application/xml".parse().unwrap(),
+        hyper::header::HeaderValue::from_static("application/xml"),
     );
     let (status, resp) = send(&http, req).await?;
     map_status(status, "列出远端备份")?;

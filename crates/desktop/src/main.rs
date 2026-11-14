@@ -192,7 +192,7 @@ async fn reconcile_autostart(app: &AppHandle, ctx: &CoreContext) {
     }
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -203,10 +203,8 @@ fn main() {
     // 进程内 tokio 运行时承载 axum(回环)+ 任务执行器 + 扫描调度器 + 壳侧事件消费。
     // 所有 DB 访问都在这一个运行时上(SeaORM/sqlx 连接池的归属运行时),壳侧任务经 rt.handle 派发,
     // 不用 Tauri 自带运行时,避免"连接池建于 rt、任务跑在另一 runtime"的 sqlx 陷阱。
-    let rt = tokio::runtime::Runtime::new().expect("创建 tokio 运行时失败");
-    let (app_router, listener, ctx) = rt
-        .block_on(boot())
-        .expect("boot autohttps core(建库/迁移/绑定回环)失败");
+    let rt = tokio::runtime::Runtime::new()?;
+    let (app_router, listener, ctx) = rt.block_on(boot())?;
     tracing::info!("桌面回环服务已就绪 → http://{LOOPBACK_ADDR}");
     rt.spawn(async move {
         if let Err(e) = axum::serve(listener, app_router).await {
@@ -214,7 +212,7 @@ fn main() {
         }
     });
 
-    let icons = TrayIcons::load().expect("加载托盘图标失败");
+    let icons = TrayIcons::load()?;
     let rt_handle = rt.handle().clone();
 
     tauri::Builder::default()
@@ -269,8 +267,12 @@ fn main() {
             rt_handle.spawn(async move {
                 let mut rx = ctx_task.events.subscribe();
                 // 初始:按当前待处理数点亮角标 + 同步开机自启。
-                let initial = dashboard::pending_count(&ctx_task).await.unwrap_or(0) as i64;
-                apply_badge(&tray, &icons, initial);
+                match dashboard::pending_count(&ctx_task).await {
+                    Ok(initial) => apply_badge(&tray, &icons, initial as i64),
+                    Err(error) => {
+                        tracing::warn!(error = %error, "读取初始待处理数失败,保留托盘素图标")
+                    }
+                }
                 reconcile_autostart(&app_handle, &ctx_task).await;
                 loop {
                     match rx.recv().await {
@@ -298,8 +300,8 @@ fn main() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("运行 Tauri 应用失败");
+        .run(tauri::generate_context!())?;
 
     drop(rt);
+    Ok(())
 }

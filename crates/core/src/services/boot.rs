@@ -73,16 +73,31 @@ pub async fn sweep_orphan_secrets(ctx: &CoreContext) -> CoreResult<u64> {
 
     let dir = ctx.data_dir.join("secrets");
     let mut removed = 0u64;
-    let Ok(entries) = std::fs::read_dir(&dir) else {
-        return Ok(0); // 目录不存在(尚无密钥材料)→ 无事可做
+    let mut entries = match tokio::fs::read_dir(&dir).await {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(0); // 目录不存在(尚无密钥材料)→ 无事可做
+        }
+        Err(error) => {
+            tracing::warn!(path = %dir.display(), error = %error, "读取密钥目录失败,跳过孤儿清扫");
+            return Ok(0);
+        }
     };
-    for entry in entries.flatten() {
+    loop {
+        let entry = match entries.next_entry().await {
+            Ok(Some(entry)) => entry,
+            Ok(None) => break,
+            Err(error) => {
+                tracing::warn!(path = %dir.display(), error = %error, "读取密钥目录失败,停止孤儿清扫");
+                break;
+            }
+        };
         let name = entry.file_name();
         let Some(ref_key) = name.to_str().and_then(|n| n.strip_suffix(".age")) else {
             continue; // 非 .age 文件(含 master.key)不动
         };
         if !live.contains(ref_key) {
-            match std::fs::remove_file(entry.path()) {
+            match tokio::fs::remove_file(entry.path()).await {
                 Ok(()) => {
                     removed += 1;
                     tracing::warn!(ref_key, "清扫孤儿密钥材料(无实体引用)");

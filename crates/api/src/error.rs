@@ -52,3 +52,23 @@ impl IntoResponse for ApiError {
 
 /// api 层内部结果别名。
 pub type ApiResult<T> = Result<T, ApiError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+
+    #[tokio::test]
+    async fn validation_error_keeps_status_and_wire_envelope() {
+        let response = ApiError::new(ErrorCode::ValidationFailed, "输入无效").into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let body = to_bytes(response.into_body(), 1024)
+            .await
+            .expect("read body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("parse JSON");
+        assert_eq!(json["error"]["code"], "validation_failed");
+        assert_eq!(json["error"]["message"], "输入无效");
+        assert!(json["error"].get("details").is_none());
+    }
+}
