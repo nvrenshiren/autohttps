@@ -1,7 +1,7 @@
 # API 契约 · 系统设置(settings)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/settings.md §2 功能列表 / §4 数据来源`(运行形态配置 / 存储路径 / 续签策略 / 默认 ACME 账户)· `flows/settings.md`(无状态机 SF1 · 存储路径只读 SF5 · 无重试参数 SF2 · 不切换形态 SF4)· `database/settings.md`(单例表)· 共用约定 [`common/conventions.md`](./common/conventions.md)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/settings.md §2 功能列表 / §4 数据来源`(运行形态配置 / 存储路径 / 续签策略 / 默认 ACME 账户)· `flows/settings.md`(无状态机 SF1 · 存储路径只读 SF5 · 无重试参数 SF2 · 不切换形态 SF4)· `database/settings.md`(单例表)· 共用约定 [`common/conventions.md`](./common/conventions.md)。
 > **边界**:ACME 账户本体归 acme(本模块仅存"默认指向");运行形态为运行时探测(经 `GET /app-info`,common §6.2),本模块不落形态、不提供切换(SF4)。
 > **不含**:登录 / 权限 / 账户设置(D4 无鉴权)· 通知渠道配置(project §6.2)· 主题 / 语言 / 日志级别 · 续签重试次数 / 间隔(SF2)· 扫描周期(SF3)· 形态切换 / 数据迁移(SF4)。
 
@@ -43,7 +43,7 @@ interface UpdateSettingsRequest {          // 均可选;仅改传入字段
 - **形态适用校验**:改与当前 `runMode` 不适用的字段(服务器形态改 `autostartEnabled`,或桌面形态改 `listenAddress` / `listenPort`)→ `422 setting_not_applicable`(`details.field` / `details.runMode`)。
 - **默认账户校验**:`defaultAcmeAccountId` 指向不存在的账户 → `422 acme_account_not_found`(`details.id`);账户本体在 acme,本模块只存指向(database 纪律)。
 - **入参校验**:`renewalAdvanceDays` 非正整数 / `listenPort` 越界 → `400 validation_failed`。
-- **生效时机**:`renewalAdvanceDays` / `autoRenewEnabled` / `defaultAcmeAccountId` 对后续扫描与签发即时生效;`listenAddress` / `listenPort` / `autostartEnabled` 涉运行载体,**生效时机**(即时 / 需重启服务器进程 / 需重登录桌面会话)属实现(flows/settings §2 生效口径),契约层标注、不承诺机制。
+- **生效时机**:`renewalAdvanceDays` / `autoRenewEnabled` / `defaultAcmeAccountId` 对后续扫描与签发即时生效;桌面 `autostartEnabled` 保存后由壳同步到操作系统;服务器 `listenAddress` / `listenPort` 下次启动时读取,修改后须重启服务器。`AUTOHTTPS_ADDR` 环境变量存在时覆盖服务器设置。
 
 ---
 
@@ -84,7 +84,3 @@ interface SettingsView {
 - **本模块不发 SSE 事件**:设置修改为 operator 同步动作,前端 react-query 于 mutation 成功即失效 `/settings`。续签策略变更的**后续效应**(某证书据新提前天数在下次扫描转 `expiring_soon`)经 `certificate_status_changed` 驱动(common/events.md),非 settings 直接推送。
 
 ---
-
-## 6. PRD/DB 缺口(architect 停止条件核查)
-
-- 无阻塞缺口。功能列表(查看 / 修改各配置)、数据来源(DS1–DS5)、只读 / 形态差异 / 无重试参数(SF2–SF5)均明确;运行形态经 `/app-info` 取得(common),职责边界清晰。

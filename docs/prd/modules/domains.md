@@ -1,7 +1,7 @@
 # 模块 PRD · 域名管理(domains)
 
 > 文档状态: draft · 模块: domains · 端点: app · 撰写: product-manager
-> 信任基础: project.md(approved)§5/§6/§7 · roles.md(operator 全权)· glossary.md · flows/domains.md · flows/certificates.md(证书状态机,引用不复述)
+> 信任基础: project.md§5/§6/§7 · roles.md(operator 全权)· glossary.md · flows/domains.md · flows/certificates.md(证书状态机,引用不复述)
 > **引用不复述**:证书状态机见 flows/certificates.md;术语见 glossary.md;域名管理流程与边界见 flows/domains.md;本文件引用不复述。
 
 ---
@@ -63,7 +63,7 @@ MVP 单一角色 operator 对本模块全权(roles.md),无细粒度权限差异�
 
 ## 4. 数据来源
 
-> 供 architect 作为唯一设计依据,用**业务语言**描述本模块涉及哪些数据及其来源;**不含**表结构 / 字段类型 / 存储机制 / API(由 architect 设计)。
+> 本节以业务语言说明本模块数据的来源与归属,不定义表结构、字段类型或 API;相应技术契约见 `docs/architecture/`。敏感数据遵循 project §7 与 TECH §2-决策3。
 
 | # | 数据 | 来源 | 说明 |
 | --- | --- | --- | --- |
@@ -72,17 +72,17 @@ MVP 单一角色 operator 对本模块全权(roles.md),无细粒度权限差异�
 | DS3 | 域名的证书态投影 | `certificates`(只读消费) | 该域名当前被哪些证书关联及各证书状态(证书状态机,引用不复述);"无证书 / 即将到期 / 失败"等呈现均派生自 certificates,本模块不定义证书状态 |
 | DS4 | 域名 ↔ 证书关联链 | `certificates`(持有)/ 本模块反向消费 | 证书侧记录其覆盖域名(SAN,含至多一个通配符);本模块从域名侧反查"被哪些证书覆盖";关联在 certificates 签发流程建立 |
 
-> **关联基数(供 architect 关注)**:域名 ↔ 证书为**多对多**——一证多域(SAN),一域可被多证关联;domains 管域名侧,关联链归 certificates(与 modules/certificates.md §4 DS2 / DEC4 一致)。
+> **关联基数**:域名 ↔ 证书为**多对多**——一证多域(SAN),一域可被多证关联;domains 管域名侧,关联链归 certificates(与 modules/certificates.md §4 DS2 / DEC4 一致)。
 
 ---
 
-## 5. 决策记录(append-only)
+## 5. 决策记录
 
-> 只增不改;记"决定了什么 / 为什么不做另一选项"。与 flows/domains.md §5 互补(此处记模块 / 功能 / 数据相关决策)。
+> 记"决定了什么 / 为什么不做另一选项"。与 flows/domains.md §5 互补(此处记模块 / 功能 / 数据相关决策)。
 
 - **DECM1(2026-07-16)· 分组为组织 / 筛选属性,不引入批量操作**:分组是域名的可选组织标签,仅用于列表筛选与归类,不作为批量签发 / 批量删除的入口;每个域名归入至多一个分组。
   - 为什么:project §5 明示"分组"但未明示批量场景与分组层级;批量操作为需求未明示功能,与 certificates DEC2 收敛一致;单一分组是"分组"最小可用读法,后续如需多标签再增量。
 - **DECM2(2026-07-16)· 域名与验证方式的关联归本模块,明细归 acme**:本模块持有"域名 ↔ 验证方式类别"的选择 / 引用(承接 project §5"验证方式的关联"),验证方式的配置与执行归 acme。
-  - 为什么这样切:ACME 验证按域名(identifier)逐个校验,把类别选择置于域名对象便于签发时按域名取用;明细留在 acme 以免边界重叠。**已裁决(orchestrator, 2026-07-16):webroot 路径归 acme(验证执行配置),domains 仅持"域名 ↔ 验证方式类别"关联;acme ↔ domains 边界对齐完成(见 acme DEA5)。**
+  - 为什么这样切:ACME 验证按域名(identifier)逐个校验,把类别选择置于域名对象便于签发时按域名取用;明细留在 acme 以免边界重叠。**已确认(2026-07-16):webroot 路径归 acme(验证执行配置),domains 仅持"域名 ↔ 验证方式类别"关联**(见 acme DEA5)。
 - **DECM3(2026-07-16)· 页面收敛为 2 页**:域名列表页 + 域名详情页;新增 / 编辑 / 删除作为其上的对话框 / 面板,不单列页面。
   - 为什么不拆:域名对象轻量,增删改是对列表 / 详情上下文的动作;单列页面会割裂操作与对象,与 certificates DEC3 收敛口径一致。

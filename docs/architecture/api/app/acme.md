@@ -1,7 +1,7 @@
 # API 契约 · ACME 签发(acme)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/acme.md §2 功能列表`(A1–A5 账户、B1–B6 验证向导与挑战)· `flows/acme.md`(账户状态机 4 态 AT1–AT5 · 挑战状态机 6 态 CT1–CT10 · §3.4 多域名整体判定)· `database/acme.md` · 共用约定 [`common/conventions.md`](./common/conventions.md)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/acme.md §2 功能列表`(A1–A5 账户、B1–B6 验证向导与挑战)· `flows/acme.md`(账户状态机 4 态 AT1–AT5 · 挑战状态机 6 态 CT1–CT10 · §3.4 多域名整体判定)· `database/acme.md` · 共用约定 [`common/conventions.md`](./common/conventions.md)。
 > **边界**:被 certificates 委托验证+取证,取证后交回、**不留存证书本体**(DEA4);验证方式**类别**关联归 domains,本模块持 **webroot 执行配置** + 挑战记录(DEA5);默认账户归 settings(仅消费)。
 > **不含**:DNS 厂商 API 自动验证(仅手动 DNS-01,DEA2)、证书存储/到期/吊销对外动作(归 certificates)、批量账户操作、统计卡片。
 
@@ -86,7 +86,7 @@ interface AcmeAccountSummary {
   id: string;
   directoryUrl: string;
   caLabel: string | null;
-  environment: string | null;         // 生产/测试 展示标签(非 §4.3 枚举,DB §2 已标注)
+  environment: string | null;         // 由 directoryUrl 决定的展示标签，不属于共享状态枚举
   contactEmail: string;
   status: AcmeAccountStatus;           // §4.3:registering|registered|registration_failed(unconfigured 为概念态,持久行不取)
   isDefault: boolean;                  // 计算:settings.defaultAcmeAccountId 是否指向此账户
@@ -123,7 +123,7 @@ interface ChallengeDetail extends ChallengeSummary {
 }
 ```
 
-> **密钥边界**:账户 DTO **无** `accountKeyRef`/账户密钥;真正敏感的账户密钥仅 core secrets 持有(AR4)。挑战的 TXT 值 / HTTP 文件内容 / key authorization **非** AR4 敏感三类,可展示(DNS-01 需供复制,acme DB §4.2)。acme **不返回证书本体**(DEA4)。
+> **密钥边界**:账户 DTO **无** `accountKeyRef`/账户密钥;账户密钥仅由 core secrets 持有(TECH.md §2 决策3)。挑战的 TXT 值 / HTTP 文件内容 / key authorization 不是私钥或账户密钥，可展示(DNS-01 需供复制,acme DB §4.2)。acme **不返回证书本体**(DEA4)。
 
 ---
 
@@ -158,7 +158,3 @@ interface ChallengeDetail extends ChallengeSummary {
 - `acme_account_status_changed { accountId, status }` — 注册完成/失败(AT2/AT3)。
 - `challenge_status_changed { challengeId, taskId, domainId, status }` — 挑战流转;**`status=awaiting_manual` 是 DNS-01 待处理提示 + 红点来源**(CT3)。
 - 引发 `dashboard_changed`(挑战进入/离开 `awaiting_manual`,由聚合层合并发出)。
-
-## 7. PRD/DB 缺口(architect 停止条件核查)
-
-- 无阻塞缺口。账户/挑战状态机、多账户(DA3)、手动 DNS-01(DA2)、webroot 归属(DEA5)均已裁决且明确。account registration 非 task 的处置与状态机 `registering` 过渡态一致。

@@ -1,37 +1,31 @@
-# autohttps · COHESION 设计系统接入
+# autohttps · 逐科设计系统接入
 
-前端以现有 shadcn/ui、Radix 和 Tailwind CSS v4 作为唯一组件体系，品牌视觉跟随 **COHESION 逐科设计系统 v2.0.0**。页面继续按 autohttps 的证书管理任务组织；本接入文档记录项目实际采用的主题、Shell 和组件表达。
+本文件记录 autohttps 如何接入 whzhuke 逐科设计系统。品牌、颜色和组件样式遵循设计系统；页面结构由 autohttps 的产品需求和使用任务决定。
 
-## Token 与品牌资源
+设计系统正式入口为 `D:\Work\dawi\design`，规范见其 `README.md` 与 `DESIGN.md`；业务仓库内的主题文件是供构建使用的快照。
 
-- shadcn 浅深主题快照来自设计系统 `theme/create-shadcn-theme.mjs` 生成的 `preview/shadcn/tokens.css`，接入文件为 `frontend/src/theme/cohesion-shadcn-tokens.css`。
-- 状态语义读取 `theme/create-theme.mjs` 的官方算法结果；对应 `dist/tokens/cohesion-tokens.css` 随项目打包为 `frontend/src/theme/cohesion-tokens.css`，成功、警告、错误、信息各自保留语义色族。
-- COHESION 浅色与深色品牌标志分别来自 `原色.png`、`白色.png`，保存在 `frontend/public/`。应用主操作使用派生 `primary` 与独立 hover/active 角色；状态色不承担品牌色用途。
-- `:root` 同步 `data-theme` 与 `data-shadcn-theme`，密度设为 `comfortable`；`frontend/src/stores/ui.ts` 是运行时主题状态入口。两个 Token 文件和 PNG 均随前端构建，运行时不引用设计系统工作区绝对路径。
-- 主题来源变化后，在 `D:\Work\dawi\design` 更新相应生成物，再将完整输出复制到上述消费路径并检查版本差异。禁止在页面另手写一套主题基础色。
+## 主题资源
 
-## 页面与组件表达
+- `frontend/src/theme/cohesion-shadcn-tokens.css` 是 shadcn 浅色与深色主题的生成快照，源自设计系统的 `theme/create-shadcn-theme.mjs`。
+- `frontend/src/theme/cohesion-tokens.css` 提供成功、警告、错误和信息等语义 Token，源自设计系统的 `theme/create-theme.mjs`。
+- 运行时主题状态由 `frontend/src/stores/ui.ts` 管理；根节点同步 `data-theme` 与 `data-shadcn-theme`。浅色、深色和系统偏好均使用上述 Token。
+- 页面与业务组件使用语义 Token，不复制基础色值或另建品牌色板。产品状态色保持独立，不用品牌色替代成功、警告或失败语义。
+- 前端构建使用仓库内的主题快照，不依赖开发机上的设计系统绝对路径。设计系统更新后，应从正式配置重新生成完整快照，并核对消费侧主题。
 
-- 画布使用很低对比的品牌光晕；长内容、对话框、菜单、Tooltip、Toast、输入和数据列表使用清楚的不透明表面，并使用对应的容器或浮层 Token。
-- 页面标题与正文使用系统字体栈，不在线加载展示字体。页面主标题、辅助说明、状态标签和等宽技术值按层级区分。
-- 主按钮使用实色品牌绿，次要按钮使用中性面；实体危险操作单独使用危险按钮配色。标签继续区分状态与普通分类。
-- 证书、任务、账户和挑战的状态含义由现有状态映射与 API 契约决定；主题改造不改变其流转、筛选或可执行操作。
-- 桌面在 `xl` 展开为约 240px 侧栏，较窄窗口使用 64px 图标栏；手机底栏提供总览、域名、证书、任务 4 个常用入口，“更多”菜单承载 ACME、根 CA 和设置。800×600 Tauri 基线下保留全部桌面路由入口。
-- 手机输入与主操作提供至少 44px 的点击高度，窄屏输入保留 16px 字号；表格保留局部横向滚动。
-- 路由切换仅对内容区域轻入场；系统减少动态效果时页面、状态、加载提示和浮层均直接显示最终结果。
+## 组件与视觉约定
 
-## 项目品牌图标
+- 组件体系使用项目现有的 shadcn/ui、Radix 和 Tailwind CSS v4。优先复用 `frontend/src/components/ui/` 中的控件与语义 Token。
+- 使用系统字体栈；域名、指纹、序列号、TXT 记录、路径和时间等技术值按需使用等宽字体。
+- 主操作使用品牌主色，次要操作使用中性样式，危险操作使用危险语义。状态标签使用统一状态组件，分类标签不冒充生命周期状态。
+- 长内容、表单、菜单、对话框、Tooltip 和 Toast 使用清晰的不透明表面。装饰效果不能干扰内容对比度或操作辨识。
+- 交互保留键盘操作、可见焦点、正确标签与屏幕阅读器语义；减少动态效果偏好下不播放非必要动画。
 
-`assets/icon.svg` 保留 autohttps 锁与验证勾图形，底色和勾色使用 COHESION 浅色 `primary` 与 `primary-active`。前端通过 Vite 使用 `frontend/public/icon.svg`；桌面各尺寸 PNG 由 `tools/render_icons.py` 按脚本内的几何参数生成，SVG 不参与该脚本的渲染。`frontend/public/favicon-32.png` 是单独维护的前端 favicon，不由桌面图标脚本生成。
+## 页面结构与导航
 
-## UI 设计与复核
+- 页面、导航和信息层级根据产品需求中的功能、用户任务与平台范围确定，不以现有页面结构或路由作为模板。
+- 列表可按信息密度采用清单、卡片行或表格；详情页突出当前对象及可执行的下一步，不要求各模块套用同一模板。
+- 不新增 PRD 未定义的字段、统计、批量操作或状态。桌面、服务器和移动 Web 共用品牌与组件规则，仅按运行形态显示相应功能。
 
-- 逐科 UI 设计、实现与调整同时遵循 COHESION 设计系统，并使用 `ui-ux-pro-max` 做针对性的布局、响应式、交互与无障碍复核。
-- COHESION 是品牌、token 和组件表达的规范来源；`ui-ux-pro-max` 用于发现问题与补充实践建议。搜索结果需结合本项目业务和现有技术栈判断，不直接覆盖 COHESION 的正式规范。
+## 产品图标
 
-## 2026-11 全局视觉方向
-
-- 采用适合证书生命周期工具的安全运营控制台结构，以 Swiss 网格和信息密度建立技术感；UI/UX Pro Max 命中的落地页转化模式不适用于本产品。
-- 科技质感通过低对比背景、清晰分组、轻边界和小范围品牌强调表达。数据卡片、长内容、表单和浮层保持不透明；玻璃与模糊不作为装饰层。
-- 所有页面继续读取 COHESION 正式浅深主题、品牌图标和状态语义。列表页可用更宽内容区，表单和详情按阅读任务控制宽度；不能新增 PRD 未定义的统计、字段、批量操作或状态色。
-- 实时连接提示只反映 SSE 连接状态；页面轻入场和悬停动效服从系统减少动态效果，移动底栏预留安全区。
+`assets/icon.svg` 是 autohttps 产品图标；前端入口为 `frontend/public/icon.svg`。桌面尺寸 PNG 由 `tools/render_icons.py` 生成；`frontend/public/favicon-32.png` 单独维护。

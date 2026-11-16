@@ -1,7 +1,7 @@
 # API 契约 · 自签根 CA(local-ca)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/local-ca.md §2 功能列表`(A1 查看、A2 创建、A3 导入、A4 导出;B1/B2 受托签发/作废=后端行为)· `flows/local-ca.md`(根 CA 状态机 2 态 L1–L3 · 无过渡态 LC1 · 多根并存 LC6 · 不显式移除 LC5 · 仅公开证书导出 LC4)· `database/local-ca.md` · 共用约定 [`common/conventions.md`](./common/conventions.md)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/local-ca.md §2 功能列表`(A1 查看、A2 创建、A3 导入、A4 导出;B1/B2 受托签发/作废=后端行为)· `flows/local-ca.md`(根 CA 状态机 2 态 L1–L3 · 无过渡态 LC1 · 多根并存 LC6 · 不显式移除 LC5 · 仅公开证书导出 LC4)· `database/local-ca.md` · 共用约定 [`common/conventions.md`](./common/conventions.md)。
 > **边界**:只管根 CA 本身;内网证书本体/状态/续签/到期/吊销归 certificates(走证书状态机,LC2);B1 签发 / B2 作废标记是 **certificates 委托的后端行为、非页面端点**。
 > **不含**:内网证书列表/详情/管理(归 certificates)、批量操作、根 CA 自动续期(LC3)、含私钥/迁移导出(LC4)、显式移除根 CA(LC5)、自动安装信任库。
 
@@ -40,7 +40,7 @@
 interface CreateRootCaRequest {
   name: string;
   validityDays: number;                 // 有效期(自 now);服务层算 notBefore/notAfter
-  // 密钥算法等技术参数由 architect 定合理默认,不在业务契约暴露(modules/local-ca §3.1)
+  // 当前实现使用 rcgen 的默认密钥算法；该技术参数不作为业务入参(flows/local-ca §3.1)
 }
 ```
 - **行为**:本地生成密钥对并自签(rcgen)→ 私钥密文落数据目录(`private_key_ref`)、公开证书内联 → 进入 `active`。**本地同步操作、无过渡态**(LC1)→ **201** + `RootCaDetail`。
@@ -73,7 +73,7 @@ interface RootCaSummary {
   id: string;
   name: string;
   status: RootCaStatus;                 // §4.3:active | expired
-  creationMethod: string;               // 'created' | 'imported'(局部属性,非 §4.3 枚举,DB §2 已标注治理路径)
+  creationMethod: string;               // 合法值为 'created' | 'imported'；局部属性，不属于 §4.3 共享状态枚举
   notBefore: string;
   notAfter: string;
   daysUntilExpiry: number;              // 计算字段:相对 now;已过期为负
@@ -88,7 +88,7 @@ interface RootCaDetail extends RootCaSummary {
 }
 ```
 
-> **密钥边界**:DTO **无** `privateKeyRef`/根 CA 私钥(敏感级最高,AR4);`certPem` 为公开材料可返回。**永不导出根 CA 私钥**(LC4)。`creationMethod` 沿 wire snake_case(`created`/`imported`),前端如需强类型消费须经 architect 纳入 §4.3(勿自造枚举)。
+> **密钥边界**:DTO **无** `privateKeyRef`/根 CA 私钥(敏感级最高,TECH.md §2 决策3);`certPem` 为公开材料可返回。**永不导出根 CA 私钥**(LC4)。`creationMethod` 的 wire 值为 `created` 或 `imported`，它是局部属性，不属于 §4.3 共享状态枚举。
 
 ---
 
@@ -122,7 +122,3 @@ interface RootCaDetail extends RootCaSummary {
 
 - `root_ca_status_changed { rootCaId, status }` — 扫描判定 `active→expired`(L3)。前端失效根 CA 列表/详情;dashboard 可据此提示"链根到期影响其签出内网证书"(呈现口径归 dashboard)。
 - 创建/导入为同步动作,前端 mutation 成功即失效,无需专门 SSE。
-
-## 7. PRD/DB 缺口(architect 停止条件核查)
-
-- 无阻塞缺口。多根并存(LC6)、无移除(LC5)、仅公开证书导出(LC4)、无自动续期(LC3)均已裁决;B1/B2 委托后端行为不暴露为端点,与"非页面直达操作"一致。

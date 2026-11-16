@@ -1,7 +1,7 @@
 # API 契约 · 总览仪表盘(dashboard)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/dashboard.md §2 功能列表`(A1 指标 / B1 待处理清单 / B2 红点 / C1 跳转 / C2 入口)· `flows/dashboard.md`(聚合口径 §2 / 红点触发 §3.1 / 纯聚合无状态机 §0)· `database/dashboard.md`(无表,只读聚合)· 共用约定 [`common/conventions.md`](./common/conventions.md) · 全局 SSE [`common/events.md`](./common/events.md)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/dashboard.md §2 功能列表`(A1 指标 / B1 待处理清单 / B2 红点 / C1 跳转 / C2 入口)· `flows/dashboard.md`(聚合口径 §2 / 红点触发 §3.1 / 纯聚合无状态机 §0)· `database/dashboard.md`(无表,只读聚合)· 共用约定 [`common/conventions.md`](./common/conventions.md) · 全局 SSE [`common/events.md`](./common/events.md)。
 > **边界**:纯聚合只读;证书状态唯一真相在 certificates、任务概况在 tasks;dashboard **不改任何状态、不落副本**(DD1 / DB2)。
 > **不含**:证书 / 任务 / 域名的任何增删改执行(仅只读聚合 + 前端跳转)· 证书状态判定 / 扫描(归 certificates)· 多渠道通知(project §6.2)· project §5 未明示的统计维度(DD3)。
 
@@ -56,7 +56,7 @@ interface PendingCertItem {
 ```
 
 > **只读投影,不落副本**(DD1 / DB2):全部字段派生自 certificates / tasks / domains,dashboard 不持久化。
-> **不引入"级别"新枚举**:告警级 / 关注级由 `status` 依 flows/dashboard §3.1 映射(前端 import 自 bindings),契约层以**已排序的 `pendingItems` + `status`** 表达优先级,守 §4.3 枚举唯一入口(呼应 architect 对枚举不散落的纪律)。
+> **不引入"级别"新枚举**:告警级 / 关注级由 `status` 依 flows/dashboard §3.1 映射(前端从 bindings 导入),契约层以**已排序的 `pendingItems` + `status`** 表达优先级,遵守 TECH §4.3 的枚举单一来源约定。
 > **`awaiting_manual` 不并入三指标**:DNS-01 挑战 `awaiting_manual` 是 acme 侧独立待处理信号(common/events §4.2),经 `GET /acme/challenges?status=awaiting_manual` 取明细,**不计入** dashboard 三指标(口径严格基于证书状态,避免双口径,DB1)。首屏是否并列展示该提示属页面 PRD。
 
 ---
@@ -74,7 +74,3 @@ interface PendingCertItem {
 - **发出 `dashboard_changed`**(common/events #7):聚合的待处理集 / 三指标变化时发**粗粒度红点合并信号**(`{ pendingCount }`),前端据此更新红点;**桌面托盘角标**(仅桌面)直接据此刷新,无需拉全量。
 
 ---
-
-## 6. PRD/DB 缺口(architect 停止条件核查)
-
-- 无阻塞缺口。三指标口径(flows §2)、红点触发集(§3.1)、聚合来源(DS1–DS4)、一致性约束(指标 = 清单 = 触发集,DB1)均明确;C1 / C2 为前端跳转、无需端点。

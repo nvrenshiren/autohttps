@@ -6,7 +6,7 @@ export interface Crumb {
   to?: string;
 }
 
-/** 页首:面包屑 + 标题 + 右侧操作区。详情页通过面包屑承载页面层级。 */
+/** 场景页首:以任务名称建立层级,详情页用短路径提供回退上下文。 */
 export function PageHeader({
   title,
   description,
@@ -18,15 +18,13 @@ export function PageHeader({
   crumbs?: Crumb[];
   actions?: React.ReactNode;
 }) {
+  const context = crumbs?.[0]?.label ?? (title === "证书概览" ? "证书运行" : title);
+
   return (
-    <div data-slot="page-header" className="mb-7 flex flex-col items-stretch gap-4 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
+    <div data-slot="page-header" className="mb-7 flex flex-col items-stretch gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
-          <span>AutoHTTPS / Security Operations</span>
-        </div>
         {crumbs && crumbs.length > 0 && (
-          <nav aria-label="面包屑" className="mb-2 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+          <nav aria-label="面包屑" className="mb-3 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
             {crumbs.map((c, i) => (
               <span
                 key={i}
@@ -48,7 +46,11 @@ export function PageHeader({
             ))}
           </nav>
         )}
-        <h1 className="max-w-full break-words font-display text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold tracking-[0.12em] text-primary">
+          <span aria-hidden="true" className="h-4 w-0.5 rounded-full bg-primary" />
+          <span>{context}</span>
+        </div>
+        <h1 className="max-w-full break-words font-display text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{title}</h1>
         {description && (
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>
         )}

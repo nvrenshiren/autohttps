@@ -1,7 +1,7 @@
 # 页面 PRD · 任务列表页(tasks / list)
 
 > 文档状态: draft · 模块: tasks · 端点: app · 撰写: product-manager
-> 信任基础: modules/tasks.md(approved)§2.1-A1·B1·B2 / §3 页面定位 / §4-DS1·DS3 / §5-DEC1·DEC2·DEC3·DEC5 · flows/tasks.md(approved)§3 任务状态机(权威 TT1–TT7)/ §4 任务↔证书联动 / §5.2·§5.4 · glossary.md(approved,任务)· roles.md(approved,operator 全权:查看历史 / 重试 / 取消)
+> 信任基础: modules/tasks.md§2.1-A1·B1·B2 / §3 页面定位 / §4-DS1·DS3 / §5-DEC1·DEC2·DEC3·DEC5 · flows/tasks.md§3 任务状态机(权威 TT1–TT7)/ §4 任务↔证书联动 / §5.2·§5.4 · glossary.md(任务)· roles.md(operator 全权:查看历史 / 重试 / 取消)
 > **引用不复述**:任务状态定义与流转(排队 / 执行中 / 成功 / 失败 / 已取消)见 flows/tasks.md §3;证书状态与联动见 flows/certificates.md 与 flows/tasks.md §4;术语见 glossary.md。本页引用不复述。
 
 ---

@@ -1,7 +1,7 @@
 # 页面 PRD · 域名详情页(domains / detail)
 
 > 文档状态: draft · 模块: domains · 端点: app · 撰写: product-manager
-> 信任基础: modules/domains.md(approved)§2.1-A2·B2·B3·C1·C2 / §3 页面定位 / §5-DECM2 · flows/domains.md(approved)§3.2 编辑 / §3.3 删除 / §3.4 关联证书 / §3.5 关联验证方式 / §5-DECD2·DECD3 · flows/certificates.md(approved)§2 证书状态机(投影引用不复述)· glossary.md(approved)· roles.md(approved,operator 全权)
+> 信任基础: modules/domains.md§2.1-A2·B2·B3·C1·C2 / §3 页面定位 / §5-DECM2 · flows/domains.md§3.2 编辑 / §3.3 删除 / §3.4 关联证书 / §3.5 关联验证方式 / §5-DECD2·DECD3 · flows/certificates.md§2 证书状态机(投影引用不复述)· glossary.md· roles.md(operator 全权)
 > **引用不复述**:证书状态定义见 flows/certificates.md §2;验证方式明细归 acme;术语见 glossary.md。本页引用不复述。
 
 ---

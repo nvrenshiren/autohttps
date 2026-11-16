@@ -1,7 +1,7 @@
 # 数据库设计 · 总览仪表盘(dashboard)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(DB)· 端点: app · 撰写: architect
-> 依据(approved): `modules/dashboard.md §4 数据来源`(DS1–DS4,全部只读消费)· `flows/dashboard.md`(纯聚合、无独立状态机 DB2/§0)· `TECH.md` / `ARCHITECTURE.md §9`(SSE 推送 + 轮询兜底)。
+> 文档状态: draft · 层级: 技术契约(DB)· 端点: app · 撰写: architect
+> 依据: `modules/dashboard.md §4 数据来源`(DS1–DS4,全部只读消费)· `flows/dashboard.md`(纯聚合、无独立状态机 DB2/§0)· `TECH.md` / `ARCHITECTURE.md §9`(SSE 推送 + 轮询兜底)。
 > 全局 ER 见 [`_overview.md`](./_overview.md)。
 
 ---

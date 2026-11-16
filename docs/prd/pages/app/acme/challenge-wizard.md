@@ -1,7 +1,7 @@
 # 页面 PRD · 验证方式向导页(acme / challenge-wizard)
 
 > 文档状态: draft · 模块: acme · 端点: app · 撰写: product-manager
-> 信任基础: modules/acme.md(approved)§2.1-B1·B2·B3·B4·B5·B6 / §3 页面定位 / §4-DS2·DS3·DS4 / §5-DEA1·DEA5 · flows/acme.md(approved)§3 挑战状态机(权威 CT1–CT10)/ §3.4 多域名整体判定 / §4.2 HTTP-01 / §4.3 DNS-01 / §4.4 委托衔接 · glossary.md(approved,挑战 / HTTP-01 / webroot / DNS-01 / 通配符)· roles.md(approved,operator 全权)
+> 信任基础: modules/acme.md§2.1-B1·B2·B3·B4·B5·B6 / §3 页面定位 / §4-DS2·DS3·DS4 / §5-DEA1·DEA5 · flows/acme.md§3 挑战状态机(权威 CT1–CT10)/ §3.4 多域名整体判定 / §4.2 HTTP-01 / §4.3 DNS-01 / §4.4 委托衔接 · glossary.md(挑战 / HTTP-01 / webroot / DNS-01 / 通配符)· roles.md(operator 全权)
 > **引用不复述**:验证挑战状态定义与流转(待验证 / 等待手动配置 / 验证中 / 验证通过 / 验证失败 / 已取消)见 flows/acme.md §3;证书状态见 flows/certificates.md;「等待手动配置」的红点 / 待处理呈现归 dashboard;术语见 glossary.md。本页引用不复述。
 
 ---

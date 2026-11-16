@@ -3,8 +3,8 @@
  * 触发首次签发(F4)→ POST /certificates → 跳详情看进度。自签路径全链路已通;ACME 验证向导归 acme
  * 模块(F3,本页仅衔接入口)。校验错误行内,提交结果 toast。
  */
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import {
   BadgeCheck,
   Check,
@@ -45,6 +45,8 @@ import { toast } from "@/components/ui/sonner";
 
 export function CertificateIssuePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preselectedDomainId = searchParams.get("domainId");
   const create = useCreateCertificate();
 
   const domainsQ = useDomains({ page: 1, pageSize: 200, sort: "hostname", order: "asc" });
@@ -61,6 +63,13 @@ export function CertificateIssuePage() {
   const domains = domainsQ.data?.items ?? [];
   const rootCas = rootCasQ.data?.items ?? [];
   const accounts = accountsQ.data?.items ?? [];
+
+  useEffect(() => {
+    if (!preselectedDomainId || domains.length === 0) return;
+    if (domains.some((domain) => domain.id === preselectedDomainId)) {
+      setSelected((current) => current.size === 0 ? new Set([preselectedDomainId]) : current);
+    }
+  }, [domains, preselectedDomainId]);
 
   const filteredDomains = useMemo(
     () => domains.filter((d) => d.hostname.toLowerCase().includes(search.trim().toLowerCase())),

@@ -1,7 +1,7 @@
 # 页面 PRD · 签发证书页(certificates / issue)
 
 > 文档状态: draft · 模块: certificates · 端点: app · 撰写: product-manager
-> 信任基础: modules/certificates.md(approved)§2.1-B1 / §3 页面定位 / §4-DS2·DS3 / §5-DEC4 · flows/certificates.md(approved)§3.1 首次签发 / §2.3-T1 · glossary.md(approved,通配符 / ACME / 自签根 CA)· roles.md(approved,operator 全权)
+> 信任基础: modules/certificates.md§2.1-B1 / §3 页面定位 / §4-DS2·DS3 / §5-DEC4 · flows/certificates.md§3.1 首次签发 / §2.3-T1 · glossary.md(通配符 / ACME / 自签根 CA)· roles.md(operator 全权)
 > **引用不复述**:证书状态见 flows/certificates.md §2;验证方式(HTTP-01 / DNS-01)与向导明细归 acme;术语见 glossary.md。本页引用不复述。
 
 ---

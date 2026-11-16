@@ -1,16 +1,14 @@
-/**
- * 总览页：指标、待处理清单与常用操作。仅在计数大于零时强调告警；待处理项按紧急程度排序(§3.4)。
- */
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
-  ChevronRight,
-  CircleCheckBig,
-  Clock,
-  Globe,
+  ArrowRight,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock3,
+  Globe2,
   ListChecks,
   Plus,
+  ShieldAlert,
   ShieldCheck,
-  TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
 import { useDashboard } from "@/lib/queries";
@@ -23,143 +21,92 @@ import { absoluteUtc, daysLabel } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PageHeader } from "@/components/shared/page-header";
+import { Button } from "@/components/ui/button";
 
-function MetricCard({
+function SummaryMetric({
   label,
   value,
-  hint,
+  note,
   Icon,
-  emphasis,
-  primary,
+  tone,
 }: {
   label: string;
   value: number;
-  hint: string;
+  note: string;
   Icon: LucideIcon;
-  emphasis?: "warning" | "danger";
-  primary?: boolean;
+  tone?: "warning" | "danger";
 }) {
-  // 强调色仅计数大于零时出现；健康状态保持中性(§3.4)。
-  const active = emphasis && value > 0;
-  const color = active
-    ? emphasis === "danger"
-      ? "text-danger"
-      : "text-warning"
-    : undefined;
-  const iconAccent = active && emphasis === "danger"
-    ? "border-danger/20 bg-danger-muted text-danger"
-    : active && emphasis === "warning"
-      ? "border-warning/25 bg-warning-muted text-warning-muted-foreground"
-      : primary
-        ? "border-primary/15 bg-accent text-primary"
-        : "border-border bg-muted text-muted-foreground";
+  const active = value > 0 && tone;
+  const toneClass = active === "danger" ? "text-danger" : active === "warning" ? "text-warning-muted-foreground" : "text-foreground";
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4 shadow-card sm:p-5">
-      <span
-        aria-hidden="true"
-        className={cn(
-          "absolute inset-y-4 left-0 w-0.5 rounded-r-full",
-          active && emphasis === "danger" ? "bg-danger" : active && emphasis === "warning" ? "bg-warning" : primary ? "bg-primary" : "bg-border",
-        )}
-      />
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">{label}</span>
-        <span
-          className={cn(
-            "inline-flex size-10 items-center justify-center rounded-md border transition-colors",
-            iconAccent,
-          )}
-        >
-          <Icon aria-hidden="true" className="size-[18px]" />
-        </span>
+    <div className="min-w-0 px-4 py-2 first:pl-0 last:pr-0 sm:px-5">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <Icon aria-hidden="true" className={cn("size-4", active && toneClass)} />
+        <span>{label}</span>
       </div>
-      <div
-        className={cn("mt-3 font-display text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl", color ?? (primary ? "text-primary" : "text-foreground"))}
-      >
+      <div className={cn("mt-2 font-display text-3xl font-semibold leading-none tracking-tight tabular-nums sm:text-4xl", toneClass)}>
         {value}
       </div>
-      <div className="relative mt-1.5 text-xs text-muted-foreground">{hint}</div>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{note}</p>
     </div>
   );
 }
 
 function PendingRow({ item }: { item: PendingCertItem }) {
   const navigate = useNavigate();
-  const failed =
-    item.status === "expired" ||
-    item.status === "issue_failed" ||
-    item.status === "renewal_failed";
   const hostname = item.domains[0] ?? "(无域名)";
+
   return (
     <li>
       <button
         type="button"
-        className="group relative flex w-full items-center gap-3 py-3 pl-5 pr-4 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring"
+        className="group flex min-h-[68px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
         onClick={() => navigate(`/certificates/${item.certificateId}`)}
       >
-        <span className={cn("absolute bottom-2 left-0 top-2 w-0.5 rounded-full", failed ? "bg-danger" : "bg-warning")} />
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">
-            {hostname}
-            {item.domains.length > 1 && (
-              <span className="ml-1 text-xs text-muted-foreground">+{item.domains.length - 1}</span>
-            )}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-border-strong" />
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-2">
+            <Mono className="max-w-full truncate font-medium text-foreground">{hostname}</Mono>
+            {item.domains.length > 1 && <span className="shrink-0 text-xs text-muted-foreground">+{item.domains.length - 1}</span>}
+          </span>
+          <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
             <StatusBadge status={item.status} />
             {item.notAfter ? (
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="cursor-help">{daysLabel(item.daysUntilExpiry)}</span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <Mono>{absoluteUtc(item.notAfter)}</Mono>
-                </TooltipContent>
+                <TooltipTrigger asChild><span className="cursor-help">{daysLabel(item.daysUntilExpiry)}</span></TooltipTrigger>
+                <TooltipContent><Mono>{absoluteUtc(item.notAfter)}</Mono></TooltipContent>
               </Tooltip>
-            ) : (
-              <span>尚未签发</span>
-            )}
-          </div>
-        </div>
-        <ChevronRight className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            ) : <span>尚未签发</span>}
+          </span>
+        </span>
+        <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
       </button>
     </li>
   );
 }
 
-function QuickAction({
+function OperationLink({
+  to,
   label,
-  hint,
+  detail,
   Icon,
-  onClick,
-  primary,
 }: {
+  to: string;
   label: string;
-  hint: string;
+  detail: string;
   Icon: LucideIcon;
-  onClick: () => void;
-  primary?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-[border-color,background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:bg-accent/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring motion-reduce:transform-none"
-    >
-      <span
-        className={cn(
-          "inline-flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
-          primary
-            ? "bg-primary text-primary-foreground"
-            : "bg-secondary text-secondary-foreground",
-        )}
-      >
-        <Icon aria-hidden="true" className="size-[18px]" />
+    <Link to={to} className="group flex min-h-[58px] items-center gap-3 rounded-md px-2.5 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
+      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors group-hover:border-primary/25 group-hover:text-primary">
+        <Icon aria-hidden="true" className="size-[17px]" />
       </span>
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium">{label}</span>
-        <span className="block truncate text-xs text-muted-foreground">{hint}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{detail}</span>
       </span>
-    </button>
+      <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+    </Link>
   );
 }
 
@@ -168,119 +115,84 @@ export function DashboardPage() {
   const { data, isLoading, isError, error, refetch } = useDashboard();
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-7 p-4 sm:p-6 lg:p-8">
-      <PageHeader
-        title="证书概览"
-        description="快速查看证书健康状态，并处理临期或签发异常。"
-      />
-      {/* Hero 指标带 */}
-      {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-3 lg:gap-4">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-[124px] rounded-xl" />
-          ))}
-        </div>
-      ) : isError ? (
-        <ErrorState error={error} onRetry={() => void refetch()} />
-      ) : data ? (
-        <section aria-label="证书指标" className="relative">
-          <div className="grid gap-3 sm:grid-cols-3 lg:gap-4">
-            <MetricCard
-              label="证书总数"
-              value={data.metrics.totalCount}
-              hint="含各状态(含已吊销)"
-              Icon={ShieldCheck}
-              primary
-            />
-            <MetricCard
-              label="即将到期"
-              value={data.metrics.expiringSoonCount}
-              hint="临近到期 · 需及时续签"
-              Icon={Clock}
-              emphasis="warning"
-            />
-            <MetricCard
-              label="失败"
-              value={data.metrics.failedCount}
-              hint="已过期 / 签发失败 / 续签失败"
-              Icon={TriangleAlert}
-              emphasis="danger"
-            />
-          </div>
-        </section>
-      ) : null}
+    <div className="mx-auto w-full max-w-[1440px] space-y-6 p-4 sm:p-6 lg:p-8">
+      <PageHeader title="运行概览" description="查看证书健康状态，并直接进入需要处理的事项。" />
 
-      {/* 待处理清单 */}
-      {!isLoading && !isError && data && (
-        <section aria-labelledby="pending-certificates-title" className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/20 px-5 py-4 sm:px-6">
-            <div className="flex items-center gap-2">
-              <h2 id="pending-certificates-title" className="font-display text-base font-semibold tracking-tight">
-                待处理证书
-              </h2>
-              {data.pendingCount > 0 && (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-danger-muted px-1.5 text-xs font-semibold text-danger-muted-foreground">
-                  {data.pendingCount}
-                </span>
-              )}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(270px,0.8fr)]">
+        <div className="min-w-0 space-y-5">
+          <section aria-label="证书运行指标" className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex size-8 items-center justify-center rounded-md bg-accent text-primary"><ShieldCheck aria-hidden="true" className="size-4" /></span>
+                <div>
+                  <h2 className="text-sm font-semibold">证书保障状态</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">当前实例中的证书资产</p>
+                </div>
+              </div>
             </div>
-            {data.pendingCount > 0 && (
-              <span className="hidden text-xs text-muted-foreground sm:inline">
-                告警级优先 · 已过期居首
-              </span>
-            )}
-          </div>
-          {data.pendingItems.length === 0 ? (
-            <EmptyState
-              Icon={CircleCheckBig}
-              iconClassName="text-success"
-              title="全部证书状态良好"
-              description="没有需要处理的证书,红点已清零。"
-            />
-          ) : (
-            <ul className="divide-y divide-border">
-              {data.pendingItems.map((item) => (
-                <PendingRow key={item.certificateId} item={item} />
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
 
-      {/* 常用操作 */}
-      <section>
-        <h2 className="mb-3 flex items-center gap-2 font-display text-base font-semibold tracking-tight">
-          <span aria-hidden="true" className="h-4 w-0.5 rounded-full bg-primary" />
-          快捷入口
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickAction
-            label="签发证书"
-            hint="创建新证书"
-            Icon={Plus}
-            primary
-            onClick={() => navigate("/certificates/issue")}
-          />
-          <QuickAction
-            label="全部证书"
-            hint="证书列表与状态"
-            Icon={ShieldCheck}
-            onClick={() => navigate("/certificates")}
-          />
-          <QuickAction
-            label="域名管理"
-            hint="维护域名列表"
-            Icon={Globe}
-            onClick={() => navigate("/domains")}
-          />
-          <QuickAction
-            label="任务与历史"
-            hint="签发 / 续签 / 吊销记录"
-            Icon={ListChecks}
-            onClick={() => navigate("/tasks")}
-          />
+            {isLoading ? (
+              <div className="grid grid-cols-3 divide-x divide-border px-5 py-5 sm:px-6">
+                {[0, 1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-md" />)}
+              </div>
+            ) : isError ? (
+              <div className="p-5"><ErrorState error={error} onRetry={() => void refetch()} /></div>
+            ) : data ? (
+              <dl className="grid grid-cols-3 divide-x divide-border px-5 py-5 sm:px-6">
+                <SummaryMetric label="证书总数" value={data.metrics.totalCount} note="包含全部状态" Icon={ShieldCheck} />
+                <SummaryMetric label="即将到期" value={data.metrics.expiringSoonCount} note="按续签策略判定" Icon={Clock3} tone="warning" />
+                <SummaryMetric label="失败" value={data.metrics.failedCount} note="含签发、续签失败与过期" Icon={ShieldAlert} tone="danger" />
+              </dl>
+            ) : null}
+          </section>
+
+          {!isLoading && !isError && data && (
+            <section aria-labelledby="pending-certificates-title" className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
+              <div className="flex min-h-[62px] items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+                <div className="flex items-center gap-2.5">
+                  <h2 id="pending-certificates-title" className="text-sm font-semibold">待处理</h2>
+                  <span className={cn("inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-semibold tabular-nums", data.pendingCount > 0 ? "bg-danger-muted text-danger-muted-foreground" : "bg-muted text-muted-foreground")}>
+                    {data.pendingCount}
+                  </span>
+                </div>
+                <Link to="/certificates" className="inline-flex min-h-9 items-center gap-1 rounded-sm px-2 text-xs font-medium text-link transition-colors hover:text-link-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
+                  全部证书<ArrowRight aria-hidden="true" className="size-3.5" />
+                </Link>
+              </div>
+              {data.pendingItems.length === 0 ? (
+                <EmptyState Icon={CheckCircle2} iconClassName="text-success" title="当前没有待处理证书" description="到期关注和失败状态会在这里集中显示。" />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {data.pendingItems.map((item) => <PendingRow key={item.certificateId} item={item} />)}
+                </ul>
+              )}
+            </section>
+          )}
         </div>
-      </section>
+
+        <aside aria-labelledby="operations-title" className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
+          <div className="border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground"><Plus aria-hidden="true" className="size-4" /></span>
+              <div>
+                <h2 id="operations-title" className="text-sm font-semibold">常用操作</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">从这里开始下一步工作</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-3">
+            <Button className="mb-2 min-h-11 w-full justify-between" onClick={() => navigate("/certificates/issue")}>
+              <span className="inline-flex items-center gap-2"><Plus aria-hidden="true" />发起证书签发</span>
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Button>
+            <OperationLink to="/domains" label="域名管理" detail="维护主机名与验证方式" Icon={Globe2} />
+            <OperationLink to="/tasks" label="执行记录" detail="查看签发、续签与失败原因" Icon={ListChecks} />
+          </div>
+          <div className="border-t border-border bg-muted/30 px-5 py-3 text-xs leading-relaxed text-muted-foreground">
+            证书状态由后台自动扫描；此页面只读汇总并提供处理入口。
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

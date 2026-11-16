@@ -1,7 +1,7 @@
 # 数据库设计 · 系统设置(settings)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(DB)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/settings.md §4 数据来源`(DS1–DS5)· `flows/settings.md`(无实体状态机 SF1 · 存储路径只读 SF5/DEC3 · 无重试参数 SF2)· `TECH.md`(SeaORM 1.x / 时间 RFC3339 / 运行形态枚举 §4.3)。
+> 文档状态: draft · 层级: 技术契约(DB)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/settings.md §4 数据来源`(DS1–DS5)· `flows/settings.md`(无实体状态机 SF1 · 存储路径只读 SF5/DEC3 · 无重试参数 SF2)· `TECH.md`(SeaORM 1.x / 时间 RFC3339 / 运行形态枚举 §4.3)。
 > 类型口径见 [`certificates.md` 顶部](./certificates.md);全局 ER 见 [`_overview.md`](./_overview.md)。
 
 ---
@@ -20,15 +20,17 @@
 
 全局唯一一行;主键为固定常量,应用层保证仅一行(见 §2.2)。
 
+下表“默认”指应用首次初始化单例行的值；迁移中的 SQL `DEFAULT` 仅以迁移文件为准。
+
 | 字段 | 类型 | 约束 | 可空 | 默认 | 说明 |
 | --- | --- | --- | :-: | --- | --- |
 | `id` | `TEXT` | PK · CHECK(`id='global'`) | 否 | `'global'` | 单例哨兵主键;仅一行(§2.2) |
-| `renewal_advance_days` | `INTEGER` | NOT NULL | 否 | `30`(architect 默认) | 续签提前天数(DS3/C1);certificates 据此判定"即将到期"(T6),消费不定义状态 |
+| `renewal_advance_days` | `INTEGER` | NOT NULL | 否 | `30` | 续签提前天数(DS3/C1);certificates 据此判定"即将到期"(T6),消费不定义状态 |
 | `auto_renew_enabled` | `BOOLEAN` | NOT NULL | 否 | `true` | 自动续签开关(DS3/C2);开启则"即将到期"自动续签 + 续签失败未过期者随周期扫描再尝试(SF2,无独立重试参数) |
 | `default_acme_account_id` | `TEXT·UUIDv7` | FK→`acme_accounts.id` ON DELETE SET NULL | 是 | NULL | 默认 ACME 账户**指向**(DS4/D1);仅存引用,账户本体归 acme;账户被删则置空,签发处引导显式选择(settings D1) |
-| `autostart_enabled` | `BOOLEAN` | — | 是 | NULL | **仅桌面**:开机自启开关(DS1/A2);服务器形态无意义,留空 |
-| `listen_address` | `TEXT` | — | 是 | NULL | **仅服务器**:服务器进程 Web UI 监听地址(DS1/A3);默认仅本机/可信内网,设为对外可达须界面提示公网暴露风险(roles §3) |
-| `listen_port` | `INTEGER` | — | 是 | NULL | **仅服务器**:Web UI 监听端口(DS1/A3);有合理默认 |
+| `autostart_enabled` | `BOOLEAN` | — | 是 | 桌面 `false`；服务器 `NULL` | **仅桌面**:开机自启开关(DS1/A2);服务器形态无意义,留空 |
+| `listen_address` | `TEXT` | — | 是 | 服务器 `127.0.0.1`；桌面 `NULL` | **仅服务器**:服务器进程 Web UI 监听地址(DS1/A3);默认仅本机,设为对外可达须界面提示公网暴露风险(roles §3) |
+| `listen_port` | `INTEGER` | — | 是 | 服务器 `8443`；桌面 `NULL` | **仅服务器**:Web UI 监听端口(DS1/A3);使用者可修改为合法端口 |
 | `data_storage_path` | `TEXT` | NOT NULL | 否 | 部署时定 | 数据存储根路径(DS2/B1);其下含私钥/账户密钥等敏感材料;**运行期只读、不可改、无迁移语义**(SF5/DEC3),库内仅记录既定路径供展示 |
 | `updated_at` | `TEXT·RFC3339` | NOT NULL | 否 | now | 最近保存时间 |
 
@@ -39,7 +41,7 @@
 ### 2.2 单例约束
 
 - 通过 `CHECK(id='global')` + 应用层"读取即 upsert 该行"保证**仅一行**;无需索引(单行)。
-- 备选(等价):`id INTEGER PK CHECK(id=1)`。architect 取固定文本哨兵 `'global'`,语义直观。
+- 主键固定为文本哨兵 `'global'`,表示唯一的全局设置记录。
 
 ### 2.3 未持久化项(消费/运行时,不建列)
 

@@ -1,7 +1,7 @@
 # 模块 PRD · 备份同步(sync / WebDAV)
 
 > 文档状态: draft · 模块: sync · 端点: app · 撰写: product-manager
-> 信任基础: project.md(approved)§7 数据安全 · glossary.md · modules/settings.md(设置聚合 / 配置只读项)· flows/settings.md
+> 信任基础: project.md§7 数据安全 · glossary.md · modules/settings.md(设置聚合 / 配置只读项)· flows/settings.md
 > **引用不复述**:敏感数据安全口径见 project §7;配置项呈现与形态差异见 settings 模块;术语见 glossary.md;本文件引用不复述。
 
 ---
@@ -68,7 +68,7 @@
 
 ## 4. 数据来源
 
-> 供 architect 作为唯一设计依据,用**业务语言**描述本模块涉及哪些数据及其来源;**不含**表结构 / 字段类型 / 存储机制 / API(由 architect 设计)。敏感数据的具体存储机制由 architect 依 project §7 数据安全约束确定。
+> 本节以业务语言说明本模块数据的来源与归属,不定义表结构、字段类型或 API;相应技术契约见 `docs/architecture/`。敏感数据遵循 project §7 与 TECH §2-决策3。
 
 | # | 数据 | 来源 | 说明 |
 | --- | --- | --- | --- |
@@ -79,9 +79,9 @@
 
 ---
 
-## 5. 决策记录(append-only)
+## 5. 决策记录
 
-> 只增不改;记"决定了什么 / 为什么不做另一选项"。与 flows/settings.md §5 互补(此处记模块 / 功能 / 数据相关决策)。
+> 记"决定了什么 / 为什么不做另一选项"。与 flows/settings.md §5 互补(此处记模块 / 功能 / 数据相关决策)。
 
 - **DEC1(2026-07-19)· 手动快照,不做定时 / 双向同步**:备份与恢复都是 operator 显式动作。
   - 为什么不做自动 / 双向:MVP 最简;自动周期备份涉口令托管(备份需口令,自动则要存口令,放大泄露面)与冲突合并复杂度;双向同步与「单一真相在本机库」冲突。后续确需再增量。

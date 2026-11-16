@@ -1,7 +1,7 @@
 # 页面 PRD · 根 CA 详情页(local-ca / detail)
 
 > 文档状态: draft · 模块: local-ca · 端点: app · 撰写: product-manager
-> 信任基础: modules/local-ca.md(approved)§2.1-A1·A4 / §3 页面定位 / §4-DS1·DS3 / §5-DEC1·DEC4 / §6 裁决记录 · flows/local-ca.md(approved)§2.4 跨状态动作 / §3.3 导出 / §3.6 到期处理 / §4-LC4·LC5 · glossary.md(approved,自签根 CA / 内网证书 / 信任根 CA)· roles.md(approved,operator 全权)
+> 信任基础: modules/local-ca.md§2.1-A1·A4 / §3 页面定位 / §4-DS1·DS3 / §5-DEC1·DEC4 / §6 删除边界 · flows/local-ca.md§2.4 跨状态动作 / §3.3 导出 / §3.6 到期处理 / §4-LC4·LC5 · glossary.md(自签根 CA / 内网证书 / 信任根 CA)· roles.md(operator 全权)
 > **引用不复述**:根 CA 状态定义与流转见 flows/local-ca.md §2;内网证书状态走证书状态机(flows/certificates.md);术语见 glossary.md。本页引用不复述。
 
 ---

@@ -1,7 +1,7 @@
 # 数据库设计 · 域名管理(domains)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(DB)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/domains.md §4 数据来源` · `flows/domains.md`(域名无独立状态机,DECD1)· `TECH.md`(SeaORM 1.x / UUIDv7 / 枚举 §4.3 / 时间 RFC3339)。
+> 文档状态: draft · 层级: 技术契约(DB)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/domains.md §4 数据来源` · `flows/domains.md`(域名无独立状态机,DECD1)· `TECH.md`(SeaORM 1.x / UUIDv7 / 枚举 §4.3 / 时间 RFC3339)。
 > 类型口径见 [`certificates.md` 顶部](./certificates.md);全局 ER 见 [`_overview.md`](./_overview.md)。域名 ↔ 证书的 SAN 关联表 `certificate_domains` 归 certificates(反查在此说明,不在本模块建表)。
 
 ---

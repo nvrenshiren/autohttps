@@ -1,7 +1,7 @@
 # API 契约 · 全局 SSE 事件流(common)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `ARCHITECTURE.md §9`(SSE 推送 + 轮询兜底、**单向 server→client**)· `TECH.md 决策8`(SSE + EventSource + 自动重连)· `TECH.md §1.4`(react-query 配 SSE `invalidate`)· 各 flows 5 台状态机。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `ARCHITECTURE.md §9`(SSE 推送 + 轮询兜底、**单向 server→client**)· `TECH.md 决策8`(SSE + EventSource + 自动重连)· `TECH.md §1.4`(react-query 配 SSE `invalidate`)· 各 flows 5 台状态机。
 > 定位:**全系统唯一的实时通道**。一个全局 stream 端点,各模块的异步状态变更统一经此推送;前端据事件 **invalidate react-query** 缓存后重取。共用约定见 [`conventions.md`](./conventions.md)。
 
 ---
@@ -53,7 +53,7 @@ interface ServerEvent<T = unknown> {
 
 ## 4. 事件类型清单(单一定义,导出 TS)
 
-> `EventType` 与各 payload 类型在 `crates/api` 单一定义、经 ts-rs 导出到 `frontend/src/bindings/`;**前端 import,不手写事件名字面量**(同枚举纪律 L1)。状态字段取 TECH §4.3 wire 值。
+> `EventType` 与各 payload 类型在 `crates/api` 单一定义、经 ts-rs 导出到 `frontend/src/bindings/`;**前端 import,不手写事件名字面量**(同枚举纪律 TECH.md §4)。状态字段取 TECH §4.3 wire 值。
 
 | # | `type` | 发出模块 | payload | 语义 / 触发 | 前端失效目标(react-query) |
 | --- | --- | --- | --- | --- | --- |
@@ -88,6 +88,6 @@ interface ServerEvent<T = unknown> {
 
 ## 6. 纪律
 
-- **一个流、一套事件类型**:新增事件类型须经 architect 改 `crates/api` 事件定义 + 同步本表 + 重新导出 TS;模块不得私增流或私发未登记事件。
-- **payload 不搬运整实体、不含敏感字段**:仅标识 + 判别字段;密钥材料、`*_ref` 绝不入事件(AR4 / L6)。
+- **一个流、一套事件类型**:新增事件类型须同步更新 `crates/api` 事件定义、本表与 TypeScript 投影;模块不得私增流或私发未登记事件。
+- **payload 不搬运整实体、不含敏感字段**:仅标识 + 判别字段;密钥材料、`*_ref` 绝不入事件(TECH.md §2 决策3 / 日志脱敏要求)。
 - **事件是失效信号,不是数据源**:前端据事件重取 REST 权威数据(单一真相),不以 payload 直接渲染业务数据。

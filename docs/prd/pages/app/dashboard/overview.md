@@ -1,7 +1,7 @@
 # 页面 PRD · 总览页(dashboard / overview)
 
 > 文档状态: draft · 模块: dashboard · 端点: app · 撰写: product-manager
-> 信任基础: modules/dashboard.md(approved)§2/§3 · flows/dashboard.md(approved)§2 聚合口径 / §3 红点规则 / §4 快速入口去向 · flows/certificates.md(approved)§2 证书状态机 · glossary.md(approved)· roles.md(approved,operator 全权)
+> 信任基础: modules/dashboard.md§2/§3 · flows/dashboard.md§2 聚合口径 / §3 红点规则 / §4 快速入口去向 · flows/certificates.md§2 证书状态机 · glossary.md· roles.md(operator 全权)
 > **引用不复述**:证书状态定义与流转见 flows/certificates.md §2;三指标口径与红点触发规则见 flows/dashboard.md §2/§3;术语见 glossary.md。本页引用不复述。
 
 ---
@@ -53,7 +53,7 @@
   - 服务器形态(仅服务器):无系统托盘,红点体现在浏览器内。
   - 红点的**触发规则两形态一致**,仅呈现载体不同。
 - **纯呈现 + 跳转**:本页不提供任何增删改;点待处理项进入对应证书详情或其最近任务,处置在目标页面完成。
-- **随状态刷新**:certificates 定期扫描推进证书状态,本页聚合随之刷新(刷新机制由 architect 设计,业务只要求「呈现与证书当前状态一致」)。
+- **随状态刷新**:certificates 定期扫描推进证书状态,本页聚合随之刷新;当前刷新机制见 `ARCHITECTURE.md` §9.2。
 
 ---
 

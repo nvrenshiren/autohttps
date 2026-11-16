@@ -1,7 +1,7 @@
 # 角色权限矩阵 · autohttps
 
 > 文档状态: draft · 模块: project · 端点: app · 撰写: product-manager
-> 信任基础: project.md(approved)§4/§6.2/§7/§9-D4 —— MVP 不做鉴权
+> 信任基础: project.md§4/§6.2/§7/§9-D4 —— MVP 不做鉴权
 
 ---
 

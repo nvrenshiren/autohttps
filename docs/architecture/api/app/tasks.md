@@ -1,7 +1,7 @@
 # API 契约 · 任务与历史(tasks)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/tasks.md §2 功能列表`(A1/A2 查看、B1 重试、B2 取消;C1–C4 系统行为)· `flows/tasks.md`(任务状态机 5 态 TT1–TT7 · 类型 issue/renew/revoke · 触发 manual/auto/cleanup · 重试链 DT1 · 删除保留 DT3 · 尽力取消 DT2)· `database/tasks.md` · 共用约定 [`common/conventions.md`](./common/conventions.md)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/tasks.md §2 功能列表`(A1/A2 查看、B1 重试、B2 取消;C1–C4 系统行为)· `flows/tasks.md`(任务状态机 5 态 TT1–TT7 · 类型 issue/renew/revoke · 触发 manual/auto/cleanup · 重试链 DT1 · 删除保留 DT3 · 尽力取消 DT2)· `database/tasks.md` · 共用约定 [`common/conventions.md`](./common/conventions.md)。
 > **边界**:任务是"对某证书的一次执行单元",据结果**驱动**证书状态(§4),但不改写/复述证书状态机;不判到期、不持续签策略/重试参数(归 certificates/settings)。
 > **不含**:批量重试/取消、跨证书操作审计视图、手动新建/编辑任务(任务只由 certificates 触发或对失败任务重试派生,DEC5)。
 
@@ -38,7 +38,7 @@
 ### 2.3 `GET /tasks/{id}/logs` — 执行日志(A2)
 
 - 按 `seq` 升序返回 `TaskLogEntry[]`;支持 `?afterSeq=<n>` 增量拉取(配合 SSE `task_log_appended` 做进度追加)。
-- 可选分页;日志脱敏(不含密钥,AR4/L6)。响应 `{ items: TaskLogEntry[], … }`(afterSeq 模式可返回裸数组增量,统一用分页包络亦可——实现期定,契约取分页包络)。
+- 可选分页;日志脱敏(不含密钥,TECH.md §2 决策3/日志脱敏要求)。响应 `{ items: TaskLogEntry[], … }`(afterSeq 模式可返回裸数组增量,统一用分页包络亦可——实现期定,契约取分页包络)。
 
 ### 2.4 `POST /tasks/{id}/retry` — 手动重试(B1,TT7)
 
@@ -59,7 +59,7 @@
 interface TaskSummary {
   id: string;
   certificateId: string;
-  certificateDeleted: boolean;         // 计算:certificates 中该 id 是否已不存在(软引用,DT3/Q2)
+  certificateDeleted: boolean;         // 计算:certificates 中该 id 是否已不存在(软引用,DT3 / modules/tasks DEC3)
   certificateDomains: string[] | null; // 关联证书的 hostname(证书存在时展示;已删除为 null)
   taskType: TaskType;                  // §4.3:issue | renew | revoke
   trigger: TaskTrigger;                // §4.3:manual | auto | cleanup
@@ -86,11 +86,11 @@ interface TaskLogEntry {
   seq: number;                         // 任务内有序
   loggedAt: string;                    // RFC3339
   level: string;                       // info | warn | error(与 tracing 对齐;局部属性,非 §4.3 枚举)
-  message: string;                     // 脱敏:绝不含密钥材料(AR4/L6)
+  message: string;                     // 脱敏:绝不含密钥材料(TECH.md §2 决策3/日志脱敏要求)
 }
 ```
 
-> **软引用与"证书已删除"**:`certificateId` 保留原值,`certificateDeleted` 经 `LEFT JOIN certificates` 判定(UUIDv7 不复用,不误配)。历史任务只增留痕、证书删除不级联(DT3/Q2)。日志 `message` 脱敏。
+> **软引用与"证书已删除"**:`certificateId` 保留原值,`certificateDeleted` 经 `LEFT JOIN certificates` 判定(UUIDv7 不复用,不误配)。历史任务只增留痕、证书删除不级联(DT3 / modules/tasks DEC3)。日志 `message` 脱敏。
 
 ---
 
@@ -121,7 +121,3 @@ interface TaskLogEntry {
 
 - `task_status_changed { taskId, certificateId, status }` — 任务流转(入队/开始/终态/派生)。前端失效任务列表/详情、关联证书详情(`activeTaskId`)、dashboard。
 - `task_log_appended { taskId, seq }` — 执行中新增日志。前端增量拉 `GET /tasks/{id}/logs?afterSeq=` 做进度。
-
-## 7. PRD/DB 缺口(architect 停止条件核查)
-
-- 无阻塞缺口。任务状态机、重试链(DT1)、软引用只读保留(DT3/Q2)、尽力取消(DT2)、不持策略/重试参数(DT5)、取消→证书回退(Q1→T21–T24)均已裁决且明确。任务只由 certificates 触发/失败重试派生(DEC5),故无手动建任务端点。

@@ -1,7 +1,7 @@
 # API 契约 · 备份同步(sync / WebDAV)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/sync.md §2 功能列表 / §4 数据来源 / §5 决策记录`(手动快照 DEC1 · 整目录快照 DEC2 · 整包加密 DEC3 · 口令分流 DEC4 · 覆盖式恢复 DEC5 · 独立远程目录 DEC6)· `database/sync.md`(sync_configs 单例)· 共用约定 [`common/conventions.md`](./common/conventions.md)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/sync.md §2 功能列表 / §4 数据来源 / §5 决策记录`(手动快照 DEC1 · 整目录快照 DEC2 · 整包加密 DEC3 · 口令分流 DEC4 · 覆盖式恢复 DEC5 · 独立远程目录 DEC6)· `database/sync.md`(sync_configs 单例)· 共用约定 [`common/conventions.md`](./common/conventions.md)。
 > **边界**:本模块只做「整目录快照 ↔ WebDAV」的传输与落法;快照**内容**(各业务表 / 密钥材料)的语义归各业务模块。WebDAV 登录口令经统一 SecretStore 存引用(project §7),库内只存 `password_ref`,**任何端点永不回传口令本体**;备份口令(`passphrase`)仅存在于请求体,绝不落盘 / 入库 / 入日志 / 响应。
 > **不含**:定时 / 自动备份触发(无调度端点)· 远端备份删除 · 备份内容的分模块读取。
 
@@ -35,7 +35,7 @@
 ```ts
 interface PutSyncConfigRequest {
   serverUrl: string;        // 服务器地址(http/https,不含备份目录;末尾斜杠归一)
-  remoteDir?: string;       // 远程目录;缺省 `autohttps/`;拒绝 `..` 与反斜杠(防路径穿越,DEC6)
+  remoteDir?: string;       // 远程目录;缺省 `autohttps`,首尾斜杠会归一化;拒绝 `..` 与反斜杠(防路径穿越,DEC6)
   username: string;
   password?: string;        // 口令三态:缺省 = 保留已存;"" = 清除(并删除旧密文);非空 = 重写为新引用
 }
@@ -102,7 +102,7 @@ interface RestoreRequest {
 interface SyncConfigView {
   configured: boolean;             // 是否已保存配置(单例存在)
   serverUrl: string | null;        // 服务器地址(展示/回填;不含远程目录)
-  remoteDir: string | null;        // 远程目录(展示/回填)
+  remoteDir: string | null;        // 远程目录(展示/回填;wire 值不含首尾斜杠)
   baseUrl: string | null;          // 拼好的完整远端目录 URL(serverUrl + remoteDir;实际请求目标)
   username: string | null;
   passwordSet: boolean;            // 口令是否已保存;本体永不回传
@@ -151,8 +151,3 @@ interface RestoreOutcome {
 - 恢复完成后的**生效**依赖应用重启(DEC5),非 SSE 驱动;前端据 `RestoreOutcome.requiresRestart` 提示。
 
 ---
-
-## 6. PRD/DB 缺口(architect 停止条件核查)
-
-- 无阻塞缺口。功能 A1–A4 / B1–B3 / C1–C3 均有端点承载;口令三态(保留 / 清除 / 重写)与「读取永不回传」在 PRD §2-A1 明确;`last_backup_*` 留痕字段由 database/sync §2 承载;远端过滤前缀、文件名时间戳格式、`passphrase` 最小长度(10)均有实现 / PRD 依据(DEC3 / DEC6)。
-- **提示**:`remoteDir` 默认值在 DTO 注释与 PRD 写作 `autohttps/`(含尾斜杠,展示口径),存储层归一为无尾斜杠(database/sync §2);两端口径差异仅展示层,不影响拼接(`baseUrl` 由服务端拼好返回)。

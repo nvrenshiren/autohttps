@@ -1,7 +1,7 @@
 # 数据库设计 · 自签根 CA(local-ca)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(DB)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/local-ca.md §4 数据来源`(DS1 根 CA / DS2 私钥 / DS3 作废记录)· `flows/local-ca.md`(根 CA 状态机 2 态 · 多根并存 LC6 · 不显式移除 LC5)· `TECH.md`(SeaORM 1.x / UUIDv7 / 枚举 §4.3 / 时间 RFC3339 / 敏感数据 AR4 / rcgen 0.14 · 决策5 注:MVP 作废=本地作废记录)。
+> 文档状态: draft · 层级: 技术契约(DB)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/local-ca.md §4 数据来源`(DS1 根 CA / DS2 私钥 / DS3 作废记录)· `flows/local-ca.md`(根 CA 状态机 2 态 · 多根并存 LC6 · 不显式移除 LC5)· `TECH.md`(SeaORM 1.x / UUIDv7 / 枚举 §4.3 / 时间 RFC3339 / 敏感数据 TECH.md §2 决策3 / rcgen 0.14 · 决策5 注:MVP 作废=本地作废记录)。
 > 类型口径见 [`certificates.md` 顶部](./certificates.md);全局 ER 见 [`_overview.md`](./_overview.md)。内网证书本体/状态归 certificates(走证书状态机,LC2),本模块不建证书表。
 
 ---
@@ -26,13 +26,13 @@
 | `id` | `TEXT·UUIDv7` | PK | 否 | 生成 | 根 CA 主键;被 `certificates.root_ca_id` / `internal_cert_revocations.root_ca_id` 引用 |
 | `name` | `TEXT` | NOT NULL | 否 | — | 根 CA 名称/标识(DS1/DS5;创建/导入录入) |
 | `status` | `TEXT·enum{active,expired}` | NOT NULL | 否 | `active` | 根 CA 状态机(flows §2.1,2 态);扫描判定 `active→expired`(L3);`expired` 拒绝新签发委托(§3.4) |
-| `creation_method` | `TEXT` | NOT NULL | 否 | — | 创建方式:`created`(新建)/`imported`(导入),DS1。**说明**:局部 2 值属性,非 §4.3 跨端状态枚举;沿 wire snake_case,如需前端强类型消费再经 architect 纳入 §4.3 |
+| `creation_method` | `TEXT` | NOT NULL | 否 | — | 创建方式:`created`(新建)/`imported`(导入),DS1。局部两值属性，不属于 §4.3 共享状态枚举。 |
 | `not_before` | `TEXT·RFC3339` | NOT NULL | 否 | — | 有效期生效时间(DS1) |
 | `not_after` | `TEXT·RFC3339` | NOT NULL | 否 | — | 有效期失效时间(DS1);扫描器据此判定 `expired`(L3) |
 | `serial_number` | `TEXT` | — | 是 | NULL | 根 CA 证书序列号(标识,DS1/A1) |
 | `fingerprint` | `TEXT` | — | 是 | NULL | 根 CA 证书指纹(标识,DS1/A1) |
 | `cert_pem` | `TEXT` | NOT NULL | 否 | — | 根 CA 证书本体 PEM(DS1;**公开**材料,非敏感,内联存储);导出(A4)与签发组链直接取用 |
-| `private_key_ref` | `TEXT` | NOT NULL | 否 | — | **根 CA 私钥存储位置引用**(DS2,敏感 AR4;敏感级高于叶子私钥,§4 敏感边界);密文落数据目录,**库内只存引用键** |
+| `private_key_ref` | `TEXT` | NOT NULL | 否 | — | **根 CA 私钥存储位置引用**(DS2,敏感 TECH.md §2 决策3;敏感级高于叶子私钥,§4 敏感边界);密文落数据目录,**库内只存引用键** |
 | `created_at` | `TEXT·RFC3339` | NOT NULL | 否 | now | 创建/导入时间(DS1) |
 | `updated_at` | `TEXT·RFC3339` | NOT NULL | 否 | now | 最近更新(状态推进等) |
 
@@ -44,7 +44,7 @@
 
 ### 2.2 根 CA 私钥敏感边界
 
-- `private_key_ref` 只存引用;根 CA 私钥泄露则其签出全部内网证书可被冒用,敏感级别最高(DS2 注),密文落数据目录、脱敏不入日志。`cert_pem`(公开)内联;私钥**绝不**内联/明文入库(AR4)。
+- `private_key_ref` 只存引用;根 CA 私钥泄露则其签出全部内网证书可被冒用,敏感级别最高(DS2 注),密文落数据目录、脱敏不入日志。`cert_pem`(公开)内联;私钥**绝不**内联/明文入库(TECH.md §2 决策3)。
 
 ---
 
@@ -87,7 +87,7 @@ erDiagram
         text serial_number
         text fingerprint
         text cert_pem "根 CA 证书本体(公开,内联)"
-        text private_key_ref "根 CA 私钥引用(敏感,AR4)"
+        text private_key_ref "根 CA 私钥引用(敏感,TECH.md §2 决策3)"
         text created_at "RFC3339"
     }
     INTERNAL_CERT_REVOCATIONS {
@@ -105,7 +105,7 @@ erDiagram
 
 ## 5. 纪律
 
-- **根 CA 私钥只存 `private_key_ref`**(AR4);`cert_pem`(公开)内联可存;不做含私钥导出(LC4)。
+- **根 CA 私钥只存 `private_key_ref`**(TECH.md §2 决策3);`cert_pem`(公开)内联可存;不做含私钥导出(LC4)。
 - **不复述证书状态**(LC2):内网证书状态/续签/到期/吊销走证书状态机,本模块只提供签发结果与作废标记,不建内网证书表。
-- **枚举照 §4.3**:根 CA 状态 `active`/`expired` 不自造;`creation_method` 为局部属性,已在 §2 标注治理路径。
+- **枚举照 §4.3**:根 CA 状态 `active`/`expired` 不自造;`creation_method` 是局部属性，不加入共享状态枚举。
 - 根 CA 无"进行中/即将到期"态(LC1/LC3);DB 仅两态,扫描驱动 `active→expired`(引用 flows,不复述)。

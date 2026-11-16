@@ -1,7 +1,7 @@
 # 业务流程与状态机 · ACME 签发(acme)
 
 > 文档状态: draft · 模块: acme · 端点: app · 撰写: product-manager
-> 信任基础: project.md(approved)§5/§6/§7/§9 · roles.md(operator 全权)· glossary.md(术语引用不复述)· flows/certificates.md + modules/certificates.md(证书主线已定:certificates 把"证明域名控制权"委托 acme)
+> 信任基础: project.md§5/§6/§7/§9 · roles.md(operator 全权)· glossary.md(术语引用不复述)· flows/certificates.md + modules/certificates.md(证书主线已定:certificates 把"证明域名控制权"委托 acme)
 > **单一出现原则**:本文件定义 **ACME 账户状态机** 与 **验证挑战状态机**;certificates / dashboard / tasks 等模块引用挑战状态但**不复述**其定义与流转。**证书状态机**归 flows/certificates.md,本文件引用不复述。
 
 ---
@@ -22,7 +22,7 @@ acme 负责"**证明域名控制权**"这一验证环节,以及为此所需的 *
 | 事项 | 归属模块 | 本模块的关系 |
 | --- | --- | --- |
 | 证书状态、有效期、签发 / 续签 / 吊销的编排、证书文件存储与到期提醒 | `certificates` | acme 被其**委托**执行域名验证与取证;只接收"验证哪些域名",把验证结果 / 取得的证书**交回**;证书状态机与生命周期归 certificates,不复述 |
-| 域名列表、域名与验证方式的**关联** | `domains` | acme 的验证对象是 domains 中已存在的域名;"某域名用哪种验证方式"的关联归 domains;acme 提供向导体验、执行挑战并持有执行参数(webroot 归 acme,已裁决 orchestrator 2026-07-16;见 modules/acme.md DEA5) |
+| 域名列表、域名与验证方式的**关联** | `domains` | acme 的验证对象是 domains 中已存在的域名;"某域名用哪种验证方式"的关联归 domains;acme 提供向导体验、执行挑战并持有执行参数(webroot 归 acme;见 modules/acme.md DEA5,决策已于 2026-07-16 确认) |
 | 签发 / 续签 / 吊销任务的队列、执行时间、日志、重试历史 | `tasks` | 挑战执行是签发 / 续签任务的一环;每次执行的时间 / 结果 / 日志留痕归 tasks;acme 推进挑战状态并把结果反映到任务 |
 | 默认 ACME 账户的指定 | `settings` | 签发时若未显式选账户,采用 settings 指定的默认账户;"哪个是默认"的设定归 settings,acme **消费**不定义 |
 | 红点 / 待处理高亮(如 DNS-01 等待手动添加 TXT) | `dashboard` | acme **提供**挑战状态数据(尤其"等待手动配置");提醒呈现归 dashboard |
@@ -186,9 +186,9 @@ stateDiagram-v2
 
 ---
 
-## 5. 决策记录(append-only)
+## 5. 决策记录
 
-> 只增不改;记"决定了什么 / 为什么不做另一选项"。模块 PRD 的决策记录与此互补(此处记流程 / 状态机相关决策)。
+> 记"决定了什么 / 为什么不做另一选项"。模块 PRD 的决策记录与此互补(此处记流程 / 状态机相关决策)。
 
 - **DA1(2026-07-16)· 验证挑战独立建模,不并入证书状态机**:挑战有独立生命周期(待验证 → 验证中 → 通过 / 失败),作为 certificates 签发 / 续签的委托子过程。
   - 为什么:验证是可失败、可能需人工介入(DNS-01 手动)的独立在线过程;独立建模才能承载"等待手动配置"与挑战级重试,且不污染证书状态机;certificates 只关心"验证是否通过"的最终结果,不感知挑战内部态。

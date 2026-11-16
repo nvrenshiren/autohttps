@@ -1,7 +1,7 @@
 # 页面 PRD · ACME 账户页(acme / accounts)
 
 > 文档状态: draft · 模块: acme · 端点: app · 撰写: product-manager
-> 信任基础: modules/acme.md(approved)§2.1-A1·A2·A3·A4·A5 / §3 页面定位 / §4-DS1·DS6 / §5-DEA3 · flows/acme.md(approved)§2 账户状态机(权威 AT1–AT5)/ §2.3 跨状态动作 / §4.1 · glossary.md(approved,ACME 账户 / CA / ACME)· roles.md(approved,operator 全权)
+> 信任基础: modules/acme.md§2.1-A1·A2·A3·A4·A5 / §3 页面定位 / §4-DS1·DS6 / §5-DEA3 · flows/acme.md§2 账户状态机(权威 AT1–AT5)/ §2.3 跨状态动作 / §4.1 · glossary.md(ACME 账户 / CA / ACME)· roles.md(operator 全权)
 > **引用不复述**:ACME 账户状态定义与流转(未配置 / 注册中 / 已注册 / 注册失败)见 flows/acme.md §2;术语见 glossary.md。本页引用不复述,仅锚定「各操作在哪些状态可发起」。
 
 ---

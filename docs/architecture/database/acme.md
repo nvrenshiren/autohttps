@@ -1,7 +1,7 @@
 # 数据库设计 · ACME 签发(acme)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(DB)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/acme.md §4 数据来源`(DS1 账户 / DS2 验证执行配置 / DS3 挑战记录)· `flows/acme.md`(账户状态机 4 态 · 验证挑战状态机 6 态,引用不复述)· `TECH.md`(SeaORM 1.x / UUIDv7 / 枚举 §4.3 / 时间 RFC3339 / 敏感数据 AR4 / instant-acme 0.8)。
+> 文档状态: draft · 层级: 技术契约(DB)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/acme.md §4 数据来源`(DS1 账户 / DS2 验证执行配置 / DS3 挑战记录)· `flows/acme.md`(账户状态机 4 态 · 验证挑战状态机 6 态,引用不复述)· `TECH.md`(SeaORM 1.x / UUIDv7 / 枚举 §4.3 / 时间 RFC3339 / 敏感数据 TECH.md §2 决策3 / instant-acme 0.8)。
 > 类型口径见 [`certificates.md` 顶部](./certificates.md);全局 ER 见 [`_overview.md`](./_overview.md)。
 
 ---
@@ -27,12 +27,12 @@
 | `id` | `TEXT·UUIDv7` | PK | 否 | 生成 | 账户主键;被 `certificates.acme_account_id` / `settings.default_acme_account_id` 引用 |
 | `directory_url` | `TEXT` | NOT NULL | 否 | — | ACME 目录端点 URL——**唯一标定"目标 CA + 环境"**(如 LE 生产/测试为不同 URL);instant-acme 据此建订单 |
 | `ca_label` | `TEXT` | — | 是 | NULL | CA 展示名(如 "Let's Encrypt",A2 呈现用) |
-| `environment` | `TEXT` | — | 是 | NULL | CA 环境展示标签(生产/测试,A2/DS1)。**说明**:为展示属性、由 `directory_url` 决定;非 §4.3 状态枚举,故存展示标签不设强类型枚举(如后续需强类型化,经 architect 走枚举变更入口纳入 §4.3) |
+| `environment` | `TEXT` | — | 是 | NULL | CA 环境展示标签(生产/测试,A2/DS1)。由 `directory_url` 决定，是展示属性，不属于 §4.3 共享状态枚举。 |
 | `contact_email` | `TEXT` | NOT NULL | 否 | — | 联系邮箱(DS1;MVP 单邮箱) |
 | `tos_agreed` | `BOOLEAN` | NOT NULL | 否 | `false` | 服务条款同意情况(DS1;注册前提,AT1) |
 | `status` | `TEXT·enum{unconfigured,registering,registered,registration_failed}` | NOT NULL | 否 | `registering` | ACME 账户状态机(flows §2.1)。**注**:`unconfigured` 为"无账户"的概念初始态(无行即此态),**持久化行不取 `unconfigured`**——新建行自 `registering` 起(AT1) |
 | `ca_account_url` | `TEXT` | — | 是 | NULL | CA 注册成功后返回的账户资源 URL(account kid);供复用账户签发(AT2 后回填) |
-| `account_key_ref` | `TEXT` | — | 是 | NULL | **账户密钥存储位置引用**(DS1,敏感 AR4);密钥材料密文落数据目录,**库内只存引用键**;密钥生成后写入 |
+| `account_key_ref` | `TEXT` | — | 是 | NULL | **账户密钥存储位置引用**(DS1,敏感 TECH.md §2 决策3);密钥材料密文落数据目录,**库内只存引用键**;密钥生成后写入 |
 | `registered_at` | `TEXT·RFC3339` | — | 是 | NULL | 注册成功时间(DS1;AT2 时写入) |
 | `last_error` | `TEXT` | — | 是 | NULL | 注册失败原因摘要(`registration_failed` 时展示,AT3) |
 | `created_at` | `TEXT·RFC3339` | NOT NULL | 否 | now | 创建时间 |
@@ -46,7 +46,7 @@
 
 ### 2.2 账户密钥敏感边界
 
-- `account_key_ref` 只存引用;账户密钥为敏感数据(project §7 / AR4),密文落数据目录(age 加密),**绝不明文入库/入日志**。移除账户(AT5)时按引用清除密钥材料。
+- `account_key_ref` 只存引用;账户密钥为敏感数据(project §7 / TECH.md §2 决策3),密文落数据目录(age 加密),**绝不明文入库/入日志**。移除账户(AT5)时按引用清除密钥材料。
 
 ---
 
@@ -93,7 +93,7 @@ HTTP-01 验证的 webroot 路径,按域名持有(DEA5:执行配置归 acme);DNS-
 
 ### 4.2 挑战数据敏感性
 
-- TXT 值 / HTTP 文件内容 / key authorization **非私钥、非账户密钥**,不属 AR4 敏感三类,可入库并展示(DNS-01 需展示 TXT 供用户复制)。真正敏感的账户密钥在 `acme_accounts.account_key_ref`。
+- TXT 值 / HTTP 文件内容 / key authorization 不是私钥或账户密钥，可入库并展示(DNS-01 需展示 TXT 供用户复制)。账户密钥只通过 `acme_accounts.account_key_ref` 关联加密材料；敏感数据存储规则见 TECH.md §2 决策3。
 
 ---
 
@@ -115,7 +115,7 @@ erDiagram
         boolean tos_agreed
         text status "enum 账户状态机 4 态"
         text ca_account_url
-        text account_key_ref "账户密钥引用(敏感,AR4)"
+        text account_key_ref "账户密钥引用(敏感,TECH.md §2 决策3)"
         text registered_at "RFC3339"
         text created_at "RFC3339"
     }
@@ -142,8 +142,8 @@ erDiagram
 
 ## 6. 纪律
 
-- **账户密钥只存 `account_key_ref`**(AR4):`acme_accounts` 无明文密钥列;密文落数据目录、脱敏不入日志(L6)。
+- **账户密钥只存 `account_key_ref`**(TECH.md §2 决策3):`acme_accounts` 无明文密钥列;密文落数据目录、脱敏不入日志(日志脱敏要求)。
 - **acme 不留存证书本体**(DEA4):取证后交回 certificates,本模块无证书文件/私钥列。
-- **枚举照 §4.3**:账户状态、挑战状态、验证方式类别取值不自造。`environment` 为展示标签(非 §4.3 枚举),已在 §2 标注治理路径。
+- **枚举照 §4.3**:账户状态、挑战状态、验证方式类别取值不自造。`environment` 是由 `directory_url` 决定的展示标签，不属于共享枚举。
 - **默认账户不在此存**:仅 settings 存"默认指向"(DS6 / settings DS4),acme 只提供候选、消费不定义。
 - DB 只落当前状态列;账户/挑战状态机流转(AT1–AT5 / CT1–CT10)由 core 服务层强制,引用 flows 不复述。

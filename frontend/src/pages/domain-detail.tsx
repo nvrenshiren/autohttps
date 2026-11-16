@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ChevronRight, Globe, Loader2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowUpRight, Globe, Loader2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 import { useDeleteDomain, useDomain, useUpdateDomain } from "@/lib/queries";
 import type { ValidationMethod } from "@/bindings";
 import { ApiError } from "@/lib/api";
@@ -12,7 +12,6 @@ import { ErrorState, EmptyState } from "@/components/shared/states";
 import { StatusBadge, statusLabel } from "@/components/status-badge";
 import { IssuanceMethodBadge, ValidationMethodBadge, WildcardBadge } from "@/components/shared/category-badges";
 import { Mono } from "@/components/shared/mono";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -43,27 +42,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { absoluteUtc, daysLabel, relativeTime } from "@/lib/time";
 import { toast } from "@/components/ui/sonner";
 
 const NONE = "__none__";
-
-function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[110px_1fr] items-center gap-2 py-1.5 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="min-w-0">{children}</span>
-    </div>
-  );
-}
 
 export function DomainDetailPage() {
   const { id = "" } = useParams();
@@ -143,12 +125,18 @@ export function DomainDetailPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-5 p-4 sm:p-6 lg:p-8">
+    <div className="mx-auto w-full max-w-[1440px] space-y-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={data.hostname}
         crumbs={[{ label: "域名", to: "/domains" }, { label: data.hostname }]}
         actions={
           <>
+            <Button asChild>
+              <Link to={`/certificates/issue?domainId=${encodeURIComponent(data.id)}`} aria-label={`为 ${data.hostname} 发起证书签发`}>
+                <ShieldCheck />
+                为此域名签发
+              </Link>
+            </Button>
             <Button variant="secondary" onClick={() => setEditOpen(true)}>
               <Pencil />
               编辑
@@ -175,89 +163,79 @@ export function DomainDetailPage() {
         }
       />
 
-      {/* 基本信息 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>基本信息</CardTitle>
-        </CardHeader>
-        <CardContent className="pb-6">
-          <InfoRow label="hostname">
-            <div className="flex items-center gap-2">
-              <Mono>{data.hostname}</Mono>
-              {data.isWildcard && <WildcardBadge />}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(280px,0.78fr)_minmax(0,1.22fr)]">
+        <section aria-labelledby="domain-profile-title" className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
+          <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+            <span className="inline-flex size-9 items-center justify-center rounded-md bg-accent text-primary"><Globe aria-hidden="true" className="size-[18px]" /></span>
+            <div>
+              <h2 id="domain-profile-title" className="text-sm font-semibold">域名资料</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">组织方式与验证偏好</p>
             </div>
-          </InfoRow>
-          <InfoRow label="分组">
-            {data.groupName ?? <span className="text-muted-foreground">未分组</span>}
-          </InfoRow>
-          <InfoRow label="验证方式">
-            <ValidationMethodBadge method={data.validationMethod} />
-          </InfoRow>
-          <InfoRow label="备注">
-            {data.remark ?? <span className="text-muted-foreground">—</span>}
-          </InfoRow>
-          <InfoRow label="创建">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-help text-muted-foreground">
-                  {relativeTime(data.createdAt)}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <Mono>{absoluteUtc(data.createdAt)}</Mono>
-              </TooltipContent>
-            </Tooltip>
-          </InfoRow>
-        </CardContent>
-      </Card>
+          </div>
+          <dl className="grid gap-x-5 gap-y-5 p-5 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="min-w-0">
+              <dt className="text-xs font-medium text-muted-foreground">主机名</dt>
+              <dd className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                <Mono className="max-w-full break-all">{data.hostname}</Mono>
+                {data.isWildcard && <WildcardBadge />}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">分组</dt>
+              <dd className="mt-1.5 text-sm">{data.groupName || <span className="text-muted-foreground">未分组</span>}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">验证方式</dt>
+              <dd className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+                <ValidationMethodBadge method={data.validationMethod} />
+                <Link to="/acme" className="rounded-sm text-xs text-link hover:text-link-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">前往 ACME 配置</Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">创建时间</dt>
+              <dd className="mt-1.5 text-sm">
+                <Tooltip><TooltipTrigger asChild><span className="cursor-help text-muted-foreground">{relativeTime(data.createdAt)}</span></TooltipTrigger><TooltipContent><Mono>{absoluteUtc(data.createdAt)}</Mono></TooltipContent></Tooltip>
+              </dd>
+            </div>
+            <div className="sm:col-span-2 xl:col-span-1">
+              <dt className="text-xs font-medium text-muted-foreground">备注</dt>
+              <dd className="mt-1.5 break-words text-sm leading-relaxed">{data.remark || <span className="text-muted-foreground">暂无备注</span>}</dd>
+            </div>
+          </dl>
+        </section>
 
-      {/* 关联证书投影 */}
-      <Card className="gap-0 overflow-hidden py-0">
-        <CardHeader className="border-b border-border py-4">
-          <CardTitle>关联证书({data.certificateCount})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
+        <section aria-labelledby="domain-certificates-title" className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
+          <div className="flex min-h-[66px] items-center justify-between gap-3 border-b border-border px-5 py-4">
+            <div>
+              <h2 id="domain-certificates-title" className="text-sm font-semibold">关联证书</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">{data.certificateCount} 张证书覆盖此域名</p>
+            </div>
+            <span className="inline-flex size-8 items-center justify-center rounded-md bg-muted text-muted-foreground"><ShieldCheck aria-hidden="true" className="size-4" /></span>
+          </div>
           {data.certificates.length === 0 ? (
-            <EmptyState
-              Icon={ShieldCheck}
-              title="无关联证书"
-              description="该域名尚未被任何证书关联。"
-            />
+            <EmptyState Icon={ShieldCheck} title="无关联证书" description="为此域名发起首次签发，证书会显示在这里。" action={<Button asChild size="sm"><Link to={`/certificates/issue?domainId=${encodeURIComponent(data.id)}`}><ShieldCheck />发起签发</Link></Button>} />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>状态</TableHead>
-                  <TableHead>签发方式</TableHead>
-                  <TableHead>到期</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.certificates.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="py-0">
-                      <Link
-                        to={"/certificates/" + c.id}
-                        aria-label={"查看 " + data.hostname + " 的证书详情：" + (c.issuanceMethod === "acme" ? "ACME" : "自签") + "，" + statusLabel(c.status)}
-                        className="inline-flex min-h-11 items-center rounded-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                      >
-                        <StatusBadge status={c.status} />
-                        <ChevronRight aria-hidden="true" className="ml-1 size-4 self-center text-link" />
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <IssuanceMethodBadge method={c.issuanceMethod} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {daysLabel(c.daysUntilExpiry)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <ul className="divide-y divide-border">
+              {data.certificates.map((certificate) => (
+                <li key={certificate.id} className="group">
+                  <Link
+                    to={`/certificates/${certificate.id}`}
+                    aria-label={`查看 ${data.hostname} 的证书详情：${certificate.issuanceMethod === "acme" ? "ACME" : "自签"}，${statusLabel(certificate.status)}`}
+                    className="flex min-h-[74px] flex-wrap items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
+                  >
+                    <span className="min-w-[104px]"><StatusBadge status={certificate.status} /></span>
+                    <span className="flex min-w-[94px] items-center gap-1.5"><IssuanceMethodBadge method={certificate.issuanceMethod} /></span>
+                    <span className="ml-auto flex min-w-[110px] items-center justify-end gap-1.5 text-xs text-muted-foreground">
+                      {certificate.notAfter ? <Tooltip><TooltipTrigger asChild><span className="cursor-help">{daysLabel(certificate.daysUntilExpiry)}</span></TooltipTrigger><TooltipContent><Mono>{absoluteUtc(certificate.notAfter)}</Mono></TooltipContent></Tooltip> : <span>尚未签发</span>}
+                      <ArrowUpRight aria-hidden="true" className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
-        </CardContent>
-      </Card>
+        </section>
+      </div>
 
       {/* 编辑对话框 */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

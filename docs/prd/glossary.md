@@ -1,7 +1,7 @@
 # 领域术语表 · autohttps
 
 > 文档状态: draft · 模块: project · 端点: app · 撰写: product-manager
-> 信任基础: project.md(approved)
+> 信任基础: project.md
 > **单一出现原则**:术语定义只写在本表;flow / 模块 PRD / 页面 PRD 引用术语但不复述定义。首建后仅增量。
 
 ---

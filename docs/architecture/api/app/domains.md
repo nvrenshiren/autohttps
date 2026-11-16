@@ -1,7 +1,7 @@
 # API 契约 · 域名管理(domains)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/domains.md §2 功能列表`(A1/A2 查、B1/B2/B3 维护、C1/C2 关联)· `flows/domains.md`(域名无独立状态机 DECD1 · 删除硬拦截 DECD3 · hostname 不可改 DECD2)· `database/domains.md` · 共用约定 [`common/conventions.md`](./common/conventions.md)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/domains.md §2 功能列表`(A1/A2 查、B1/B2/B3 维护、C1/C2 关联)· `flows/domains.md`(域名无独立状态机 DECD1 · 删除硬拦截 DECD3 · hostname 不可改 DECD2)· `database/domains.md` · 共用约定 [`common/conventions.md`](./common/conventions.md)。
 > **边界**:证书生命周期归 certificates;证书态为**投影**(只读);验证方式**类别**关联归本模块,webroot 执行配置归 acme(DEA5)。
 > **不含**:批量新增/删除、统计卡片(归 dashboard)、证书生命周期动作(归 certificates)、验证方式配置与执行(归 acme)、域名启停(无状态机)。
 
@@ -118,7 +118,3 @@ interface DomainCertificateRef {
 
 - **无独立状态机**(DECD1):域名对象一经创建即"存在",无生命周期流转,故无"状态机→端点"映射。
 - **本模块不发 SSE 事件**:域名增删改为 operator 同步动作,前端 react-query 于 mutation 成功即本地失效;**证书态投影的新鲜度**由 `certificate_status_changed` 驱动(前端收到后一并失效域名列表/详情的投影)。见 [`common/events.md`](./common/events.md)。
-
-## 6. PRD/DB 缺口(architect 停止条件核查)
-
-- 无阻塞缺口。功能列表、数据来源(DS1–DS4)、边界(DEA5 已裁决)明确;webroot 归 acme、类别关联归 domains 的切分清晰。

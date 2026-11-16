@@ -1,7 +1,7 @@
 # API 契约 · 跨模块共用约定(common)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `TECH.md §3 编码协议`(REST 风格 / camelCase / 枚举 snake_case / limit-offset 分页 / 错误包络 / RFC3339 UTC)· `TECH.md §4.3 枚举` · `ARCHITECTURE.md §3`(方案 A 统一 HTTP + SSE)· `ARCHITECTURE.md §9 / §11`(SSE 推送 + 轮询兜底;D4 无鉴权;D3 止于导出)· 8 份 DB 文档(实体 → DTO)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `TECH.md §3 编码协议`(REST 风格 / camelCase / 枚举 snake_case / limit-offset 分页 / 错误包络 / RFC3339 UTC)· `TECH.md §4.3 枚举` · `ARCHITECTURE.md §3`(方案 A 统一 HTTP + SSE)· `ARCHITECTURE.md §9 / §11`(SSE 推送 + 轮询兜底;D4 无鉴权;D3 止于导出)· 8 份 DB 文档(实体 → DTO)。
 > 本文件是**全部 API 契约文档的共用锚**:错误包络、HTTP 状态映射、分页/排序/过滤、无鉴权模型、导出交付形态差异统一在此;各模块 API 文档服从本约定。全局 SSE 事件流契约见 [`events.md`](./events.md)。
 
 ---
@@ -11,7 +11,7 @@
 - 前端**始终且只**经 **HTTP(REST)+ SSE**(推送)与后端通信;两形态(桌面回环 / 服务器)挂载**同一** axum Router,契约**只定义一次**。
 - **无 Tauri IPC 数据通道**:桌面的原生能力(托盘、原生保存对话框)由外壳承接,不承载业务数据读写(见 §5 导出)。
 - 所有 REST 端点只有一个端点面 `app`,契约落 `docs/architecture/api/app/{模块}.md`,跨模块共用落 `common/`。
-- DTO 由 `crates/api` 定义、经 **ts-rs** 派生 TS 到 `frontend/src/bindings/`;**枚举严禁前端手写字面量**,一律 import 自 bindings(TECH §4 / L1)。本文各 DTO 以 TS 形态示意,真相在 Rust。
+- DTO 由 `crates/api` 定义、经 **ts-rs** 派生 TS 到 `frontend/src/bindings/`;**枚举严禁前端手写字面量**,一律 import 自 bindings(TECH.md §4)。本文各 DTO 以 TS 形态示意,真相在 Rust。
 
 ---
 
@@ -131,7 +131,7 @@
 
 **导出前置(状态门控)**:仅"本地已存在证书文件"的证书可导出(certificates flows §2.4);对 `pending_issue` / `issuing` / `issue_failed` 证书导出 → `409 cert_not_exportable`。
 
-**私钥敏感边界**:导出端点是 `*_ref` 引用密钥材料的**唯一对外读取口**;库内绝不返回 `private_key_ref` / `account_key_ref` 本身,DTO 亦绝不含密钥字段(AR4 / L6)。私钥导出经风险确认(UI 提示 + `acknowledgeKeyExport=true` 编码已确认);根 CA 私钥永不导出(LC4)。
+**私钥敏感边界**:导出端点是 `*_ref` 引用密钥材料的**唯一对外读取口**;库内绝不返回 `private_key_ref` / `account_key_ref` 本身,DTO 亦绝不含密钥字段(TECH.md §2 决策3 / 日志脱敏要求)。私钥导出经风险确认(UI 提示 + `acknowledgeKeyExport=true` 编码已确认);根 CA 私钥永不导出(LC4)。
 
 ---
 
@@ -162,8 +162,8 @@ interface AppInfo { runMode: RunMode; appVersion: string }  // RunMode = 'deskto
 ## 7. 一致性红线(设计与实现须守)
 
 - **DTO 绝不暴露** `private_key_ref` / `account_key_ref` / 任何密钥材料;密钥仅经 §5 导出端点按引用读取。
-- **枚举取 TECH §4.3 wire 值**,不自造;前端 import 自 bindings(L1)。
+- **枚举取 TECH §4.3 wire 值**,不自造;前端 import 自 bindings(TECH.md §4)。
 - **资源命名唯一**:`/certificates` `/domains` `/acme/accounts` `/acme/challenges` `/root-cas` `/tasks` `/settings` `/dashboard` `/app-info` `/events`。
 - **动作 = POST 子资源**;各模块同构(签发 / 续签 / 吊销 / 重试 / 取消 / 导出)。
 - **一个全局 SSE 流**([`events.md`](./events.md)),各模块引用、不各造一套。
-- **时间 RFC3339 UTC / 分页 `{items,page,pageSize,total}` / 错误 `{error:{code,message,details}}`** 三协议定死不漂移(可沉淀为 protocolLints L2–L5)。
+- **时间 RFC3339 UTC / 分页 `{items,page,pageSize,total}` / 错误 `{error:{code,message,details}}`** 按 `TECH.md` 的共享约定执行。

@@ -1,7 +1,7 @@
 # 页面 PRD · 证书详情页(certificates / detail)
 
 > 文档状态: draft · 模块: certificates · 端点: app · 撰写: product-manager
-> 信任基础: modules/certificates.md(approved)§2.1-A2·B2·C1·C3·D1·D2·E1 / §3 页面定位 / §5-DEC1·DEC3 · flows/certificates.md(approved)§2.3 流转规则(权威)/ §2.4 跨状态动作 / §3 主流程 / §4-DC3 · glossary.md(approved)· roles.md(approved,operator 全权)
+> 信任基础: modules/certificates.md§2.1-A2·B2·C1·C3·D1·D2·E1 / §3 页面定位 / §5-DEC1·DEC3 · flows/certificates.md§2.3 流转规则(权威)/ §2.4 跨状态动作 / §3 主流程 / §4-DC3 · glossary.md· roles.md(operator 全权)
 > **引用不复述**:证书状态定义、流转规则(T1–T24)、跨状态动作见 flows/certificates.md §2;术语见 glossary.md。本页引用不复述,仅锚定「各操作在哪些状态可发起」。
 
 ---

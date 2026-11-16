@@ -1,7 +1,7 @@
 # 数据库设计 · 备份同步(sync / WebDAV)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(DB)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/sync.md §4 数据来源`(DS1 连接配置单份 / DS3 口令不持久)· §5 决策记录(口令分流 DEC4 · 覆盖式恢复 DEC5)· `TECH.md`(SeaORM 1.x / 时间 RFC3339 / SecretStore 引用口径)。
+> 文档状态: draft · 层级: 技术契约(DB)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/sync.md §4 数据来源`(DS1 连接配置单份 / DS3 口令不持久)· §5 决策记录(口令分流 DEC4 · 覆盖式恢复 DEC5)· `TECH.md`(SeaORM 1.x / 时间 RFC3339 / SecretStore 引用口径)。
 > 类型口径见 [`certificates.md` 顶部](./certificates.md);全局 ER 见 [`_overview.md`](./_overview.md)。
 
 ---

@@ -1,9 +1,9 @@
 # 系统架构 · autohttps
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术基线 · 端点: app · 撰写: architect
-> 信任基础: 全部 17 份 PRD 已 approved(2026-07-16)—— project / roles / glossary + 7 flows + 7 模块 PRD;本文件视其为真相直接使用,不复述业务定义。
-> 定位: 本文件是**全部代码产物的 DAG 上游**。批准前任何模块不得开工。与 [TECH.md](./TECH.md) 配套:ARCHITECTURE 定"系统怎么搭",TECH 定"用什么技术 + 编码协议"。
-> 纪律: 技术选型是用户决策;本文给方案 + 理由,有实质权衡者列入 [TECH.md §2 决策清单]。**§2 决策 1–10 已于 2026-07-16 由 orchestrator 全部确认(采纳 architect 推荐)**;本文相关处已落成"已确认"。本文不设计各模块表结构 / API 契约(基线批准后的下一步)。
+> 文档状态: draft · 层级: 技术基线 · 端点: app · 撰写: architect
+> 依据: `docs/prd/` 中的产品范围、角色、术语、流程和模块需求；本文件描述架构，不重复定义业务规则。
+> 定位: 本文件记录系统架构与运行形态;与 [TECH.md](./TECH.md) 配套,ARCHITECTURE 说明系统如何组织,TECH 说明采用的技术与共享协议。模块 API 和数据库细节分别见 `docs/architecture/api/` 与 `docs/architecture/database/`。
+> 决策: 架构与技术决策以当前正文为准;关键选择的理由见 [TECH.md §2](./TECH.md)。
 
 ---
 
@@ -77,9 +77,9 @@ graph TB
 
 ## 3. 关键架构决策:两形态如何共享一套前端(最关键)
 
-这是本基线**决定后续 API 契约形态**的决策(TECH §2-决策1)。**已确认方案 A(orchestrator, 2026-07-16)**。
+该决策确定了 API 契约与前端数据访问的统一方式(TECH §2-决策1)。**方案 A 于 2026-07-16 确认**。
 
-### 3.1 推荐方案 A · 统一 HTTP + SSE 传输 · 桌面内嵌同一服务
+### 3.1 当前方案 · 统一 HTTP + SSE 传输 · 桌面内嵌同一服务
 
 **两形态运行同一个 Rust HTTP + SSE 服务(axum)。前端是标准 SPA,永远只经 HTTP(REST)+ SSE(推送)通信。**
 
@@ -88,7 +88,7 @@ graph TB
 
 ```mermaid
 graph LR
-    subgraph A["方案 A（推荐）：统一 HTTP + SSE"]
+    subgraph A["当前方案：统一 HTTP + SSE"]
         FEa["同一 React SPA<br/>只有 HTTP + SSE 一条网络路径"]
         FEa -->|"服务器: 浏览器 → addr:port"| SVa["axum 服务"]
         FEa -->|"桌面: WebView → 127.0.0.1:port"| SVa
@@ -96,15 +96,15 @@ graph LR
     end
 ```
 
-**为什么推荐**:
+**采用原因**:
 - **单一传输、单一契约**:前端只有一层网络代码(HTTP + SSE),无 `invoke()` 与 `fetch()` 的形态分叉;API 契约**只定义一次**(REST + SSE)。直接落实 D1、把契约漂移面降到最低。
 - **实时天然统一**:5 台状态机的实时诉求(dashboard 红点、DNS-01 挑战"等待手动配置"待处理提示、任务进度/日志流)统一用 SSE 从同一服务推送,两形态行为一致(见 §9)。
 - **离线可用**:桌面回环服务无需外网即可跑(project §7 离线可用);ACME 在线签发才依赖外网,与本地服务解耦。
-- **契约形态影响**:据此,下一步 API 契约 = **REST + SSE**,产出于 `docs/architecture/api/app/{模块}.md`。
+- **契约形态影响**:API 统一采用 **REST + SSE**;模块契约见 `docs/architecture/api/app/{模块}.md`。
 
 **回环安全**:桌面服务仅绑 `127.0.0.1`,机外不可达,契合 D4(信任 = 网络可达性)+ 桌面单本机用户信任模型。可选加固(每会话 localhost token)MVP 按 D4 不做应用层鉴权,回环边界即安全边界。
 
-### 3.2 备选方案 B · 双传输(Tauri IPC + HTTP)
+### 3.2 未采用方案 · 双传输(Tauri IPC + HTTP)
 
 前端在桌面走 Tauri `invoke()` 命令 IPC、在服务器走 `fetch()` HTTP,以客户端抽象层屏蔽差异。
 
@@ -114,7 +114,7 @@ graph LR
 
 ### 3.3 结论
 
-**已确认方案 A(orchestrator, 2026-07-16)**。它是"共享一套前端"从页面层贯彻到传输层的唯一低漂移路径,且让 API 契约单一化。后续 API 契约按方案 A 的 REST + SSE 形态展开,不再切换;方案 B 留作记录。
+当前采用方案 A，让两种运行形态共用一套前端和 API 契约；方案 B 仅保留为未采用方案及其取舍记录。当前 API 文档按 REST + SSE 描述。
 
 ---
 
@@ -171,17 +171,17 @@ autohttps/
 │   └── desktop/                    # bin：Tauri v2 桌面壳（含 tauri.conf、图标、权限）
 ├── frontend/                       # React + Vite + TS SPA（两形态共用）
 │   └── src/
-│       ├── bindings/               # 由 core 生成的 TS 类型/枚举绑定（勿手改，见 TECH §4）
+│       ├── bindings/               # Rust 类型与枚举的 TypeScript 投影；按 TECH §4 同步维护
 │       ├── api/                    # 单一 HTTP + SSE 客户端层（react-query hooks + SSE）
-│       ├── components/ui/          # shadcn/ui 手写组件（遵 v4/React19 约定；设计 token 归 designer）
+│       ├── components/ui/          # shadcn/ui 手写组件（遵 v4/React19 约定；Token 来源见 docs/design）
 │       ├── stores/                 # zustand 客户端/UI 态（不含服务端数据，见 TECH §1.4）
 │       ├── pages/                  # 对应 pages/app/{模块}/{页面}
 │       └── ...
 ├── docs/
-│   ├── prd/                        # 上游 PRD（approved）
+│   ├── prd/                        # 产品需求、流程与页面契约
 │   └── architecture/               # 本层产出
-│       ├── database/{模块}.md       # DB 文档（字段说明 + Mermaid 关系图）——基线批准后逐模块产出
-│       └── api/app/{模块}.md        # API 契约（REST + SSE）——基线批准后逐模块产出
+│       ├── database/{模块}.md       # 按模块维护数据库契约（字段说明 + Mermaid 关系图）
+│       └── api/app/{模块}.md        # 按模块维护 REST + SSE 契约
 ├── ARCHITECTURE.md                 # 本文件
 └── TECH.md                         # 技术选型 + 编码协议
 ```
@@ -197,12 +197,12 @@ autohttps/
 ### 6.1 任务队列 + 执行器(tasks)
 
 - **队列即数据表**:任务状态机(`queued / running / succeeded / failed / cancelled`,tasks flow §3)本身就是持久队列——`queued` 行即待办队列,无需外部队列中间件。天然持久化、天然可查历史、天然崩溃可恢复。
-- **执行器**:tokio 异步 worker,以有界并发(信号量,上限属实现、architect 定)从 `queued` 取任务 → `running` → 委托 acme 验证 / 委托 local-ca 自签 / 与 CA 交互吊销 → `succeeded` / `failed`,并按 tasks §4 联动驱动证书状态。
+- **执行器**:每个进程运行单个 tokio worker,按 `queued_at` FIFO 取出任务 → `running` → 委托 acme 验证 / 委托 local-ca 自签 / 与 CA 交互吊销 → `succeeded` / `failed`,并按 tasks §4 联动驱动证书状态。DNS-01 任务进入人工等待时让出 worker,由确认请求继续执行。
 - **触发来源单一**:任务只由 certificates 触发或对失败任务重试派生(tasks DEC5);执行器不自建触发。
 - **重试 = 派生新任务**(tasks DT1),不回炉;执行器据此写重试链。
 - **无独立重试参数**:自动再尝试依附扫描器(下)+ settings 自动续签开关(settings SF2 / tasks DT5),执行器不持重试计时器。
 
-> 备选:引入 apalis 等任务框架。但其内建重试/调度模型与 PRD"任务不持重试参数、自动再尝试依附扫描"(SF2/DT5)相抵,反增适配成本;推荐自建轻量队列。列 TECH §2-决策7。
+> 当前采用自建轻量队列。外部任务框架的内建重试/调度模型与 PRD"任务不持重试参数、自动再尝试依附扫描"(SF2/DT5)不一致。技术决策见 TECH §2-决策7。
 
 ### 6.2 扫描调度器(certificates 拥有)
 
@@ -210,7 +210,7 @@ autohttps/
   - 启动即全量扫描(project §7 启动即检测,见 §7);
   - 周期扫描:驱动 `valid → expiring_soon`(T6)、`expiring_soon → expired`(T10)、根 CA `active → expired`(local-ca L3);
   - 依 settings 自动续签开关,对"即将到期"发起续签、对"续签失败且未过期"再尝试续签(触发 tasks 建新续签任务)。
-- **周期不可配**:扫描周期属实现机制,settings 不暴露旋钮(settings SF3);architect 定合理默认。
+- **周期不可配**:扫描周期属实现机制,settings 不暴露旋钮(settings SF3);当前实现每 60 秒扫描一次(`crates/core/src/scan/mod.rs`),调整时应同步更新实现说明。
 
 ### 6.3 二者协作
 
@@ -234,7 +234,7 @@ graph LR
 1. **任务崩溃恢复**(tasks §3.3 业务底线:进行中/排队任务不得永久卡死):
    - 对上一进程遗留在 `queued` 的任务:重新纳入队列执行。
    - 对遗留在 `running` 的任务(进程在执行中崩溃):**校正为 `failed`(可重试)**——因客户端无法确知在途 CA 操作是否已在对端生效(tasks DT2 尽力而为),置失败最诚实且不卡死;实际结果由随后的证书扫描据实校正(DT2 扫描校正)。
-   - > 具体恢复策略(能否续跑在途执行)是实现细节由 architect 定,业务底线是"不卡死、可被 operator 看到并处置";本基线取"running→failed 可重试 + 扫描校正"为默认策略,列 TECH §2-决策7。
+   - 当前恢复策略是将遗留 `running` 任务校正为可重试失败,重排 `queued` 任务,再由证书扫描校正实际状态(TECH §2-决策7)。任务不得永久卡住,结果须能由 operator 查看和处置。
 2. **启动即检测全量扫描**(project §7):certificates 立即扫描全部证书 → 驱动 T6/T10 到应有状态;local-ca 扫描全部根 CA → 驱动 L3;dashboard 首屏读取扫描后的最新状态。
 3. 依 settings 自动续签开关,对扫描判定为"即将到期 / 续签失败未过期"的证书发起自动续签(经任务队列)。
 4. 启动 axum 服务 + 扫描周期任务 + 任务执行器 → 开始对外服务。
@@ -266,20 +266,19 @@ graph LR
 
 ### 9.1 读路径(聚合视图)
 
-dashboard 是纯聚合、只读(dashboard DD1):它经 API 读 certificates 的证书状态 + tasks 的最近任务概况,聚合出三指标 + 待处理清单 + 红点。刷新要求仅为"呈现与证书当前状态一致"(dashboard §5),机制由 architect 定。
+dashboard 是纯聚合、只读(dashboard DD1):它经 API 读 certificates 的证书状态 + tasks 的最近任务概况,聚合出三指标 + 待处理清单 + 红点。当前使用 SSE 推送状态变更,前端以低频轮询兜底(见 §9.2)。
 
 ### 9.2 实时刷新机制(dashboard 红点 · TECH §2-决策8)
 
-- **推荐**:**SSE(Server-Sent Events)服务端推送 + 轮询兜底**。当扫描器推进状态、任务执行完成、或 DNS-01 挑战进入"等待手动配置"时,服务端经 SSE 向前端推送"状态已变"事件,前端刷新聚合;若 SSE 连接不可用则回退到低频轮询。
-  - 为什么 SSE:状态推送是**单向**(服务端 → 前端)诉求,SSE 原生 `EventSource`、自动重连、经 axum 实现简单、经回环与浏览器都通,足够覆盖红点 / 待处理 / 任务进度。
-- **备选**:WebSocket(双向,若后续需前端 → 服务端流式交互再上)/ 纯轮询(最简但实时性差、空转多)。
+- **当前机制**:**SSE(Server-Sent Events)服务端推送 + 轮询兜底**。扫描器推进状态、任务执行完成或 DNS-01 挑战进入"等待手动配置"时,服务端通过 SSE 通知前端刷新;SSE 不可用时由前端低频轮询。
+- 状态变更事件只通知资源发生变化,前端通过 react-query 重新读取 REST 数据,避免在 SSE 与 REST 之间维护两份业务状态。
 - 两形态一致:因统一走同一 axum 服务(§3),SSE/轮询在桌面(回环)与服务器(浏览器)行为相同。
 
 ---
 
 ## 10. 决策清单(指向 TECH.md §2)
 
-以下关键选型曾有实质权衡,**已于 2026-07-16 由 orchestrator 全部确认(采纳 architect 推荐)**;方案 + 备选 + 理由集中在 [TECH.md §2](./TECH.md),此处登记其架构决策身份与最终取定:
+以下关键选型已于 2026-07-16 确认；理由和版本基线集中在 [TECH.md §2](./TECH.md):
 
 1. 两形态传输统一方式(§3)——**已确认:方案 A 统一 HTTP + SSE**(桌面内嵌回环),决定 API 契约为 REST + SSE。
 2. 本地持久化访问层——**已确认:SQLite + SeaORM 1.x**。
@@ -290,7 +289,8 @@ dashboard 是纯聚合、只读(dashboard DD1):它经 API 读 certificates 的�
 7. 任务队列 + 崩溃恢复策略——**已确认:自建轻量队列(SQLite 表即队列)+ "running→failed 可重试 + queued 重排 + 扫描校正"**。
 8. dashboard 实时刷新——**已确认:SSE 推送 + 轮询兜底**(§9.2)。
 
-> 另含低风险项(TECH §2):决策 9 TS 版本线 **已确认 7.0(存疑回退 5.8)**、决策 10 实体 ID **已确认 UUIDv7**。
+9. TypeScript 版本线——**已确认 5.8**；`tsc --noEmit` 纳入前端构建检查。
+10. 实体 ID——**已确认 UUIDv7 文本 ID**。
 
 ---
 

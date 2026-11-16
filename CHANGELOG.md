@@ -17,7 +17,7 @@
 
 ### Changed
 
-- 设计表达统一遵循 COHESION 接入规范；移除重复维护的旧色板、玻璃材质样式和未登记的旧 HTML 原型。
+- 设计表达统一遵循逐科设计系统接入规范；移除重复维护的旧色板、玻璃材质样式和未登记的旧 HTML 原型。
 - 移除没有调用方的通用 `NotImplemented` 501 错误码及对应 TS 联合项。
 - 证书创建(证书 + SAN 关联)与删除(任务取消 + 关联清理 + 行删除)的库内多步写纳入事务,失败整体回滚;事件广播与文件清理移至提交之后。
 - CI 收紧:`cargo fmt --check` 与 `cargo clippy` 不再 `continue-on-error`,clippy 以 `--all-targets -D warnings` 作为硬门禁。

@@ -158,6 +158,7 @@ export interface DomainFilter {
   page?: number;
   pageSize?: number;
   group?: string;
+  certificateState?: string;
   hostname?: string;
   sort?: string;
   order?: string;
@@ -173,6 +174,7 @@ export function useDomains(f: DomainFilter) {
             page: f.page,
             pageSize: f.pageSize,
             group: f.group,
+            certificateState: f.certificateState,
             hostname: f.hostname,
             sort: f.sort,
             order: f.order,

@@ -1,7 +1,7 @@
 # 模块 PRD · ACME 签发(acme)
 
 > 文档状态: draft · 模块: acme · 端点: app · 撰写: product-manager
-> 信任基础: project.md(approved)§5/§6/§7/§9 · roles.md(operator 全权)· glossary.md · flows/acme.md(账户状态机 + 挑战状态机)· modules/certificates.md(委托边界)
+> 信任基础: project.md§5/§6/§7/§9 · roles.md(operator 全权)· glossary.md · flows/acme.md(账户状态机 + 挑战状态机)· modules/certificates.md(委托边界)
 > **引用不复述**:ACME 账户状态机、验证挑战状态机定义见 flows/acme.md;证书状态机见 flows/certificates.md;术语定义见 glossary.md;本文件引用不复述。
 
 ---
@@ -60,7 +60,7 @@ acme 是证书主线中"**证明域名控制权**"的落点模块。它对外提
 
 ## 4. 数据来源
 
-> 供 architect 作为唯一设计依据,用**业务语言**描述本模块涉及哪些数据及其来源;**不含**表结构 / 字段类型 / 存储机制 / API(由 architect 设计)。敏感数据(账户密钥)的具体存储机制由 architect 依 project §7 数据安全约束确定。
+> 本节以业务语言说明本模块数据的来源与归属,不定义表结构、字段类型或 API;相应技术契约见 `docs/architecture/`。敏感数据遵循 project §7 与 TECH §2-决策3。
 
 | # | 数据 | 来源 | 说明 |
 | --- | --- | --- | --- |
@@ -74,9 +74,9 @@ acme 是证书主线中"**证明域名控制权**"的落点模块。它对外提
 
 ---
 
-## 5. 决策记录(append-only)
+## 5. 决策记录
 
-> 只增不改;记"决定了什么 / 为什么不做另一选项"。与 flows/acme.md §5 互补(此处记模块 / 功能 / 数据相关决策)。
+> 记"决定了什么 / 为什么不做另一选项"。与 flows/acme.md §5 互补(此处记模块 / 功能 / 数据相关决策)。
 
 - **DEA1(2026-07-16)· 页面收敛为 2 页**:ACME 账户页 + 验证方式向导页(含挑战执行);不为 DNS-01 手动、HTTP-01 进度单列页面。
   - 为什么不拆:验证配置与其挑战执行在 DNS-01 首签本就连续,单列会割裂"配置方式"与"执行验证";自动续签遗留的手动挑战复用向导页的执行部分即可承接。若 CP2 设计发现单页过密,可再拆(属页面层决策)。
@@ -87,4 +87,4 @@ acme 是证书主线中"**证明域名控制权**"的落点模块。它对外提
 - **DEA4(2026-07-16)· acme 取证后交回,不留存证书本体**:acme 完成 ACME 订单取得证书即交回 certificates,自身不存储证书文件 / 私钥。
   - 为什么:证书的存储、状态、到期提醒、导出、吊销均归 certificates(其 DS6);acme 留存会造成双写与状态漂移。acme 仅持有账户密钥与挑战过程数据。
 - **DEA5(2026-07-16)· 验证方式的执行配置归 acme,域名↔方式的关联归 domains**:acme 提供向导与挑战执行、持有执行参数(HTTP-01 webroot 路径);"某域名用哪种验证方式"的关联落 domains(project §5)。
-  - 为什么:project §5 将"域名与验证方式的关联"划给 domains、"验证方式向导"划给 acme,据此切分。**已裁决(orchestrator, 2026-07-16):webroot 路径作为验证执行配置归 acme;domains 仅持"域名 ↔ 验证方式类别"关联。acme ↔ domains 边界对齐完成。**
+  - 为什么:project §5 将"域名与验证方式的关联"划给 domains、"验证方式向导"划给 acme,据此切分。**已确认(2026-07-16):webroot 路径归 acme;domains 仅持"域名 ↔ 验证方式类别"关联。**

@@ -1,7 +1,7 @@
 # 数据库设计 · 证书管理(certificates)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(DB)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/certificates.md §4 数据来源` · `flows/certificates.md`(证书状态机 10 态,引用不复述)· `TECH.md`(SeaORM 1.x / UUIDv7 文本 ID / 枚举 §4.3 / 时间 RFC3339 UTC / 敏感数据 AR4)· `ARCHITECTURE.md`(数据模型落 `crates/core/src/persistence/`)。
+> 文档状态: draft · 层级: 技术契约(DB)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/certificates.md §4 数据来源` · `flows/certificates.md`(证书状态机 10 态,引用不复述)· `TECH.md`(SeaORM 1.x / UUIDv7 文本 ID / 枚举 §4.3 / 时间 RFC3339 UTC / 敏感数据 TECH.md §2 决策3)· `ARCHITECTURE.md`(数据模型落 `crates/core/src/persistence/`)。
 > **certificates 是全局枢纽**:证书↔域名(SAN 多对多)、证书↔任务(一对多)、证书↔ACME 账户、证书↔根 CA 四类关系在此定义;跨模块全局 ER 与基数见 [`_overview.md`](./_overview.md)。
 
 ## 类型口径(SeaORM 1.x → SQLite,全 DB 文档统一)
@@ -10,8 +10,8 @@
 - `TEXT·enum{…}`:core `crates/core/src/domain/enums.rs` 单一定义,serde `rename_all="snake_case"`,wire 值严格照 **TECH §4.3**;SeaORM `DeriveActiveEnum`(`rs_type="String"`,`db_type="Text"`)。
 - `TEXT·RFC3339`:`time::OffsetDateTime`(SeaORM `TimeDateTimeWithTimeZone`),UTC,wire 为 RFC3339 字符串(TECH §3.5)。
 - `BOOLEAN`:SQLite 存 INTEGER 0/1。
-- `*_ref`:**存储位置引用**——敏感材料(私钥)密文落 settings 数据存储路径下,库内**只存引用键、绝不存明文**(AR4 / project §7);证书文件(公开)亦以文件引用落数据目录。
-- 审计列 `created_at`/`updated_at`(`TEXT·RFC3339`)为 architect 统一约定(全表);**无软删除列**——证书为硬删除(退出状态机,flows §2.4)。
+- `*_ref`:**存储位置引用**——敏感材料(私钥)密文落 settings 数据存储路径下,库内**只存引用键、绝不存明文**(TECH.md §2 决策3 / project §7);证书文件(公开)亦以文件引用落数据目录。
+- 审计列 `created_at`/`updated_at`(`TEXT·RFC3339`)在全业务表统一使用;**无软删除列**——证书为硬删除(退出状态机,flows §2.4)。
 
 ---
 
@@ -43,7 +43,7 @@
 | `not_after` | `TEXT·RFC3339` | — | 是 | NULL | 有效期失效时间(DS1);扫描器据此判定 `valid→expiring_soon`(T6)/`→expired`(T10) |
 | `issued_at` | `TEXT·RFC3339` | — | 是 | NULL | 最近一次成功签发/续签落地时间(DS1 签发时间;续签刷新,DC1) |
 | `cert_pem_ref` | `TEXT` | — | 是 | NULL | 叶子证书 + 证书链的存储位置引用(DS1/DS6);公开材料,落数据目录文件;未签发前为空 |
-| `private_key_ref` | `TEXT` | — | 是 | NULL | **私钥存储位置引用**(DS6,敏感 AR4);密钥材料密文落数据目录,**库内只存引用键**;导出时按引用读取 |
+| `private_key_ref` | `TEXT` | — | 是 | NULL | **私钥存储位置引用**(DS6,敏感 TECH.md §2 决策3);密钥材料密文落数据目录,**库内只存引用键**;导出时按引用读取 |
 | `last_error` | `TEXT` | — | 是 | NULL | 最近一次失败原因摘要(冗余自最近失败任务,便于列表/详情直显;完整日志归 tasks) |
 | `created_at` | `TEXT·RFC3339` | NOT NULL | 否 | now | 条目创建时间(T1 创建条目) |
 | `updated_at` | `TEXT·RFC3339` | NOT NULL | 否 | now | 最近状态/字段更新时间 |
@@ -121,7 +121,7 @@ erDiagram
         text not_after "RFC3339"
         text issued_at "RFC3339"
         text cert_pem_ref "证书文件引用"
-        text private_key_ref "私钥引用(敏感,AR4)"
+        text private_key_ref "私钥引用(敏感,TECH.md §2 决策3)"
         text created_at "RFC3339"
         text updated_at "RFC3339"
     }
@@ -135,12 +135,12 @@ erDiagram
     }
 ```
 
-> `..`(非识别关系)= 可空/软引用:`certificates.acme_account_id`、`certificates.root_ca_id` 为可空 FK;`tasks.certificate_id` 为软引用(证书硬删除后任务历史只读保留,tasks Q2/DEC3)。
+> `..`(非识别关系)= 可空/软引用:`certificates.acme_account_id`、`certificates.root_ca_id` 为可空 FK;`tasks.certificate_id` 为软引用(证书硬删除后任务历史只读保留,DT3 / modules/tasks DEC3)。
 
 ---
 
 ## 5. 敏感数据与状态机纪律
 
-- **私钥只存 `private_key_ref`**(AR4):`certificates` 无任何明文密钥列;私钥密文由 `crates/core/src/secrets/`(age 加密)落数据目录,库内仅引用键。证书文件(公开)以 `cert_pem_ref` 落数据目录。
-- **枚举照 TECH §4.3**:`status`、`issuance_method` 取值不自造;新增/改值须经 architect 改 `enums.rs` + 同步 §4.3 + 重新导出 TS。
+- **私钥只存 `private_key_ref`**(TECH.md §2 决策3):`certificates` 无任何明文密钥列;私钥密文由 `crates/core/src/secrets/`(age 加密)落数据目录,库内仅引用键。证书文件(公开)以 `cert_pem_ref` 落数据目录。
+- **枚举照 TECH §4.3**:`status`、`issuance_method` 取值不自造;新增/改值须更新 Rust 单一来源、TECH §4.3 与 TypeScript 投影。
 - **DB 只落当前状态列**:证书状态机流转(T1–T24)、取消回退等规则由 core 服务层强制,本文件引用 `flows/certificates.md` 不复述。

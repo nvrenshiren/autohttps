@@ -1,7 +1,7 @@
 # 模块 PRD · 总览仪表盘(dashboard)
 
 > 文档状态: draft · 模块: dashboard · 端点: app · 撰写: product-manager
-> 信任基础: project.md(approved)§1/§5/§6.2/§7 · roles.md(operator 全权)· glossary.md · flows/dashboard.md(聚合逻辑 + 红点规则)· flows/certificates.md(证书状态机)
+> 信任基础: project.md§1/§5/§6.2/§7 · roles.md(operator 全权)· glossary.md · flows/dashboard.md(聚合逻辑 + 红点规则)· flows/certificates.md(证书状态机)
 > **引用不复述**:证书状态机定义见 flows/certificates.md;聚合口径与红点触发规则见 flows/dashboard.md;术语见 glossary.md;本文件引用不复述。
 
 ---
@@ -62,7 +62,7 @@ MVP 单一角色 operator 对本模块全权(roles.md「查看总览 / 红点 / 
 
 ## 4. 数据来源
 
-> 供 architect 作为唯一设计依据,用**业务语言**描述本模块涉及哪些数据及其来源;**不含**表结构 / 字段类型 / 存储机制 / API(由 architect 设计)。本模块为纯聚合视图,以下数据**全部只读消费,不新增持久实体**。
+> 本节以业务语言说明本模块数据的来源与归属,不定义表结构、字段类型或 API;相应技术契约见 `docs/architecture/`。敏感数据遵循 project §7 与 TECH §2-决策3。 本模块为纯聚合视图,以下数据**全部只读消费,不新增持久实体**。
 
 | # | 数据 | 来源 | 说明 |
 | --- | --- | --- | --- |
@@ -71,13 +71,13 @@ MVP 单一角色 operator 对本模块全权(roles.md「查看总览 / 红点 / 
 | DS3 | 关联任务的执行结果与时间 | `tasks` | 待处理项(尤其失败类)关联其最近一次签发 / 续签任务的结果与时间,供「去排查失败原因 / 去处理」跳转;任务明细、日志、重试历史归 tasks,本模块只读展示概况、不复述 |
 | DS4 | 运行形态 | 运行时环境 | 决定红点载体的呈现差异(桌面 = 系统托盘角标 + 窗口内 / 服务器 = 浏览器内);属呈现依据,非本模块持久业务数据 |
 
-> **聚合基数(待 architect 关注)**:概览指标与待处理清单需覆盖**全部未删除证书**;三项指标口径(§2 / flows/dashboard.md §2)与红点触发集(flows/dashboard.md §3.1)须保持一致,避免出现「总览数字与待处理清单条数对不上」。刷新机制(实时 / 轮询 / 事件触发)由 architect 设计,业务要求仅为「呈现与证书当前状态一致」。
+> **聚合不变量**:概览指标与待处理清单覆盖**全部未删除证书**;指标、清单与红点使用同一待处理口径(§2 / flows/dashboard.md §2–3)。页面数据应随证书状态更新；实时刷新实现见 `ARCHITECTURE.md` §9。
 
 ---
 
-## 5. 决策记录(append-only)
+## 5. 决策记录
 
-> 只增不改;记「决定了什么 / 为什么不做另一选项」。与 flows/dashboard.md §6 互补(此处记模块 / 功能 / 数据 / 页面相关决策)。
+> 记「决定了什么 / 为什么不做另一选项」。与 flows/dashboard.md §6 互补(此处记模块 / 功能 / 数据 / 页面相关决策)。
 
 - **DD1(2026-07-16)· dashboard 为纯聚合视图,不产生核心实体**:证书状态来自 certificates、任务概况来自 tasks、域名经 certificates 携带;本模块只读聚合呈现。
   - 为什么不自持数据:project §5 定位其为「总览 + 红点 + 快速入口」;自建证书 / 任务副本会与源模块产生双真相与漂移,违反单一出现原则。

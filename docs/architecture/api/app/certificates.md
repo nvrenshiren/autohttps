@@ -1,7 +1,7 @@
 # API 契约 · 证书管理(certificates)
 
-> 文档状态: draft(待 orchestrator 统一送审)· 层级: 技术契约(API)· 端点: app · 撰写: architect
-> 依据(approved,唯一设计依据): `modules/certificates.md §2 功能列表`(A1/A2 查、B1/B2 签发、C1/C3 续签、D1/D2 吊销删除、E1 导出)· `flows/certificates.md`(证书状态机 10 态 · T1–T24)· `database/certificates.md`(实体→DTO)· 共用约定 [`common/conventions.md`](./common/conventions.md) · 全局事件 [`common/events.md`](./common/events.md)。
+> 文档状态: draft · 层级: 技术契约(API)· 端点: app · 撰写: architect
+> 依据(唯一设计依据): `modules/certificates.md §2 功能列表`(A1/A2 查、B1/B2 签发、C1/C3 续签、D1/D2 吊销删除、E1 导出)· `flows/certificates.md`(证书状态机 10 态 · T1–T24)· `database/certificates.md`(实体→DTO)· 共用约定 [`common/conventions.md`](./common/conventions.md) · 全局事件 [`common/events.md`](./common/events.md)。
 > **certificates 是全局枢纽**:证书↔域名(SAN)、证书↔任务、证书↔ACME 账户、证书↔根 CA 四类引用在此暴露为动作入参与 DTO。
 > **不含**(遵 DEC2):批量签发/吊销/删除、统计卡片(归 dashboard)、自动部署(D3)。
 
@@ -84,7 +84,7 @@ interface IssueCertificateRequest {
 
 - **适用**:非进行中态(`pending_issue`/`issue_failed`/`valid`/`expiring_soon`/`renewal_failed`/`expired`/`revoked`)。
 - 进行中态(`issuing`/`renewing`/`revoking`)→ `409 cert_in_progress_cannot_delete`(须先经 `POST /tasks/{id}/cancel` 取消其任务)。
-- **行为**:移除证书条目 + 本地证书/私钥文件(按 `*_ref` 清除密文);其**未完成任务**由 tasks 一并取消(`trigger=cleanup`,tasks §5.5);**历史任务只读保留**、软引用不级联(DT3/Q2)。**204**。
+- **行为**:移除证书条目 + 本地证书/私钥文件(按 `*_ref` 清除密文);其**未完成任务**由 tasks 一并取消(`trigger=cleanup`,tasks §5.5);**历史任务只读保留**、软引用不级联(DT3 / modules/tasks DEC3)。**204**。
 - 二次确认为 UI 职责,端点不设 `confirm` 参数。
 - 成功后 SSE `certificate_status_changed`(该证书退出)+ 关联 `task_status_changed`(清理取消)+ `dashboard_changed`。
 
@@ -132,7 +132,7 @@ interface AcmeAccountRef { id: string; caLabel: string | null; environment: stri
 interface RootCaRef { id: string; name: string }
 ```
 
-> **密钥边界**:DTO **无** `privateKeyRef`/`certPemRef`/任何密钥字段;证书链/私钥仅经 §2.8 导出端点按引用读取(AR4)。`acmeAccount`/`rootCa` 仅回投影引用,不泄露账户密钥/根 CA 私钥。
+> **密钥边界**:DTO **无** `privateKeyRef`/`certPemRef`/任何密钥字段;证书链/私钥仅经 §2.8 导出端点按引用读取(TECH.md §2 决策3)。`acmeAccount`/`rootCa` 仅回投影引用,不泄露账户密钥/根 CA 私钥。
 
 ---
 
@@ -184,7 +184,3 @@ interface RootCaRef { id: string; name: string }
 - 引发:`dashboard_changed`(证书进/出待处理集时,由聚合层合并发出)。
 
 ---
-
-## 7. PRD/DB 缺口(architect 停止条件核查)
-
-- **非阻塞·口径提示**:flows/certificates §3.5 正文含 `expired` 可吊销,但 §2.3 权威转移表无 `expired→revoking`(T8/T11/T16 仅 valid/expiring_soon/renewal_failed)。本契约按**权威转移表**设计 revoke 适用态、**未擅自新增** `expired→revoking`。建议 PM 校订 §3.5 正文或补 T 转移;不阻塞本契约交付。其余功能/数据来源明确,无阻塞缺口。

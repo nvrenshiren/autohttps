@@ -1,7 +1,7 @@
 # 页面 PRD · 证书列表页(certificates / list)
 
 > 文档状态: draft · 模块: certificates · 端点: app · 撰写: product-manager
-> 信任基础: modules/certificates.md(approved)§2.1-A1 / §3 页面定位 / §5-DEC2·DEC3·DEC4 · flows/certificates.md(approved)§2 证书状态机 · glossary.md(approved)· roles.md(approved,operator 全权)
+> 信任基础: modules/certificates.md§2.1-A1 / §3 页面定位 / §5-DEC2·DEC3·DEC4 · flows/certificates.md§2 证书状态机 · glossary.md· roles.md(operator 全权)
 > **引用不复述**:证书状态定义与流转见 flows/certificates.md §2;术语见 glossary.md。本页引用不复述。
 
 ---

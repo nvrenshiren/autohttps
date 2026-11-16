@@ -13,7 +13,7 @@ import { TASK_TYPES } from "@/bindings";
 import { api, ApiError } from "@/lib/api";
 import { canCancelTask, canRetryTask } from "@/lib/task-rules";
 import { PageHeader } from "@/components/shared/page-header";
-import { EmptyState, ErrorState, TableSkeletonRows } from "@/components/shared/states";
+import { EmptyState, ErrorState } from "@/components/shared/states";
 import { Pagination } from "@/components/shared/pagination";
 import { StatusBadge, statusLabel } from "@/components/status-badge";
 import { TaskTypeBadge, TaskTriggerBadge, taskTypeLabel } from "@/components/shared/category-badges";
@@ -21,6 +21,7 @@ import { Mono } from "@/components/shared/mono";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -29,14 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +52,6 @@ import { absoluteUtc, relativeTime } from "@/lib/time";
 import { toast } from "@/components/ui/sonner";
 
 const PAGE_SIZE = 20;
-const COLS = 6;
 const ALL = "all";
 const QUEUE = "queue"; // 聚合:排队 + 执行中(DEC1)
 
@@ -137,15 +129,15 @@ export function TasksListPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+    <div className="mx-auto w-full max-w-[1440px] p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="任务与历史"
-        description="签发 / 续签 / 吊销任务的队列与历史统一视图;失败可重试、进行中可取消。"
+        title="执行记录"
+        description="追踪签发、续签与吊销流程；失败任务可重试，进行中的任务可取消。"
       />
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
         {/* 工具栏(组合筛选:类型 / 状态 / 时间;关联证书经详情页跳入) */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-border bg-muted/25 p-3 sm:px-5">
           <Select
             value={type}
             onValueChange={(v) => {
@@ -222,6 +214,9 @@ export function TasksListPage() {
               清除筛选
             </Button>
           )}
+          <span className="ml-auto inline-flex min-h-9 items-center text-xs text-muted-foreground" aria-live="polite">
+            {data ? data.total + " 条记录" : ""}
+          </span>
         </div>
 
         {isError ? (
@@ -248,102 +243,49 @@ export function TasksListPage() {
             />
           )
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>类型</TableHead>
-                <TableHead>关联证书</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>触发</TableHead>
-                <TableHead>入队</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableSkeletonRows rows={6} cols={COLS} />
-              ) : (
-                items.map((t) => {
-                  const domains = t.certificateDomains ?? [];
-                  const primary = domains[0];
-                  const summary = t.status === "failed" ? t.failureReason : t.resultSummary;
-                  return (
-                    <TableRow key={t.id}>
-                      <TableCell className="py-0">
-                        <Link
-                          to={"/tasks/" + t.id}
-                          aria-label={"查看" + taskTypeLabel(t.taskType) + "任务详情" + (t.attemptNumber > 1 ? "，第 " + t.attemptNumber + " 次尝试" : "")}
-                          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-link hover:text-link-hover hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                        >
-                          <TaskTypeBadge type={t.taskType} />
-                          {t.attemptNumber > 1 && (
-                            <span className="text-xs text-muted-foreground">
-                              #{t.attemptNumber}
-                            </span>
-                          )}
-                          <ChevronRight aria-hidden="true" className="size-3.5 text-link" />
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {t.certificateDeleted ? (
-                          <Badge variant="neutral">证书已删除</Badge>
-                        ) : primary ? (
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <Mono className="max-w-[180px] truncate">{primary}</Mono>
-                              {domains.length > 1 && (
-                                <span className="text-xs text-muted-foreground">
-                                  +{domains.length - 1}
-                                </span>
-                              )}
-                            </div>
-                            {summary && (
-                              <div
-                                className={
-                                  "max-w-[220px] truncate text-xs " +
-                                  (t.status === "failed"
-                                    ? "text-danger-muted-foreground"
-                                    : "text-muted-foreground")
-                                }
-                              >
-                                {summary}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={t.status} />
-                      </TableCell>
-                      <TableCell>
-                        <TaskTriggerBadge trigger={t.trigger} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help">{relativeTime(t.queuedAt)}</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <Mono>{absoluteUtc(t.queuedAt)}</Mono>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell>
-                        <RowActions
-                          task={t}
-                          onView={() => navigate(`/tasks/${t.id}`)}
-                          onRetry={() => setConfirm({ task: t, kind: "retry" })}
-                          onCancel={() => setConfirm({ task: t, kind: "cancel" })}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+          <ol aria-label="任务队列与历史" className="divide-y divide-border">
+            {isLoading ? Array.from({ length: 6 }, (_, index) => (
+              <li key={index} className="flex min-h-[94px] items-center gap-4 px-4 py-4 sm:px-5">
+                <Skeleton className="size-9 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-3 w-64" /></div>
+                <Skeleton className="h-7 w-24" />
+              </li>
+            )) : items.map((task) => {
+              const domains = task.certificateDomains ?? [];
+              const primary = domains[0];
+              const summary = task.status === "failed" ? task.failureReason : task.resultSummary;
+              const detailLabel = "查看" + taskTypeLabel(task.taskType) + "任务详情" + (task.attemptNumber > 1 ? "，第 " + task.attemptNumber + " 次尝试" : "");
+              return (
+                <li key={task.id} className="group flex min-w-0 items-start gap-3 px-3 py-3 transition-colors hover:bg-muted/30 sm:gap-4 sm:px-5">
+                  <span aria-hidden="true" className="mt-2 inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground">
+                    <ListChecks className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1 py-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link to={"/tasks/" + task.id} aria-label={detailLabel} className="inline-flex min-h-8 items-center gap-1.5 rounded-sm text-link hover:text-link-hover focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring">
+                        <TaskTypeBadge type={task.taskType} />
+                        {task.attemptNumber > 1 && <span className="text-xs text-muted-foreground">第 {task.attemptNumber} 次</span>}
+                        <ChevronRight aria-hidden="true" className="size-3.5" />
+                      </Link>
+                      <StatusBadge status={task.status} />
+                      <TaskTriggerBadge trigger={task.trigger} />
+                    </div>
+                    <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      {task.certificateDeleted ? <Badge variant="neutral">证书已删除</Badge> : primary ? <><Mono className="max-w-[240px] truncate">{primary}</Mono>{domains.length > 1 && <span>+{domains.length - 1} 个域名</span>}</> : <span>未关联证书</span>}
+                      {summary && <span className="w-full truncate sm:w-auto sm:max-w-[360px]">{summary}</span>}
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild><span className="mt-2 inline-flex cursor-help text-xs text-muted-foreground">入队于 {relativeTime(task.queuedAt)}</span></TooltipTrigger>
+                      <TooltipContent><Mono>{absoluteUtc(task.queuedAt)}</Mono></TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="pt-0.5">
+                    <RowActions task={task} onView={() => navigate("/tasks/" + task.id)} onRetry={() => setConfirm({ task, kind: "retry" })} onCancel={() => setConfirm({ task, kind: "cancel" })} />
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         )}
 
         {data && data.total > PAGE_SIZE && (

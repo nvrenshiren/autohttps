@@ -121,9 +121,9 @@ function GatedButton({
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] items-start gap-2 py-1.5 text-sm">
-      <span className="pt-0.5 text-muted-foreground">{label}</span>
-      <span className="min-w-0">{children}</span>
+    <div className="min-w-0">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1.5 min-w-0 break-words text-sm">{children}</dd>
     </div>
   );
 }
@@ -240,75 +240,28 @@ export function CertificateDetailPage() {
   const inProgress = isInProgress(s);
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-5 p-4 sm:p-6 lg:p-8">
+    <div className="mx-auto w-full max-w-[1440px] space-y-5 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title={primary}
         crumbs={[{ label: "证书", to: "/certificates" }, { label: primary }]}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate(`/tasks?certificateId=${id}`)}
-            >
-              <ListChecks />
-              关联任务
-            </Button>
-            {data.issuanceMethod === "acme" && (
-              <Button
-                variant="outline"
-                onClick={() => navigate(`/certificates/${id}/challenges`)}
-              >
-                <BadgeCheck />
-                查看验证
-              </Button>
-            )}
-            <GatedButton
-              enabled={canRenew(s) && !busy}
-              reason="仅有效 / 即将到期 / 已过期 / 已吊销证书可续签"
-              onClick={() => runAction(`/certificates/${id}/renew`, "续签")}
-            >
-              <RotateCw />
-              续签
-            </GatedButton>
-            {canRetry(s) && (
-              <GatedButton
-                enabled={!busy}
-                reason=""
-                onClick={() => runAction(`/certificates/${id}/retry`, "重试")}
-              >
-                <RotateCw />
-                重试
-              </GatedButton>
-            )}
-            <GatedButton
-              enabled={isExportable(s) && !busy}
-              reason="尚无本地证书文件,不可导出"
-              onClick={openExport}
-            >
-              <Download />
-              导出
-            </GatedButton>
-            <GatedButton
-              enabled={canRevoke(s) && !busy}
-              reason="仅有效 / 即将到期 / 续签失败证书可吊销"
-              className="text-danger"
-              onClick={() => setConfirmRevoke(true)}
-            >
-              <Ban />
-              吊销
-            </GatedButton>
-            <GatedButton
-              enabled={canDelete(s) && !del.isPending}
-              reason="进行中态不可删除,请先取消其任务"
-              className="text-danger"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 />
-              删除
-            </GatedButton>
-          </div>
-        }
       />
+
+      <section aria-label="证书操作" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-card sm:p-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <StatusBadge status={s} />
+          <IssuanceMethodBadge method={data.issuanceMethod} />
+          {data.notAfter && <span className="hidden text-xs text-muted-foreground sm:inline">{daysLabel(data.daysUntilExpiry)}</span>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => navigate(`/tasks?certificateId=${id}`)}><ListChecks />关联任务</Button>
+          {data.issuanceMethod === "acme" && <Button variant="outline" onClick={() => navigate(`/certificates/${id}/challenges`)}><BadgeCheck />查看验证</Button>}
+          <GatedButton enabled={canRenew(s) && !busy} reason="仅有效 / 即将到期 / 已过期 / 已吊销证书可续签" variant={canRenew(s) ? "default" : "outline"} onClick={() => runAction(`/certificates/${id}/renew`, "续签")}><RotateCw />续签</GatedButton>
+          {canRetry(s) && <GatedButton enabled={!busy} reason="" onClick={() => runAction(`/certificates/${id}/retry`, "重试")}><RotateCw />重试</GatedButton>}
+          <GatedButton enabled={isExportable(s) && !busy} reason="尚无本地证书文件,不可导出" onClick={openExport}><Download />导出</GatedButton>
+          <GatedButton enabled={canRevoke(s) && !busy} reason="仅有效 / 即将到期 / 续签失败证书可吊销" className="text-danger" onClick={() => setConfirmRevoke(true)}><Ban />吊销</GatedButton>
+          <GatedButton enabled={canDelete(s) && !del.isPending} reason="进行中态不可删除,请先取消其任务" className="text-danger" onClick={() => setConfirmDelete(true)}><Trash2 />删除</GatedButton>
+        </div>
+      </section>
 
       {inProgress && (
         <Alert>
@@ -353,64 +306,68 @@ export function CertificateDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pb-6">
-          <InfoRow label="域名(SAN)">
-            <div className="flex flex-wrap gap-1.5">
-              {data.domains.map((d) => (
-                <span
-                  key={d.id}
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-0.5"
-                >
-                  <Mono>{d.hostname}</Mono>
-                  {d.isWildcard && <WildcardBadge />}
-                </span>
-              ))}
-            </div>
-          </InfoRow>
-          <InfoRow label="签发方式">
-            <div className="flex items-center gap-2">
-              <IssuanceMethodBadge method={data.issuanceMethod} />
-              {data.acmeAccount && (
-                <span className="text-xs text-muted-foreground">
-                  账户 {data.acmeAccount.caLabel ?? data.acmeAccount.id}
-                </span>
-              )}
-              {data.rootCa && (
-                <span className="text-xs text-muted-foreground">根 CA {data.rootCa.name}</span>
-              )}
-            </div>
-          </InfoRow>
-          <InfoRow label="序列号">
-            {data.serialNumber ? <Mono>{data.serialNumber}</Mono> : <span className="text-muted-foreground">—</span>}
-          </InfoRow>
-          <InfoRow label="指纹">
-            {data.fingerprint ? (
-              <Mono className="break-all">{data.fingerprint}</Mono>
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            )}
-          </InfoRow>
-          <InfoRow label="有效期">
-            {data.notAfter ? (
-              <div className="space-y-0.5">
-                <div>
-                  <Mono>{absoluteUtc(data.notBefore)}</Mono>
-                  <span className="mx-1 text-muted-foreground">→</span>
-                  <Mono>{absoluteUtc(data.notAfter)}</Mono>
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <InfoRow label="域名(SAN)">
+                <div className="flex flex-wrap gap-1.5">
+                  {data.domains.map((d) => (
+                    <span
+                      key={d.id}
+                      className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-0.5"
+                    >
+                      <Mono>{d.hostname}</Mono>
+                      {d.isWildcard && <WildcardBadge />}
+                    </span>
+                  ))}
                 </div>
-                <div className="text-xs text-muted-foreground">{daysLabel(data.daysUntilExpiry)}</div>
+              </InfoRow>
+            </div>
+            <InfoRow label="签发方式">
+              <div className="flex flex-wrap items-center gap-2">
+                <IssuanceMethodBadge method={data.issuanceMethod} />
+                {data.acmeAccount && (
+                  <span className="text-xs text-muted-foreground">
+                    账户 {data.acmeAccount.caLabel ?? data.acmeAccount.id}
+                  </span>
+                )}
+                {data.rootCa && (
+                  <span className="text-xs text-muted-foreground">根 CA {data.rootCa.name}</span>
+                )}
               </div>
-            ) : (
-              <span className="text-muted-foreground">未签发</span>
-            )}
-          </InfoRow>
-          <InfoRow label="签发时间">
-            {data.issuedAt ? <Mono>{absoluteUtc(data.issuedAt)}</Mono> : <span className="text-muted-foreground">—</span>}
-          </InfoRow>
-          <InfoRow label="创建 / 更新">
-            <span className="text-muted-foreground">
-              {relativeTime(data.createdAt)} · 更新 {relativeTime(data.updatedAt)}
-            </span>
-          </InfoRow>
+            </InfoRow>
+            <InfoRow label="序列号">
+              {data.serialNumber ? <Mono>{data.serialNumber}</Mono> : <span className="text-muted-foreground">—</span>}
+            </InfoRow>
+            <InfoRow label="指纹">
+              {data.fingerprint ? (
+                <Mono className="break-all">{data.fingerprint}</Mono>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+            </InfoRow>
+            <InfoRow label="有效期">
+              {data.notAfter ? (
+                <div className="space-y-0.5">
+                  <div>
+                    <Mono>{absoluteUtc(data.notBefore)}</Mono>
+                    <span className="mx-1 text-muted-foreground">→</span>
+                    <Mono>{absoluteUtc(data.notAfter)}</Mono>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{daysLabel(data.daysUntilExpiry)}</div>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">未签发</span>
+              )}
+            </InfoRow>
+            <InfoRow label="签发时间">
+              {data.issuedAt ? <Mono>{absoluteUtc(data.issuedAt)}</Mono> : <span className="text-muted-foreground">—</span>}
+            </InfoRow>
+            <InfoRow label="创建 / 更新">
+              <span className="text-muted-foreground">
+                {relativeTime(data.createdAt)} · 更新 {relativeTime(data.updatedAt)}
+              </span>
+            </InfoRow>
+          </dl>
         </CardContent>
       </Card>
 
